@@ -21,6 +21,7 @@ struct ObserverMenuView: View {
     @State private var showingRuntimeOwnerAdmitConfirmation = false
     @State private var showingRuntimeOwnerRecoverConfirmation = false
     @State private var showingRuntimeOwnerDeactivateConfirmation = false
+    @State private var showingRuntimeOwnerRolloverConfirmation = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -853,6 +854,17 @@ struct ObserverMenuView: View {
                 !model.runtimeOwnerCanAdmit
                     || model.runtimeOwnerOperationInProgress
             )
+            .confirmationDialog(
+                "Admit the Precision runtime and send one activate SET?",
+                isPresented: $showingRuntimeOwnerAdmitConfirmation
+            ) {
+                Button("Cancel", role: .cancel) {}
+                Button("Admit and send SET", role: .destructive) {
+                    Task { await model.confirmRuntimeOwnerAdmission() }
+                }
+            } message: {
+                Text("BetterTouchTool and Logi Options must be fully quit. This stops the current observer, opens the Precision runtime, and can change CID 00ED. After admit, Precision tap mutes and hold+scroll changes volume only when Audio test is on. Other buttons stay with the OS or BetterTouchTool. Deactivate before quit if you need Precision restored; quit does not send an inverse SET.")
+            }
 
             Button("Recover Precision…") {
                 showingRuntimeOwnerRecoverConfirmation = true
@@ -872,17 +884,6 @@ struct ObserverMenuView: View {
                 }
             } message: {
                 Text("BetterTouchTool and Logi Options must be fully quit. This stops the current observer and runs explicit Precision recover for CID 00ED. It can send one restore SET. It does not retry, re-admit, or inverse-SET on failure. Power-cycle first if you only needed the firmware default.")
-            }
-            .confirmationDialog(
-                "Admit the Precision runtime and send one activate SET?",
-                isPresented: $showingRuntimeOwnerAdmitConfirmation
-            ) {
-                Button("Cancel", role: .cancel) {}
-                Button("Admit and send SET", role: .destructive) {
-                    Task { await model.confirmRuntimeOwnerAdmission() }
-                }
-            } message: {
-                Text("BetterTouchTool and Logi Options must be fully quit. This stops the current observer, opens the Precision runtime, and can change CID 00ED. After admit, Precision tap mutes and hold+scroll changes volume only when Audio test is on. Other buttons stay with the OS or BetterTouchTool. Deactivate before quit if you need Precision restored; quit does not send an inverse SET.")
             }
 
             Button("Deactivate Precision…") {
@@ -906,13 +907,24 @@ struct ObserverMenuView: View {
             }
 
             Button("Release for session rollover…") {
-                Task { await model.completeRuntimeOwnerSessionRollover() }
+                showingRuntimeOwnerRolloverConfirmation = true
             }
             .controlSize(.small)
             .disabled(
                 !model.runtimeOwnerCanRollover
                     || model.runtimeOwnerOperationInProgress
             )
+            .confirmationDialog(
+                "Release the observer restart fence for a new session?",
+                isPresented: $showingRuntimeOwnerRolloverConfirmation
+            ) {
+                Button("Cancel", role: .cancel) {}
+                Button("Release the fence") {
+                    Task { await model.completeRuntimeOwnerSessionRollover() }
+                }
+            } message: {
+                Text("This discards the bound runtime owner and lifts the restart fence so the observer can start on a new connection. It sends no HID command and does not restore CID 00ED. If Precision may still be diverted on the hardware, recover it on the new connection before relying on the button.")
+            }
 
             Text("While admitted, Precision tap mutes and hold+scroll changes volume when Audio test is on. If the trackball disconnects, this app shuts down without a restore SET and shows recovery-required. After rollover, start the observer on the new connection, review readiness, bind, then confirm Recover Precision to send one restore SET. Reconnect never auto-retries. Other buttons stay with the OS/BetterTouchTool.")
                 .font(.caption2)

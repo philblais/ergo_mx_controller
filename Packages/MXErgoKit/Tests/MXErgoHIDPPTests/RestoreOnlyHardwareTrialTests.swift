@@ -642,12 +642,9 @@ import Testing
     #expect(try Data(contentsOf: fileURL) == Data("outside-writer".utf8))
 }
 
-@Test func restoreOnlyHardwareTrialOperationLeaseRejectsASecondProcess() async throws {
-    guard let harnessPath = ProcessInfo.processInfo.environment[
-        "MX_ERGO_CRASH_HARNESS_PATH"
-    ], !harnessPath.isEmpty else {
-        return
-    }
+@Test(.enabled(if: crashHarnessIsAvailable, missingCrashHarness))
+func restoreOnlyHardwareTrialOperationLeaseRejectsASecondProcess() async throws {
+    let harnessPath = try #require(crashHarnessPath)
 
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
         "restore-trial-operation-lock-\(UUID().uuidString)",

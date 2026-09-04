@@ -319,22 +319,29 @@ private enum MXErgoPrecisionTrialReconcilerMain {
         )
     }
 
+    /// Delegates to the canonical, unit-tested classifier in MXErgoHIDPP.
+    ///
+    /// This helper previously carried its own keyword list, which diverged from
+    /// the canonical rule in three ways: it never stripped punctuation, it
+    /// missed the `btt` and `btthelper` aliases, and it read
+    /// `localizedName ?? bundleIdentifier`, so a process with any localized
+    /// name had its bundle identifier ignored entirely. A single classifier
+    /// means the trial, the reconciler and the menu app cannot disagree about
+    /// whether it is safe to touch the device.
     private static func competingSoftware() -> [String] {
-        let ownPID = ProcessInfo.processInfo.processIdentifier
-        let keywords = [
-            "bettertouchtool",
-            "logi options",
-            "logioptions",
-            "mx ergo controller",
-            "mx ergo precision restore trial",
-            "mx ergo restore trial probe",
-        ]
-        return NSWorkspace.shared.runningApplications.compactMap { app in
-            guard app.processIdentifier != ownPID else { return nil }
-            let name = app.localizedName ?? app.bundleIdentifier ?? ""
-            let lowercased = name.lowercased()
-            return keywords.contains(where: { lowercased.contains($0) }) ? name : nil
+        let scanner = PrecisionCompetingProcessScanner {
+            NSWorkspace.shared.runningApplications.map { application in
+                PrecisionRunningApplicationSnapshot(
+                    processIdentifier: application.processIdentifier,
+                    bundleIdentifier: application.bundleIdentifier,
+                    localizedName: application.localizedName
+                )
+            }
         }
+        let competitors = (try? scanner.scan(
+            excludingProcessIdentifier: ProcessInfo.processInfo.processIdentifier
+        )) ?? []
+        return competitors.map(\.displayName)
     }
 
     private static var supportDirectory: URL {

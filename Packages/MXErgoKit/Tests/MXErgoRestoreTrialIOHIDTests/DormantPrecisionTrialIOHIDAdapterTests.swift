@@ -544,3 +544,115 @@ private func dormantOtherDevice(
         firmwareIdentity: device.firmwareIdentity
     )
 }
+
+// MARK: - Build-graph isolation
+
+/// This target is the one dormant adapter with a deliberate path into a signed
+/// binary: `project.yml` compiles its single source file directly into the
+/// `MXErgoPrecisionRestoreTrial` helper, bypassing the package graph entirely.
+///
+/// Every sibling dormant target can assert flat absence from the Xcode project.
+/// This one cannot, so it asserts something narrower and more useful: the file
+/// reaches exactly one target, that target is the trial helper, and the menu app
+/// never compiles it.
+@Test func restoreTrialAdapterIsProductlessAndReachesOnlyTheTrialHelper() throws {
+    let packageRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let projectRoot = packageRoot
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+
+    // 1. No package product, and exactly the expected manifest references.
+    let manifest = try String(
+        contentsOf: packageRoot.appendingPathComponent("Package.swift"),
+        encoding: .utf8
+    )
+    let products = try #require(
+        manifest.split(separator: "targets: [", maxSplits: 1).first
+    )
+    #expect(!products.contains("MXErgoRestoreTrialIOHID"))
+    #expect(manifest.components(
+        separatedBy: "\"MXErgoRestoreTrialIOHID\""
+    ).count - 1 == 2)
+    #expect(manifest.components(
+        separatedBy: "\"MXErgoRestoreTrialIOHIDTests\""
+    ).count - 1 == 1)
+
+    // 2. The XcodeGen manifest names the source exactly once, under the trial
+    //    helper and no other target.
+    let projectYAML = try String(
+        contentsOf: projectRoot.appendingPathComponent("project.yml"),
+        encoding: .utf8
+    )
+    #expect(projectYAML.components(
+        separatedBy: "MXErgoRestoreTrialIOHID"
+    ).count - 1 == 1)
+    let trialTargetBody = try #require(
+        projectYAML
+            .components(separatedBy: "  MXErgoPrecisionRestoreTrial:")
+            .dropFirst().first?
+            .components(separatedBy: "\n  MXErgo").first
+    )
+    #expect(trialTargetBody.contains(
+        "Sources/MXErgoRestoreTrialIOHID/DormantPrecisionTrialIOHIDAdapter.swift"
+    ))
+
+    // 3. The generated project compiles it into exactly one Sources phase, and
+    //    that phase is the trial helper's rather than the menu app's.
+    let projectFile = try String(
+        contentsOf: projectRoot
+            .appendingPathComponent("MXErgoController.xcodeproj")
+            .appendingPathComponent("project.pbxproj"),
+        encoding: .utf8
+    )
+    #expect(projectFile.components(
+        separatedBy: "DormantPrecisionTrialIOHIDAdapter.swift in Sources"
+    ).count - 1 == 2)  // one PBXBuildFile declaration, one build-phase entry
+
+    let sourcePhases = projectFile
+        .components(separatedBy: "isa = PBXSourcesBuildPhase;")
+        .dropFirst()
+    let compilingPhases = sourcePhases.filter {
+        $0.contains("DormantPrecisionTrialIOHIDAdapter.swift in Sources")
+    }
+    #expect(compilingPhases.count == 1)
+    let trialPhase = try #require(compilingPhases.first)
+    #expect(trialPhase.contains("MXErgoPrecisionRestoreTrialMain.swift in Sources"))
+    #expect(!trialPhase.contains("AppModel.swift in Sources"))
+
+    let menuAppPhases = sourcePhases.filter {
+        $0.contains("AppModel.swift in Sources")
+    }
+    #expect(menuAppPhases.count == 1)
+    let menuAppPhase = try #require(menuAppPhases.first)
+    #expect(!menuAppPhase.contains("DormantPrecisionTrialIOHIDAdapter.swift"))
+
+    // 4. The adapter keeps exactly one output door and no discovery, lifetime,
+    //    retry, or escalation capability.
+    let adapterSource = try String(
+        contentsOf: packageRoot.appendingPathComponent(
+            "Sources/MXErgoRestoreTrialIOHID/DormantPrecisionTrialIOHIDAdapter.swift"
+        ),
+        encoding: .utf8
+    )
+    #expect(adapterSource.components(
+        separatedBy: "IOHIDDevice" + "SetReport"
+    ).count - 1 == 1)
+    let forbiddenAdapterTokens = [
+        "IOHID" + "Manager",
+        "IOHIDDevice" + "Open",
+        "IOHIDDevice" + "Close",
+        "IOHIDDevice" + "RegisterInputReportCallback",
+        "@" + "main",
+        "Process(",
+        "URLSession",
+        "public ",
+        "package ",
+        "@_spi",
+    ]
+    for forbidden in forbiddenAdapterTokens {
+        #expect(!adapterSource.contains(forbidden))
+    }
+}

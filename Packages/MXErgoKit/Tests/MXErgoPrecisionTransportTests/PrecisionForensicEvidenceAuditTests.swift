@@ -1,8 +1,9 @@
 import Foundation
 import Testing
 
-@Test func preservedPrecisionEvidencePassesTheOfflineAudit() throws {
-    guard let directory = preservedEvidenceDirectory() else { return }
+@Test(.enabled(if: preservedEvidenceIsAvailable, missingPreservedEvidence))
+func preservedPrecisionEvidencePassesTheOfflineAudit() throws {
+    let directory = try #require(preservedEvidenceDirectoryURL)
 
     let report = try PrecisionForensicEvidenceAudit.audit(
         locations: PrecisionForensicEvidenceLocations(directory: directory),
@@ -20,8 +21,9 @@ import Testing
     #expect(report.probeCompletedAt < report.reconciliationCompletedAt)
 }
 
-@Test func forensicAuditRejectsEveryCriticalFieldMutationEvenWhenItsFileHashIsRepinned() throws {
-    guard let source = preservedEvidenceDirectory() else { return }
+@Test(.enabled(if: preservedEvidenceIsAvailable, missingPreservedEvidence))
+func forensicAuditRejectsEveryCriticalFieldMutationEvenWhenItsFileHashIsRepinned() throws {
+    let source = try #require(preservedEvidenceDirectoryURL)
 
     let mutations: [(String, (inout [String: Any]) -> Void)] = [
         ("probe-function", { json in
@@ -97,8 +99,9 @@ import Testing
     }
 }
 
-@Test func forensicAuditRejectsSymlinkedEvidence() throws {
-    guard let source = preservedEvidenceDirectory() else { return }
+@Test(.enabled(if: preservedEvidenceIsAvailable, missingPreservedEvidence))
+func forensicAuditRejectsSymlinkedEvidence() throws {
+    let source = try #require(preservedEvidenceDirectoryURL)
     let fixture = try copiedEvidenceFixture(source: source, name: "symlink")
     let locations = PrecisionForensicEvidenceLocations(directory: fixture)
     let original = fixture.appendingPathComponent("live-original.json")
@@ -137,14 +140,49 @@ private func verifyTrialMutation(
     }
 }
 
-private func preservedEvidenceDirectory() -> URL? {
-    guard let path = ProcessInfo.processInfo.environment[
+/// Resolves the directory the forensic audit runs against.
+///
+/// `MX_ERGO_FORENSIC_EVIDENCE_DIRECTORY` overrides everything, so the audit can
+/// be pointed at the live Application Support directory. Otherwise it falls back
+/// to the tracked `Evidence/2026-08-30` fixtures, which are byte-identical
+/// copies of that directory taken while its hashes still matched this profile.
+///
+/// The fallback is what makes this audit real coverage on every machine. When
+/// the only source was the environment variable, all three tests returned early
+/// and reported as passing without verifying anything.
+private let preservedEvidenceDirectoryURL: URL? = {
+    if let path = ProcessInfo.processInfo.environment[
         "MX_ERGO_FORENSIC_EVIDENCE_DIRECTORY"
-    ], !path.isEmpty else {
+    ], !path.isEmpty {
+        return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()  // MXErgoPrecisionTransportTests
+        .deletingLastPathComponent()  // Tests
+        .deletingLastPathComponent()  // MXErgoKit
+        .deletingLastPathComponent()  // Packages
+        .deletingLastPathComponent()  // repository root
+    let tracked = repositoryRoot
+        .appendingPathComponent("Evidence", isDirectory: true)
+        .appendingPathComponent("2026-08-30", isDirectory: true)
+
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(
+        atPath: tracked.path,
+        isDirectory: &isDirectory
+    ), isDirectory.boolValue else {
         return nil
     }
-    return URL(fileURLWithPath: path, isDirectory: true)
-}
+    return tracked
+}()
+
+private let preservedEvidenceIsAvailable = preservedEvidenceDirectoryURL != nil
+
+private let missingPreservedEvidence: Comment = """
+No preserved evidence directory. Restore Evidence/2026-08-30 or set \
+MX_ERGO_FORENSIC_EVIDENCE_DIRECTORY to the live Application Support directory.
+"""
 
 private func copiedEvidenceFixture(source: URL, name: String) throws -> URL {
     let destination = FileManager.default.temporaryDirectory

@@ -351,7 +351,7 @@ private actor LivePrecisionRestoreTransport: RestoreOnlyHardwareTrialTransport {
             pending = nil
             phase = .setAcknowledged
             continuation.resume(returning: message)
-        case let .acknowledgementMismatch(requestID):
+        case let .acknowledgementMismatch(requestID, _):
             fail(
                 requestID: requestID,
                 error: PrecisionRestoreTrialHelperError.acknowledgementMismatch
@@ -658,20 +658,28 @@ private enum MXErgoPrecisionRestoreTrialMain {
         )
     }
 
+    /// Delegates to the canonical, unit-tested classifier in MXErgoHIDPP.
+    ///
+    /// This helper is the only binary in the project that can dispatch a SET,
+    /// so a competitor rule that disagrees with the menu app's is the worst
+    /// possible divergence. The previous inline rule never stripped
+    /// punctuation, so it required the literal substring "logi options" and
+    /// matched neither "LogiOptions" nor the `btt` / `btthelper` aliases, and
+    /// it recognised only its own bundle plus the menu app rather than the
+    /// whole com.phib.MXErgo family.
     private static func ensureCompetingSoftwareIsStopped() throws {
-        let forbidden = NSWorkspace.shared.runningApplications.compactMap { app -> String? in
-            guard app.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
-                return nil
+        let scanner = PrecisionCompetingProcessScanner {
+            NSWorkspace.shared.runningApplications.map { application in
+                PrecisionRunningApplicationSnapshot(
+                    processIdentifier: application.processIdentifier,
+                    bundleIdentifier: application.bundleIdentifier,
+                    localizedName: application.localizedName
+                )
             }
-            let bundle = app.bundleIdentifier?.lowercased() ?? ""
-            let name = app.localizedName?.lowercased() ?? ""
-            let isCompeting = bundle == "com.phib.mxergocontroller"
-                || bundle.contains("bettertouchtool")
-                || name.contains("bettertouchtool")
-                || name.contains("logi options")
-                || name.contains("logitech options")
-            return isCompeting ? (app.localizedName ?? bundle) : nil
         }
+        let forbidden = try scanner.scan(
+            excludingProcessIdentifier: ProcessInfo.processInfo.processIdentifier
+        ).map(\.displayName)
         guard forbidden.isEmpty else {
             throw PrecisionRestoreTrialHelperError.competingSoftwareRunning(
                 forbidden.sorted()

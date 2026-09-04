@@ -116,12 +116,9 @@ import Testing
     }
 }
 
-@Test func hardKilledWriterLeavesRecoverableWriteAheadJournalForFreshCoordinator() async throws {
-    guard let harnessPath = ProcessInfo.processInfo.environment[
-        "MX_ERGO_CRASH_HARNESS_PATH"
-    ], !harnessPath.isEmpty else {
-        return
-    }
+@Test(.enabled(if: crashHarnessIsAvailable, missingCrashHarness))
+func hardKilledWriterLeavesRecoverableWriteAheadJournalForFreshCoordinator() async throws {
+    let harnessPath = try #require(crashHarnessPath)
 
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -1162,3 +1159,25 @@ private func paddedTransactionBytes(_ prefix: [UInt8]) -> [UInt8] {
         count: HIDPP20LongMessage.parameterCount - prefix.count
     )
 }
+
+/// Path to the built `MXErgoTransactionCrashHarness` executable.
+///
+/// `scripts/verify.sh` builds it and exports this variable. Without it these
+/// subprocess tests cannot run, so they report as skipped rather than passing
+/// silently — a hard-kill durability test that quietly does nothing is worse
+/// than no test at all.
+let crashHarnessPath: String? = {
+    guard let path = ProcessInfo.processInfo.environment[
+        "MX_ERGO_CRASH_HARNESS_PATH"
+    ], !path.isEmpty else {
+        return nil
+    }
+    return path
+}()
+
+let crashHarnessIsAvailable = crashHarnessPath != nil
+
+let missingCrashHarness: Comment = """
+MX_ERGO_CRASH_HARNESS_PATH is not set. Run scripts/verify.sh, which builds \
+MXErgoTransactionCrashHarness and exports its path.
+"""

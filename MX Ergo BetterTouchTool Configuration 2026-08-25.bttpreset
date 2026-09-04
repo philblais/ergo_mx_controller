@@ -1,0 +1,487 @@
+{
+  "BTTPresetName" : "Default",
+  "BTTPresetColor" : "206.550000, 121.003875, 59.899500, 255.000000",
+  "BTTPresetUUID" : "0A3D1E45-C60D-4D2D-A747-09BA4AF2AB9D",
+  "BTTPresetContent" : [
+    {
+      "BTTAppBundleIdentifier" : "BT.G",
+      "BTTAppName" : "Global",
+      "BTTAppAutoInvertIcon" : 1,
+      "BTTTriggers" : [
+        {
+          "BTTLastUpdatedAt" : 1787693972.4571428,
+          "BTTIsPureAction" : true,
+          "BTTUUID" : "5EC0255A-5F62-49D5-9CAB-4B6C4610AE9C",
+          "BTTPredefinedActionType" : 25,
+          "BTTPredefinedActionName" : "Volume Down",
+          "BTTOrder" : 0
+        },
+        {
+          "BTTLastUpdatedAt" : 1787693320.598557,
+          "BTTTriggerType" : 1324,
+          "BTTTriggerTypeDescriptionReadOnly" : "Logitech Mouse Configuration",
+          "BTTTriggerTypeDescription" : "MX Ergo device access",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "A3F5F836-BA08-4EF4-ABE7-7C0163D57760",
+          "BTTOrder" : 0,
+          "BTTAdditionalDataJSON" : {
+            "BTTLogitechMouseName" : "MX Ergo Multi-Device Trackball",
+            "BTTLogitechDPI" : 2000,
+            "BTTLogitechMouseNameSelector" : "MX Ergo Multi-Device Trackball",
+            "BTTLogitechMouseSpeed" : 2.5,
+            "BTTLogitechMouseAcceleration" : 10,
+            "BTTLogitechMakeButtonsAvailableToBTT" : true
+          },
+          "BTTGestureNotes" : "MX Ergo device access"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787693972.414367,
+          "BTTIsPureAction" : true,
+          "BTTUUID" : "C75B4A67-596F-408C-A022-D54DF90A2368",
+          "BTTPredefinedActionType" : 24,
+          "BTTPredefinedActionName" : "Volume Up",
+          "BTTOrder" : 0
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.076519,
+          "BTTTriggerType" : 1341,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Zoom In / Out (like Trackpad)",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "975279FA-A804-40A3-A08E-138E6CB197F7",
+          "BTTRequiredModifierKeys" : 262144,
+          "BTTOrder" : 1,
+          "BTTAdditionalDataJSON" : {
+            "BTTScrollModifierUseHorizontalAxis" : 0,
+            "BTTScrollModifierAccelerationFactor" : 2.1000000000000001,
+            "BTTScrollModifierBaseMultiplier" : 1,
+            "BTTScrollModifierDeadZone" : 0.001,
+            "BTTScrollModifierRequiredKeys" : 262144,
+            "BTTScrollModifierDuration" : 0.14999999999999999,
+            "BTTScrollModifierEmaAlpha" : 0.29999999999999999,
+            "BTTScrollModifierInvertDirection" : 0,
+            "BTTScrollModifierMaxRotation" : 15,
+            "BTTScrollModifierInputTimeout" : 0.14999999999999999,
+            "BTTScrollModifierSensitivity" : 0.5,
+            "BTTScrollModifierOnlyRegularMouse" : 1
+          }
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.0752349,
+          "BTTTriggerType" : 1343,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Space Switch Swipe (like Trackpad)",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "06DB0CB1-97BC-4E3C-BE3A-906DED6655E9",
+          "BTTRequiredModifierKeys" : 262144,
+          "BTTOrder" : 2,
+          "BTTAdditionalDataJSON" : {
+            "BTTScrollModifierCompletionThreshold" : 0.40000000000000002,
+            "BTTScrollModifierOnlyRegularMouse" : 1,
+            "BTTScrollModifierInvertDirection" : 0,
+            "BTTScrollModifierUseHorizontalAxis" : 1,
+            "BTTScrollModifierRequiredKeys" : 262144,
+            "BTTScrollModifierDeadZone" : 0.001,
+            "BTTScrollModifierDuration" : 0.20000000000000001,
+            "BTTScrollModifierSensitivity" : 0.0016666666666666668,
+            "BTTScrollModifierInputTimeout" : 0.20000000000000001
+          }
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.071943,
+          "BTTTriggerType" : 1339,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Smooth Scrolling (like Trackpad)",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "D01279AE-B816-48DE-ACBC-B945D2E50F0D",
+          "BTTOrder" : 3,
+          "BTTAdditionalDataJSON" : {
+            "BTTScrollModifierOnlyRegularMouse" : 1,
+            "BTTScrollModifierSmoothness" : 0.5,
+            "BTTScrollModifierSlowWheelTickDistance" : 8,
+            "BTTScrollModifierSpeedHorizontal" : 3,
+            "BTTScrollModifierSubPixelBoost" : 1,
+            "BTTScrollModifierAccelerationStrength" : 0,
+            "BTTScrollModifierSimulateTrackpadPhases" : true,
+            "BTTScrollModifierSpeedVertical" : 3,
+            "BTTScrollModifierSlowWheelResponse" : 0,
+            "BTTScrollModifierEnableVelocityBoost" : true,
+            "BTTScrollModifierInputTimeout" : 0.14999999999999999
+          }
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692926.8408298,
+          "BTTTriggerType" : 1341,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Zoom In / Out (like Trackpad)",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "DD713DB1-16F9-4AF7-AA32-B68B3992E36D",
+          "BTTRequiredModifierKeys" : 262144,
+          "BTTOrder" : 4,
+          "BTTAdditionalDataJSON" : {
+            "BTTScrollModifierUseHorizontalAxis" : 0,
+            "BTTScrollModifierAccelerationFactor" : 0.99999988079071045,
+            "BTTScrollModifierRequiredKeys" : 262144,
+            "BTTScrollModifierBaseMultiplier" : 0.5,
+            "BTTScrollModifierDeadZone" : 0.001,
+            "BTTScrollModifierDuration" : 0.14999999999999999,
+            "BTTScrollModifierEmaAlpha" : 0.29999999999999999,
+            "BTTScrollModifierInvertDirection" : 0,
+            "BTTScrollModifierSensitivity" : 0.5,
+            "BTTScrollModifierInputTimeout" : 0.14999999999999999,
+            "BTTScrollModifierMaxRotation" : 15,
+            "BTTScrollModifierOnlyRegularMouse" : 1
+          }
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.077919,
+          "BTTTriggerType" : 1343,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Space Switch Swipe (like Trackpad)",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "897E49FF-97BB-4E6B-88BE-381C7C510553",
+          "BTTRequiredModifierKeys" : 262144,
+          "BTTOrder" : 5,
+          "BTTAdditionalDataJSON" : {
+            "BTTScrollModifierCompletionThreshold" : 0.40000000000000002,
+            "BTTScrollModifierOnlyRegularMouse" : 1,
+            "BTTScrollModifierInvertDirection" : 0,
+            "BTTScrollModifierUseHorizontalAxis" : 1,
+            "BTTScrollModifierRequiredKeys" : 262144,
+            "BTTScrollModifierDeadZone" : 0.001,
+            "BTTScrollModifierDuration" : 0.20000000000000001,
+            "BTTScrollModifierSensitivity" : 0.0016666666666666668,
+            "BTTScrollModifierInputTimeout" : 0.20000000000000001
+          }
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.0778179,
+          "BTTTriggerType" : 1339,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Smooth Scrolling (like Trackpad)",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "8FA30477-AF68-4BA4-9EBE-1EFBC5347EA2",
+          "BTTOrder" : 6,
+          "BTTAdditionalDataJSON" : {
+            "BTTScrollModifierSimulateTrackpadPhases" : true,
+            "BTTScrollModifierRequiredKeys" : -1,
+            "BTTScrollModifierSmoothness" : 1,
+            "BTTScrollModifierSpeedHorizontal" : 3.5,
+            "BTTScrollModifierAccelerationStrength" : 1.2000000476837158,
+            "BTTScrollModifierSlowWheelTickDistance" : 9,
+            "BTTScrollModifierSlowWheelResponse" : 0.60000002384185791,
+            "BTTScrollModifierEnableVelocityBoost" : true,
+            "BTTScrollModifierInputTimeout" : 0.14999999999999999,
+            "BTTScrollModifierSubPixelBoost" : 1,
+            "BTTScrollModifierSpeedVertical" : 3.5,
+            "BTTScrollModifierOnlyRegularMouse" : 1
+          }
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692953.909327,
+          "BTTTriggerType" : 1003,
+          "BTTTriggerTypeDescriptionReadOnly" : "Button 3",
+          "BTTTriggerTypeDescription" : "Desktop Left",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "C15D4B2C-E990-4A03-AFF7-42D1109F7D00",
+          "BTTOrder" : 7,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1787692973.34885,
+              "BTTTriggerParentUUID" : "C15D4B2C-E990-4A03-AFF7-42D1109F7D00",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "715959EF-FA52-4821-A35A-E43BFCC1D260",
+              "BTTPredefinedActionType" : 114,
+              "BTTPredefinedActionName" : "Move Right a Space",
+              "BTTOrder" : 0
+            }
+          ],
+          "BTTGestureNotes" : "Desktop Left"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.077831,
+          "BTTTriggerType" : 1004,
+          "BTTTriggerTypeDescriptionReadOnly" : "Button 4",
+          "BTTTriggerTypeDescription" : "Desktop Right",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "A225E36B-EB56-4DE9-BB41-DBB31E078387",
+          "BTTOrder" : 8,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1787692985.6620679,
+              "BTTTriggerParentUUID" : "A225E36B-EB56-4DE9-BB41-DBB31E078387",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "246FAED7-5FB3-4651-A986-EECC9FB3604D",
+              "BTTPredefinedActionType" : 113,
+              "BTTPredefinedActionName" : "Move Left a Space",
+              "BTTOrder" : 0
+            }
+          ],
+          "BTTGestureNotes" : "Desktop Right"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.0778542,
+          "BTTTriggerType" : 1010,
+          "BTTTriggerTypeDescriptionReadOnly" : "Button 10",
+          "BTTTriggerTypeDescription" : "Back",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "3F3CAAF0-3876-4002-B180-705E9C0B5D95",
+          "BTTOrder" : 9,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1787693162.4715462,
+              "BTTTriggerParentUUID" : "3F3CAAF0-3876-4002-B180-705E9C0B5D95",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "9AC6766A-7C22-48A9-B802-CAA5F11F2EE1",
+              "BTTPredefinedActionType" : 77,
+              "BTTPredefinedActionName" : "3F Swipe Left (Page Back)",
+              "BTTOrder" : 0
+            }
+          ],
+          "BTTGestureNotes" : "Back"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.077848,
+          "BTTTriggerType" : 1011,
+          "BTTTriggerTypeDescriptionReadOnly" : "Button 11",
+          "BTTTriggerTypeDescription" : "Forward",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "67A511A8-7A42-446C-90F8-8A15D7809B68",
+          "BTTOrder" : 10,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1787693155.6868448,
+              "BTTTriggerParentUUID" : "67A511A8-7A42-446C-90F8-8A15D7809B68",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "9D4BF756-C721-48F5-BB12-4C95275BD605",
+              "BTTPredefinedActionType" : 78,
+              "BTTPredefinedActionName" : "3F Swipe Right (Page Forward)",
+              "BTTOrder" : 0
+            }
+          ],
+          "BTTGestureNotes" : "Forward"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.07793,
+          "BTTTriggerType" : 1002,
+          "BTTTriggerTypeDescriptionReadOnly" : "Middle Mouse Button",
+          "BTTTriggerTypeDescription" : "Mission Control",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "660F9049-3C6D-4E4D-ADD1-C66DB6443BFE",
+          "BTTOrder" : 11,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1787689771.8113909,
+              "BTTTriggerParentUUID" : "660F9049-3C6D-4E4D-ADD1-C66DB6443BFE",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "AF08A972-33A1-4587-AD32-CD74BEC4BBF1",
+              "BTTPredefinedActionType" : 7,
+              "BTTPredefinedActionName" : "Show Spaces",
+              "BTTOrder" : 0
+            }
+          ],
+          "BTTGestureNotes" : "Mission Control"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787693797.7175751,
+          "BTTTriggerType" : 1012,
+          "BTTTriggerTypeDescriptionReadOnly" : "Button 12",
+          "BTTTriggerTypeDescription" : "Tap: Mute · Hold + Wheel: Volume",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "E6F4B2BE-16E1-40D4-B8CB-34651B313E14",
+          "BTTOrder" : 12,
+          "BTTActionCategoryButtonQuickRelease" : [
+            {
+              "BTTLastUpdatedAt" : 1787689771.828126,
+              "BTTTriggerParentUUID" : "E6F4B2BE-16E1-40D4-B8CB-34651B313E14",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "165E7C90-A414-49B2-B96A-77C2D4896BC2",
+              "BTTPredefinedActionType" : 22,
+              "BTTPredefinedActionName" : "Mute",
+              "BTTOrder" : 0
+            }
+          ],
+          "BTTGestureNotes" : "Tap: Mute · Hold + Wheel: Volume",
+          "BTTTriggerConfig" : {
+            "BTTMousePressAllowMove" : 1,
+            "BTTMousePressMaxTime" : 0.30000001192092896
+          }
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.0779061,
+          "BTTTriggerType" : 12120,
+          "BTTTriggerTypeDescriptionReadOnly" : "Button 12 + Scroll Up",
+          "BTTTriggerTypeDescription" : "Precision + Wheel Up: Volume Up",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "0AF3E5C8-BBAD-4182-98C7-7704E2F33D1F",
+          "BTTOrder" : 13,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1787693972.4138741,
+              "BTTTriggerParentUUID" : "0AF3E5C8-BBAD-4182-98C7-7704E2F33D1F",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "7254CD56-B6A6-4F11-9DA3-35FC2AC416C1",
+              "BTTPredefinedActionType" : 24,
+              "BTTPredefinedActionName" : "Volume Up",
+              "BTTOrder" : 0
+            },
+            {
+              "BTTLastUpdatedAt" : 1787693972.4140902,
+              "BTTTriggerParentUUID" : "0AF3E5C8-BBAD-4182-98C7-7704E2F33D1F",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "B3F48271-1508-4ADD-BE53-89A0BA5B5EC4",
+              "BTTPredefinedActionType" : 24,
+              "BTTPredefinedActionName" : "Volume Up",
+              "BTTOrder" : 1
+            }
+          ],
+          "BTTGestureNotes" : "Precision + Wheel Up: Volume Up"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787693972.4571519,
+          "BTTTriggerType" : 12121,
+          "BTTTriggerTypeDescriptionReadOnly" : "Button 12 + Scroll Down",
+          "BTTTriggerTypeDescription" : "Precision + Wheel Down: Volume Down",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "80644FBC-4C18-479D-A36C-8E625B21C1F8",
+          "BTTOrder" : 14,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1787693972.456918,
+              "BTTTriggerParentUUID" : "80644FBC-4C18-479D-A36C-8E625B21C1F8",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "9ACEBD9D-9AE8-40EE-BD72-433D89DD3D2E",
+              "BTTPredefinedActionType" : 25,
+              "BTTPredefinedActionName" : "Volume Down",
+              "BTTOrder" : 0
+            },
+            {
+              "BTTLastUpdatedAt" : 1787693972.456975,
+              "BTTTriggerParentUUID" : "80644FBC-4C18-479D-A36C-8E625B21C1F8",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "E73553AB-A589-4931-BE2D-9420CE09F4E9",
+              "BTTPredefinedActionType" : 25,
+              "BTTPredefinedActionName" : "Volume Down",
+              "BTTOrder" : 1
+            }
+          ],
+          "BTTGestureNotes" : "Precision + Wheel Down: Volume Down"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787693314.9476709,
+          "BTTTriggerType" : 1338,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Distance Per Tick",
+          "BTTTriggerTypeDescription" : "Probe 1338",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "E73BDFB2-935E-4717-99E3-0F25437A568C",
+          "BTTEnabled" : 0,
+          "BTTOrder" : 9007,
+          "BTTAdditionalDataJSON" : {
+            "BTTScrollModifierRequiredKeys" : -1,
+            "BTTScrollModifierVerticalDistance" : 10,
+            "BTTScrollModifierHorizontalDistance" : 10
+          },
+          "BTTGestureNotes" : "Probe 1338"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.077877,
+          "BTTTriggerType" : 1340,
+          "BTTTriggerTypeDescriptionReadOnly" : "Logitech Keyboard Configuration",
+          "BTTTriggerTypeDescription" : "Probe 1340",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "A5CC22A0-B07E-4950-9FE1-59B44F1DBF2E",
+          "BTTEnabled" : 0,
+          "BTTOrder" : 9008,
+          "BTTGestureNotes" : "Probe 1340"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.077842,
+          "BTTTriggerType" : 1341,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Zoom In / Out (like Trackpad)",
+          "BTTTriggerTypeDescription" : "Probe 1341",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "FBBFB50F-1795-44F6-AF55-39102F031405",
+          "BTTEnabled" : 0,
+          "BTTOrder" : 9009,
+          "BTTGestureNotes" : "Probe 1341"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.077837,
+          "BTTTriggerType" : 1342,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Rotate Left / Right (like Trackpad)",
+          "BTTTriggerTypeDescription" : "Probe 1342",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "E72D8666-011B-47BC-9A78-A79B8B0E2461",
+          "BTTEnabled" : 0,
+          "BTTOrder" : 9010,
+          "BTTGestureNotes" : "Probe 1342"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.0778089,
+          "BTTTriggerType" : 1343,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Space Switch Swipe (like Trackpad)",
+          "BTTTriggerTypeDescription" : "Probe 1343",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "41ACFF94-8C57-4007-9008-71FA3ADBC1CD",
+          "BTTEnabled" : 0,
+          "BTTOrder" : 9011,
+          "BTTGestureNotes" : "Probe 1343"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.0778708,
+          "BTTTriggerType" : 1344,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Ignore Events from Specific Apps",
+          "BTTTriggerTypeDescription" : "Probe 1344",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "1B356A00-7F1D-46DD-AEBE-947E2EA92062",
+          "BTTEnabled" : 0,
+          "BTTOrder" : 9012,
+          "BTTGestureNotes" : "Probe 1344"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787693296.326879,
+          "BTTTriggerType" : 1345,
+          "BTTTriggerTypeDescriptionReadOnly" : "Scroll Modifier: Disable / Reduce Scroll Acceleration",
+          "BTTTriggerTypeDescription" : "Probe 1345",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "8D3F383B-ED99-42C7-82B1-B53FA7A2A80E",
+          "BTTEnabled" : 0,
+          "BTTOrder" : 9013,
+          "BTTAdditionalDataJSON" : {
+            "BTTScrollDeaccelOutputScale" : 1,
+            "BTTScrollDeaccelCurveExponent" : 0.5,
+            "BTTScrollDeaccelReferenceSpeed" : 10,
+            "BTTScrollDeaccelDiscreteStepSize" : 10,
+            "BTTScrollDeaccelLinearZone" : 1,
+            "BTTScrollModifierRequiredKeys" : -1
+          },
+          "BTTGestureNotes" : "Probe 1345"
+        },
+        {
+          "BTTLastUpdatedAt" : 1787692513.077889,
+          "BTTTriggerType" : 1346,
+          "BTTTriggerTypeDescriptionReadOnly" : "Work Louder Keyboard Configuration",
+          "BTTTriggerTypeDescription" : "Probe 1346",
+          "BTTTriggerClass" : "BTTTriggerTypeNormalMouse",
+          "BTTUUID" : "2BA35CFD-95E2-421F-960B-88FB35B8B05C",
+          "BTTEnabled" : 0,
+          "BTTOrder" : 9014,
+          "BTTGestureNotes" : "Probe 1346"
+        }
+      ]
+    },
+    {
+      "BTTAppBundleIdentifier" : "BT.L",
+      "BTTAppName" : "Recently Used",
+      "BTTAppAutoInvertIcon" : 1,
+      "BTTTriggers" : [
+
+      ]
+    },
+    {
+      "BTTAppBundleIdentifier" : "com.apple.finder",
+      "BTTAppName" : "Finder",
+      "BTTAppAutoInvertIcon" : 1,
+      "BTTTriggers" : [
+
+      ]
+    }
+  ],
+  "BTTPresetSnapAreas" : [
+
+  ]
+}

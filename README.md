@@ -28,8 +28,19 @@ independent GET, one restore SET verified back to the exact baseline, both
 evidence and only a GET as proof. See
 [Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md).
 
-**Not yet exercised:** Precision tap-to-mute and hold+scroll volume. The control
-was restored before the audio path was tried.
+**Tried and does not work:** Precision tap-to-mute and hold+scroll volume. With
+Precision verified diverted (`flags 01`) and audio execution enabled, tapping did
+not mute and hold+scroll did not change volume — the page underneath scrolled
+normally, so the scroll swallow never engaged either. No diverted control
+notification reaches the intent path. The cause is not yet determined: the
+runtime counts unsolicited and dropped frames but surfaces neither, so it cannot
+report whether frames arrived and were rejected or never arrived. Surfacing that
+is the next milestone.
+
+**No runtime-journal rotation exists.** A schema-v3 journal models one
+apply/restore lifecycle; once `completed` it permits neither activate nor
+recover, so a second session needs the file moved aside by hand. This blocks
+daily use.
 
 **Reviewed but deliberately unauthorized:** the five BetterTouchTool-mapped CIDs
 (`0052`, `0053`, `0056`, `005B`, `005D`). Their diversion plan, readiness audit,

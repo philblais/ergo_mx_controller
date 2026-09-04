@@ -858,3 +858,35 @@ The package total stays at 344, all passing with none skipped; the status-label
 regression is guarded by an extension to the existing App-source isolation test
 rather than a new test function. This was a live HID session: two SETs were
 dispatched, each exactly once, and both verified by independent GET.
+
+The second live session set out to exercise Precision tap-to-mute and hold+scroll
+volume. The diversion lifecycle completed cleanly a second time — apply verified,
+restore verified, both replies `correlatedNonEcho`, final `restoredVerified` with
+the schema-v2 baseline unchanged — but **the audio path did not work**. With
+Precision verified diverted at `flags 01` and audio execution enabled, tapping
+did not mute and hold+scroll did not change volume; the frontmost page scrolled
+normally, so the scroll swallow never engaged. One missing input explains both
+symptoms, because the swallow is gated on the held flag that the same
+notification stream feeds.
+
+The cause was not determined and is deliberately not guessed at. The unsolicited
+filter and the notification decoder both require device index `0xFF` while every
+observed request and response from this device uses `0x00`; against that, the
+calibration panel decodes through the same function and has historically named
+Logitech controls while BetterTouchTool held them diverted. `PrecisionCallbackInputChannel`
+already counts unsolicited and dropped frames, but neither count is surfaced
+through composition, the owner facade, or the app, so the runtime cannot say
+whether frames arrived and were rejected or never arrived at all. Surfacing that
+evidence is the prerequisite for any change to the input path.
+
+The session also confirmed that no runtime-journal rotation exists. A schema-v3
+journal models exactly one apply/restore lifecycle, and once `completed` it
+permits neither activate nor recover, so a second session required moving the
+file aside by hand. The second occurrence surfaced only as
+`Bind failed: invalidIntent`. This blocks daily use.
+
+`Deactivate Precision…` stayed enabled after a verified restore — the same
+admitted-versus-diverted conflation as the status label — and is now gated on the
+diversion status. The status-line fix was confirmed on hardware.
+
+The package total stays at 344, all passing with none skipped.

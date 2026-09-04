@@ -180,3 +180,70 @@ The live mapped-control GET preflight was also run in the same session and
 matched the firmware-bound baseline for all five CIDs, with feature index `0x0A`
 and epoch 0. It remains `notAuthorizedForExecution`: five live GETs only, no
 SET, retry, or event synthesis.
+
+### Live validation record — 2026-09-04, second session
+
+Purpose: exercise Precision tap-to-mute and hold+scroll volume, which the first
+session never reached. **The audio path did not work.** The diversion lifecycle
+completed cleanly for a second time, but no control event produced any effect.
+
+The spent runtime journal from the first session was archived by hand to
+`precision-runtime-v3.completed-2026-09-04T1118.json` so a fresh one could
+bootstrap; see the rotation gap below. The new journal `068E3DA7-6D9D-48B7-A8BE-AC3A866E2272`
+bootstrapped clean from the unchanged schema-v2 baseline.
+
+The second lifecycle repeated the first exactly: one apply SET verified by an
+independent GET returning flags `01`, one restore SET verified by an exact
+baseline GET, both attempts `verified`, both device replies `correlatedNonEcho`.
+Final state `restoredVerified`, status `completed`, revision 6, no other control
+dirty. The schema-v2 baseline remained
+`60ab614927d20871994ad0ebe7368158af9a26b2c1d60f7a2ab3c51635f77097`.
+
+While Precision was verified diverted (`flags 01`) with audio execution
+explicitly enabled:
+
+- Tapping Precision **did not** mute or unmute system audio.
+- Holding Precision and scrolling **did not** change the volume, and the
+  frontmost page **scrolled normally** — the HID-level scroll swallow never
+  engaged.
+
+Both failures are consistent with a single cause: no diverted control
+notification reached the controller intent path. The scroll swallow is gated on
+Precision being held, and the held flag is derived from that same notification
+stream, so one missing input explains both symptoms.
+
+The cause was **not** determined in this session, and two candidates remain open:
+
+1. The unsolicited-notification filter and the notification decoder both require
+   device index `0xFF` (`PrecisionCallbackInputChannel` and
+   `LogitechControlEventDecoder.decodeNotification`). Every request and response
+   frame observed from this MX Ergo over direct BLE uses device index `0x00`.
+2. Against that, the calibration panel decodes through the same
+   `decodeNotification` and has historically named Logitech controls while
+   BetterTouchTool held them diverted, which suggests `0xFF` is correct for this
+   device's notifications and the fault lies further down the delivery path.
+
+These cannot be distinguished from source. `PrecisionCallbackInputChannel`
+already maintains `unsolicitedCount` and `droppedCount`, but neither is surfaced
+through composition, the owner facade, or the menu app, so the runtime cannot
+report whether frames arrived and were rejected or never arrived at all. Closing
+that diagnosability gap is the prerequisite for the next attempt; guessing at a
+filter change without evidence would be a change to the input path of a device
+writer, made blind.
+
+Two further defects were confirmed:
+
+- **No runtime-journal rotation exists.** A schema-v3 journal models exactly one
+  apply/restore lifecycle. Once it reaches `completed`/`restoredVerified`,
+  `validateAction` permits neither activate (`prepared`/`baselineVerified`) nor
+  recover, so a second session is impossible without moving the file aside by
+  hand. This was hit twice, and the second time surfaced only as
+  `Bind failed: invalidIntent`, which says nothing about the cause. For an app
+  intended to replace BetterTouchTool this is a hard blocker, not an
+  inconvenience.
+- **`Deactivate Precision…` stayed enabled after a verified restore**, the same
+  admitted-versus-diverted conflation as the status label. Fixed.
+
+The status-line fix from earlier in the day was confirmed on hardware: after the
+verified restore the app reported `Precision restored to baseline; runtime still
+admitted` rather than the previous incorrect `Precision diverted (active)`.

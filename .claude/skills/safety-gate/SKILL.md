@@ -67,7 +67,10 @@ Keep this accurate; it is the thing most likely to drift.
   through `MXErgoPrecisionRuntimeOwner`, and **ran successfully on hardware
   2026-09-04**: apply verified, restore verified, back at baseline. The durable
   runtime journal `precision-runtime-v3.json` now exists at revision 6,
-  `restoredVerified`. Tap-to-mute and hold+scroll volume are still unexercised.
+  `restoredVerified`. **Tap-to-mute and hold+scroll volume were tried and do
+  not work** — no diverted control notification reaches the intent path, cause
+  undetermined. There is also **no journal rotation**: a completed journal
+  permits no further operation and must be moved aside by hand.
 - **Mapped CIDs `0052`, `0053`, `0056`, `005B`, `005D`** — plan, readiness,
   action plan, event pump and live GET-only preflight all exist and all return
   `notAuthorizedForExecution`. No SET, no CGEvent posting. The project's own

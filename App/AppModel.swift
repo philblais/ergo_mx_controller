@@ -1761,7 +1761,12 @@ final class AppModel: ObservableObject {
             && operation == .recover
             && !recoverLocked
             && !runtimeOwnerAuthorizationExpired
-        runtimeOwnerCanDeactivate = phase == .admitted && !disconnected
+        // Deactivating a control that is already restored would offer a
+        // no-op SET path. Same conflation as the status label: admitted
+        // is not the same as diverted.
+        runtimeOwnerCanDeactivate = phase == .admitted
+            && !disconnected
+            && runtimeOwnerControlIsDiverted
         runtimeOwnerCanRollover = phase == .bound || phase == .shutDown
         runtimeOwnerDeviceDisconnected = disconnected
         switch diversion {

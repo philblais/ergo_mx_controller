@@ -63,8 +63,11 @@ still match these. `scripts/verify.sh` checks them.
 
 Keep this accurate; it is the thing most likely to drift.
 
-- **Precision CID `00ED`** — full runtime exists and is wired to the menu app
-  through `MXErgoPrecisionRuntimeOwner`. It has **never run against hardware**.
+- **Precision CID `00ED`** — full runtime exists, is wired to the menu app
+  through `MXErgoPrecisionRuntimeOwner`, and **ran successfully on hardware
+  2026-09-04**: apply verified, restore verified, back at baseline. The durable
+  runtime journal `precision-runtime-v3.json` now exists at revision 6,
+  `restoredVerified`. Tap-to-mute and hold+scroll volume are still unexercised.
 - **Mapped CIDs `0052`, `0053`, `0056`, `005B`, `005D`** — plan, readiness,
   action plan, event pump and live GET-only preflight all exist and all return
   `notAuthorizedForExecution`. No SET, no CGEvent posting. The project's own

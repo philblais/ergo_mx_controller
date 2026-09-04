@@ -78,6 +78,14 @@ final class AppModel: ObservableObject {
     @Published private(set) var runtimeOwnerCanAdmit = false
     @Published private(set) var runtimeOwnerCanRecover = false
     @Published private(set) var runtimeOwnerIsAdmitted = false
+    /// True only while the control is genuinely diverted. A restored
+    /// control still leaves the runtime admitted, so this is not the same
+    /// thing as `runtimeOwnerIsAdmitted`.
+    @Published private(set) var runtimeOwnerControlIsDiverted = false
+    /// Set when a one-use authorization expired before it could be used.
+    /// The bound intent's deadline is fixed at bind time, so retrying the
+    /// same operation can never succeed; the owner must be re-bound.
+    @Published private(set) var runtimeOwnerAuthorizationExpired = false
     @Published private(set) var runtimeOwnerCanDeactivate = false
     @Published private(set) var runtimeOwnerNeedsRecovery = false
     @Published private(set) var runtimeOwnerDeviceDisconnected = false
@@ -906,6 +914,20 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Records that a one-use authorization expired. Its deadline is minted in
+    /// `bind()`, so the bound intent is permanently dead and the only way
+    /// forward is a session rollover followed by a fresh bind.
+    private func noteAuthorizationExpiry(_ error: Error) -> Bool {
+        guard let ownerError = error as? PrecisionRuntimeOwnerError,
+              ownerError == .authorizationExpired else {
+            return false
+        }
+        runtimeOwnerAuthorizationExpired = true
+        runtimeOwnerCanAdmit = false
+        runtimeOwnerCanRecover = false
+        return true
+    }
+
     func confirmRuntimeOwnerAdmission() async {
         guard runtimeOwnerCanAdmit,
               !runtimeOwnerOperationInProgress,
@@ -935,7 +957,12 @@ final class AppModel: ObservableObject {
                 "Precision diverted (active). Precision tap mutes; hold Precision and scroll for volume when Audio test is on. Deactivate before quit if you need the button restored. Disconnect classifies recovery-required and does not send a restore SET."
         } catch {
             await refreshRuntimeOwnerFlags()
-            runtimeOwnerStatusText = "Admission failed: \(error)"
+            if noteAuthorizationExpiry(error) {
+                runtimeOwnerStatusText =
+                    "Admission authorization expired before it was used. Nothing was sent: the observer was not stopped, no lease was taken, and no journal was written. The deadline is fixed when the owner is bound, so admitting again cannot succeed. Select Release for session rollover, bind again, and confirm admission without pausing."
+            } else {
+                runtimeOwnerStatusText = "Admission failed: \(error)"
+            }
         }
     }
 
@@ -971,6 +998,9 @@ final class AppModel: ObservableObject {
                ownerError == .recoverLockedAfterAmbiguousSET {
                 runtimeOwnerStatusText =
                     "Recover is locked: a restore SET had an unknown outcome and will not be retried. Use a GET-only probe; do not send another SET."
+            } else if noteAuthorizationExpiry(error) {
+                runtimeOwnerStatusText =
+                    "Recovery authorization expired before it was used. No restore SET was sent. The deadline is fixed when the owner is bound, so recovering again cannot succeed. Select Release for session rollover, bind again, and confirm recovery without pausing."
             } else {
                 runtimeOwnerStatusText = "Recovery failed: \(error)"
             }
@@ -1707,6 +1737,8 @@ final class AppModel: ObservableObject {
             runtimeOwnerCanAdmit = false
             runtimeOwnerCanRecover = false
             runtimeOwnerIsAdmitted = false
+            runtimeOwnerControlIsDiverted = false
+            runtimeOwnerAuthorizationExpired = false
             runtimeOwnerCanDeactivate = false
             runtimeOwnerNeedsRecovery = false
             runtimeOwnerDeviceDisconnected = false
@@ -1719,10 +1751,16 @@ final class AppModel: ObservableObject {
         let recoverLocked = await owner.isRecoverLockedAfterAmbiguousSET
         runtimeOwnerBlocksRestart = await owner.blocksObserverRestart
         runtimeOwnerIsAdmitted = phase == .admitted
-        runtimeOwnerCanAdmit = phase == .bound && operation == .activate
+        // The runtime stays admitted after a verified restore, so read the
+        // diversion status rather than inferring it from admission.
+        runtimeOwnerControlIsDiverted = phase == .admitted && diversion == .active
+        runtimeOwnerCanAdmit = phase == .bound
+            && operation == .activate
+            && !runtimeOwnerAuthorizationExpired
         runtimeOwnerCanRecover = phase == .bound
             && operation == .recover
             && !recoverLocked
+            && !runtimeOwnerAuthorizationExpired
         runtimeOwnerCanDeactivate = phase == .admitted && !disconnected
         runtimeOwnerCanRollover = phase == .bound || phase == .shutDown
         runtimeOwnerDeviceDisconnected = disconnected

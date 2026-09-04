@@ -610,6 +610,26 @@ import Testing
     #expect(appText.contains("noteVerticalScroll"))
     #expect(appText.contains("setDiversionStatusHandler"))
     #expect(appText.contains("recoveryRequired"))
+
+    // Regression guard, 2026-09-04. The diverted status line was derived from
+    // whether the runtime was admitted, so a control that had been restored and
+    // verified back to its baseline still reported as diverted. The runtime
+    // stays admitted across a restore; only the diversion status distinguishes
+    // the two, so the label must be gated on that flag.
+    let divertedLabel = "\"Status: Precision diverted (active)\""
+    #expect(appText.contains(divertedLabel))
+    let beforeLabel = try #require(
+        appText.components(separatedBy: divertedLabel).first
+    )
+    let guardingCondition = try #require(
+        beforeLabel.components(separatedBy: "if model.runtimeOwner").last
+    )
+    #expect(guardingCondition.hasPrefix("ControlIsDiverted"))
+
+    // An expired one-use authorization is permanently dead, because its
+    // deadline is minted at bind time. The controls it can never satisfy must
+    // not stay enabled.
+    #expect(appText.contains("runtimeOwnerAuthorizationExpired"))
 }
 
 private func ownerSession() -> DeviceTransactionSession {

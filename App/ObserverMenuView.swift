@@ -809,10 +809,21 @@ struct ObserverMenuView: View {
             )
             .fixedSize(horizontal: false, vertical: true)
 
-            if model.runtimeOwnerIsAdmitted {
+            if model.runtimeOwnerControlIsDiverted {
                 Text("Status: Precision diverted (active)")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.red)
+            } else if model.runtimeOwnerIsAdmitted {
+                // The runtime still owns the device after a verified restore,
+                // but the control is back at its baseline. Saying "diverted"
+                // here misreports the one fact the user most needs.
+                Text("Status: Precision restored to baseline; runtime still admitted")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.green)
+            } else if model.runtimeOwnerAuthorizationExpired {
+                Text("Status: authorization expired; release for session rollover and bind again")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.orange)
             } else if model.runtimeOwnerNeedsRecovery {
                 Text(
                     model.runtimeOwnerDeviceDisconnected

@@ -815,3 +815,46 @@ was run in automated tests.
 
 The next review must keep those five CIDs unauthorized until the Precision
 recover lock has been used on hardware, then can admit them one at a time.
+
+The first live Precision admission milestone moves the runtime from dormant to
+proved. With BetterTouchTool and Logi Options fully quit and the trackball
+power-cycled, the signed menu app resolved Root to feature index `0x0A`,
+matched the firmware identity, passed the exact-baseline preflight, reviewed
+readiness as `NOT AUTHORIZED`, bound the owner, and admitted the runtime. The
+schema-v3 runtime journal was created for the first time from the clean
+schema-v2 baseline.
+
+One apply SET (`11 00 0A 3E 00 ED 03 …`) and one restore SET
+(`11 00 0A 3E 00 ED 02 …`) were dispatched, each exactly once. The device
+answered both with a correlated reply carrying zeroed parameters rather than an
+exact echo. Both were classified `correlatedNonEcho` and retained as evidence
+only; the independent verification GETs returned flags `01` and then the exact
+baseline, so both attempts recorded `verified`. The journal reached revision 6
+at `restoredVerified` with no other control dirty, and quitting wrote nothing
+further. The schema-v2 baseline hash was unchanged throughout.
+
+This is the direct hardware refutation of the 2026-08-30 failure mode. That
+trial helper demanded a full echo and recorded `outcomeUnknown` for a SET that
+had behaved correctly. The production rule — acknowledgement is evidence, a
+separate GET is proof — is now validated against the physical device.
+
+Two presentation defects were found and fixed. The one-use admission
+authorization is minted inside `bind()` with a ten-minute lifetime, so pausing
+between binding and admitting expires it; the abort was correctly fail-closed
+with no observer stop, lease, journal write, or HID frame, but the Admit control
+stayed enabled while it could never succeed. It is now disabled on expiry with
+an explicit instruction to roll over and re-bind. Separately, the status line
+read `Precision diverted (active)` after a verified restore because it was
+derived from whether the runtime was admitted rather than from the diversion
+status; a restored control now reports as restored. Neither defect affected
+device handling.
+
+Precision tap-to-mute and hold+scroll volume remain unexercised on hardware: the
+control was restored before the audio path was tried. The five mapped CIDs
+remain `notAuthorizedForExecution`; their live GET preflight was run again in
+the same session and matched the firmware-bound baseline for all five.
+
+The package total stays at 344, all passing with none skipped; the status-label
+regression is guarded by an extension to the existing App-source isolation test
+rather than a new test function. This was a live HID session: two SETs were
+dispatched, each exactly once, and both verified by independent GET.

@@ -19,11 +19,17 @@ read-only HID++ discovery (Root, Device Information, control enumeration,
 reporting snapshot), the durable schema-v2 recovery baseline, and one authorized
 single-control restore trial that was reconciled clean.
 
-**Written and fully unit-tested, but never run against the trackball:** the
-entire Precision temporary-diversion runtime — acquisition, assembly, ownership,
-composition, admission, observer host-handoff, lifecycle and the public owner
-facade. There is no `precision-runtime-v3.json` on disk yet. This is the next
-milestone; see [RUNBOOK.md](RUNBOOK.md) steps 25–28.
+**Proved on hardware 2026-09-04:** the full Precision temporary-diversion
+runtime — acquisition, assembly, ownership, composition, admission, observer
+host-handoff, lifecycle and the public owner facade. One apply SET verified by an
+independent GET, one restore SET verified back to the exact baseline, both
+`verified`, schema-v2 baseline untouched. The MX Ergo does not echo
+`SetCidReporting`, which is precisely why an acknowledgement is treated as
+evidence and only a GET as proof. See
+[Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md).
+
+**Not yet exercised:** Precision tap-to-mute and hold+scroll volume. The control
+was restored before the audio path was tried.
 
 **Reviewed but deliberately unauthorized:** the five BetterTouchTool-mapped CIDs
 (`0052`, `0053`, `0056`, `005B`, `005D`). Their diversion plan, readiness audit,

@@ -304,3 +304,52 @@ is a categorically lower risk than anything attempted so far.
 
 That conclusion is held open pending the wheel-tilt observation. Until then the
 five mapped CIDs remain `notAuthorizedForExecution`, unchanged.
+
+### Read-only observation — 2026-09-04, wheel tilt
+
+Tilting the wheel left and right navigated a horizontal carousel in Safari in
+the corresponding directions. macOS therefore receives signed horizontal scroll
+deltas from this device with nothing diverted.
+
+This agrees with the device's own control list: the enumeration found CIDs
+`005B` and `005D`, which are Left Scroll and Right Scroll in Logitech's standard
+numbering — a scroll axis, not buttons. It also fits `0053`/`0056` being Back and
+Forward, the thumb buttons that reported masks `0x08` and `0x10`.
+
+The observation rests on tilt-left and tilt-right producing opposite motion,
+which a signed horizontal axis explains and a button press does not.
+
+#### Complete picture for this device
+
+| Control | CID | Ordinary representation |
+|---|---|---|
+| Left click | `0050` | button mask `0x01` (observed) |
+| Right click | `0051` | button mask `0x02` (assumed, unobserved) |
+| Wheel click | `0052` | button mask `0x04` (assumed, unobserved) |
+| Thumb, back | `0053` | button mask `0x08` (observed) |
+| Thumb, forward | `0056` | button mask `0x10` (observed) |
+| Wheel tilt left | `005B` | horizontal scroll (observed) |
+| Wheel tilt right | `005D` | horizontal scroll (observed) |
+| **Precision** | **`00ED`** | **none — requires diversion** |
+
+#### Consequence
+
+**None of the five mapped CIDs require HID++ diversion.** Every one of them is
+already delivered to macOS as an ordinary mouse button or scroll axis. The
+planned multi-CID SET path — a widened transport allowlist, per-CID packet
+tables, multi-CID admission policy, a mapped lifecycle actor — would have been
+solving a problem this hardware does not have.
+
+Precision remains the sole control with no ordinary representation, and the only
+one that will ever need a SET. That runtime is built and proved.
+
+Replacing BetterTouchTool for the other five is therefore an event-layer
+problem: observe the ordinary reports, suppress the default behaviour, and post
+replacements. It involves **no device write at all**, which is a categorically
+lower risk than the path previously planned. It does need two things the project
+does not yet have: an Accessibility (TCC) permission gate, and a horizontal
+scroll path — the wheel observer currently decodes only vertical motion.
+
+The existing mapped-control diversion plan, readiness audit, action plan, event
+pump and GET-only preflight are superseded rather than wrong. They remain as
+reviewed evidence and stay `notAuthorizedForExecution`.

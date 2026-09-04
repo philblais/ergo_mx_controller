@@ -968,3 +968,29 @@ far.
 
 No code changed and the five mapped CIDs remain `notAuthorizedForExecution`. The
 conclusion is held open pending the wheel-tilt observation.
+
+The wheel-tilt observation completes the picture and retires the mapped-control
+SET path before it was built. Tilting left and right navigated a horizontal
+carousel in the corresponding directions, so macOS receives signed horizontal
+scroll deltas with nothing diverted. That agrees with the device's own control
+list, where `005B` and `005D` are Left Scroll and Right Scroll in Logitech's
+standard numbering.
+
+Every one of the five mapped CIDs is therefore already delivered to macOS as an
+ordinary mouse button or scroll axis. The planned multi-CID SET path — widened
+transport allowlist, per-CID packet tables, multi-CID admission policy, mapped
+lifecycle actor — would have been solving a problem this hardware does not have.
+It is cancelled.
+
+Precision remains the sole control with no ordinary representation and the only
+one that will ever need a SET. Its runtime is built and proved on hardware.
+
+Replacing BetterTouchTool for the other five becomes an event-layer problem with
+no device write: observe the ordinary reports, suppress the default behaviour,
+post replacements. Two things the project lacks are now on the critical path
+instead — an Accessibility permission gate, and a horizontal scroll path, since
+the wheel observer decodes only vertical motion today.
+
+The existing mapped-control diversion plan, readiness audit, action plan, event
+pump and GET-only preflight are superseded rather than wrong. They remain as
+reviewed evidence and stay `notAuthorizedForExecution`. No code changed.

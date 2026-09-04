@@ -74,11 +74,12 @@ Keep this accurate; it is the thing most likely to drift.
   settle it. A spent journal is retired with **Retire completed runtime
   journal…**, which is HID-free and refuses any journal still holding active,
   ambiguous, conflicted, or recovery-required evidence.
-- **Most mapped controls need no diversion at all.** Observed 2026-09-04: both
-  thumb buttons arrive as ordinary HID buttons `0x08` and `0x10`; Precision
-  produces no ordinary report. Wheel tilt is still unobserved. Before building
-  any multi-CID SET path, confirm the control actually lacks an ordinary
-  representation — on this device only Precision does.
+- **No mapped control needs diversion.** Observed 2026-09-04: thumb buttons are
+  ordinary HID buttons `0x08`/`0x10`, both wheel tilts are ordinary horizontal
+  scroll, wheel click is middle click. Only Precision (`00ED`) produces no
+  ordinary report. **Do not build a multi-CID SET path.** Replacing
+  BetterTouchTool for the other five is an event-layer problem with no device
+  write; it needs an Accessibility gate and a horizontal scroll path, not HID++.
 - **Mapped CIDs `0052`, `0053`, `0056`, `005B`, `005D`** — plan, readiness,
   action plan, event pump and live GET-only preflight all exist and all return
   `notAuthorizedForExecution`. No SET, no CGEvent posting. The project's own

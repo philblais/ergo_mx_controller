@@ -5,6 +5,7 @@ import MXErgoHIDPP
 import MXErgoPrecisionRuntimeAdmission
 import MXErgoPrecisionRuntimeHostHandoff
 import MXErgoPrecisionRuntimeLifecycle
+import MXErgoPrecisionTransport
 
 public struct PrecisionRuntimeOwnerEvidence: Sendable, Equatable {
     public let session: DeviceTransactionSession
@@ -170,6 +171,15 @@ public actor PrecisionRuntimeOwner {
 
     public var diversionStatus: PrecisionRuntimeOwnerDiversionStatus {
         get async { await currentDiversionStatus() }
+    }
+
+    /// Read-only evidence about what the input path received. Returns nil
+    /// before admission, when there is no runtime to ask.
+    public func inputDiagnostics() async -> PrecisionInputDiagnosticsSnapshot? {
+        guard let diagnostics = await lifecycle.inputDiagnostics() else {
+            return nil
+        }
+        return PrecisionInputDiagnosticsSnapshot(diagnostics)
     }
 
     public var phase: PrecisionRuntimeOwnerPhase {
@@ -530,4 +540,51 @@ private func mappedAdmission(
 
 extension PrecisionRuntimeOwner {
     static let authorizationLifetimeNanoseconds: UInt64 = 600_000_000_000
+}
+
+
+/// Public projection of the runtime's input evidence.
+///
+/// The 2026-09-04 hardware session found that Precision diverted correctly and
+/// yet produced no mute, no volume change, and no scroll suppression. Nothing
+/// in the app could say whether the device had sent a diverted-control
+/// notification that was refused, or had sent nothing at all — so the fix could
+/// only have been guessed. These counts separate those cases.
+public struct PrecisionInputDiagnosticsSnapshot: Sendable, Equatable {
+    /// Frames from this device, on this connection, of the right report type
+    /// and length — counted before any notification test.
+    public let observedCount: Int
+    /// The subset routed as HID++ notifications.
+    public let unsolicitedCount: Int
+    /// Frames matched to an outstanding request.
+    public let acceptedCount: Int
+    public let droppedCount: Int
+    public let lastObservedFrameHex: String?
+
+    init(_ diagnostics: PrecisionInputDiagnostics) {
+        observedCount = diagnostics.observedCount
+        unsolicitedCount = diagnostics.unsolicitedCount
+        acceptedCount = diagnostics.acceptedCount
+        droppedCount = diagnostics.droppedCount
+        lastObservedFrameHex = diagnostics.lastObservedFrameBytes.map { bytes in
+            bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
+        }
+    }
+
+    public var summary: String {
+        "observed \(observedCount) · notifications \(unsolicitedCount) · "
+            + "matched \(acceptedCount) · dropped \(droppedCount)"
+    }
+
+    /// States what the counts imply, so a hardware session ends with a
+    /// conclusion rather than a table someone has to interpret later.
+    public var interpretation: String {
+        if observedCount == 0 {
+            return "No input frame reached the runtime at all. The device sent nothing this connection accepted, so the notification filter is not implicated; look at diversion, the input callback registration, or whether the device reports diverted controls on this interface."
+        }
+        if unsolicitedCount == 0 {
+            return "Frames reached the runtime but none was routed as a notification. The device is sending input this connection accepts while the unsolicited test rejects all of it. Compare the last observed frame's second byte against the device index the notification filter requires."
+        }
+        return "Notifications were routed. If no action followed, the fault is downstream of delivery: control-event decoding, intent resolution, or execution."
+    }
 }

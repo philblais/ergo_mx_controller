@@ -432,3 +432,88 @@ private func waitForPendingCallbackRead(
 private enum CallbackTestWaitError: Error {
     case timedOut
 }
+
+// MARK: - Input diagnostics
+
+// The 2026-09-04 hardware session could not tell whether the device sent no
+// diverted-control notification, or sent one the runtime declined to route.
+// These two tests pin the difference the diagnostics must expose.
+
+@Test func diagnosticsSeparateAFrameThatArrivedFromOneThatNeverDid() {
+    let fixture = callbackFixture()
+    let channel = fixture.channel
+
+    #expect(channel.inputDiagnostics.observedCount == 0)
+    #expect(channel.inputDiagnostics.unsolicitedCount == 0)
+    #expect(channel.inputDiagnostics.lastObservedFrameBytes == nil)
+
+    // A frame from this device on this connection, but with a device index the
+    // notification test rejects. This is the shape that would prove the filter
+    // is what is discarding diverted-control events.
+    var notRoutable = callbackMessageBytes()
+    notRoutable[1] = 0x00
+    _ = notRoutable.withUnsafeBytes { bytes in
+        channel.receiveCallback(
+            reportType: .input,
+            reportID: HIDPP20LongMessage.reportID,
+            bytes: bytes,
+            device: fixture.device,
+            connectionEpoch: fixture.connectionEpoch,
+            rootGeneration: fixture.rootGeneration
+        )
+    }
+
+    let diagnostics = channel.inputDiagnostics
+    #expect(diagnostics.observedCount == 1)
+    #expect(diagnostics.unsolicitedCount == 0)
+    #expect(diagnostics.lastObservedFrameBytes == notRoutable)
+    // Byte 1 is exactly the datum the next hardware session needs.
+    #expect(diagnostics.lastObservedFrameBytes?[1] == 0x00)
+}
+
+@Test func diagnosticsCountARoutedNotificationSeparatelyFromArrival() {
+    let fixture = callbackFixture()
+    let channel = fixture.channel
+    channel.setUnsolicitedHIDPPHandler { _ in }
+
+    var notification = callbackMessageBytes()
+    notification[1] = 0xFF
+    _ = notification.withUnsafeBytes { bytes in
+        channel.receiveCallback(
+            reportType: .input,
+            reportID: HIDPP20LongMessage.reportID,
+            bytes: bytes,
+            device: fixture.device,
+            connectionEpoch: fixture.connectionEpoch,
+            rootGeneration: fixture.rootGeneration
+        )
+    }
+
+    let diagnostics = channel.inputDiagnostics
+    #expect(diagnostics.observedCount == 1)
+    #expect(diagnostics.unsolicitedCount == 1)
+    #expect(diagnostics.lastObservedFrameBytes == notification)
+}
+
+@Test func diagnosticsIgnoreFramesFromAForeignDeviceOrEpoch() {
+    let fixture = callbackFixture()
+    let channel = fixture.channel
+    let frame = callbackMessageBytes()
+
+    _ = frame.withUnsafeBytes { bytes in
+        channel.receiveCallback(
+            reportType: .input,
+            reportID: HIDPP20LongMessage.reportID,
+            bytes: bytes,
+            device: fixture.device,
+            connectionEpoch: fixture.connectionEpoch &+ 1,
+            rootGeneration: fixture.rootGeneration
+        )
+    }
+
+    // Rejected before observation: counting it would make the evidence lie.
+    let diagnostics = channel.inputDiagnostics
+    #expect(diagnostics.observedCount == 0)
+    #expect(diagnostics.lastObservedFrameBytes == nil)
+    #expect(diagnostics.droppedCount == 1)
+}

@@ -890,3 +890,56 @@ admitted-versus-diverted conflation as the status label — and is now gated on 
 diversion status. The status-line fix was confirmed on hardware.
 
 The package total stays at 344, all passing with none skipped.
+
+The input-diagnostics and journal-rotation milestone closes the two blockers the
+2026-09-04 sessions exposed. Neither adds a HID operation, a SET path, or an
+event-synthesis path.
+
+`PrecisionInputDiagnostics` makes the input path observable. The callback
+channel already counted accepted, dropped and unsolicited frames, but nothing
+could read them, so the runtime could not say whether a diverted-control
+notification had arrived and been refused or had never arrived. A new
+`observedCount` counts frames that passed report type, report ID, length,
+device identity, connection epoch and Root generation checks — recorded before
+the notification test — together with the last such frame's bytes. The gap
+between `observedCount` and `unsolicitedCount` is the discriminator, and the
+last frame's second byte is the exact datum the notification filter tests
+against.
+
+The counters are forwarded, never re-derived: the input session is the only
+place that observes, and ownership, assembly, acquisition, composition,
+admission and lifecycle each add a pull-through accessor with a nil default so
+existing fakes and endpoints stay valid. The public owner projects them with an
+interpretation, so a hardware session ends with a conclusion rather than a table.
+Diagnostics gate nothing and are readable while an operation is in flight; they
+take no reservation and hold no lock.
+
+`PrecisionRuntimeJournalRotation` retires a spent runtime journal. A schema-v3
+journal models exactly one apply/restore lifecycle, and once `completed` the
+admission policy permits neither activate nor recover, so a second session was
+impossible and the failure surfaced only as `invalidIntent`. Rotation is
+deliberately not part of bootstrap: bootstrap runs inside an already-authorized
+admission, and retiring durable evidence there would let one confirmation both
+discard a journal and open the device. It is a separate, separately confirmed,
+HID-free operation that renames rather than deletes, holds the canonical
+device-operation lease, re-derives the review under that lease before moving,
+refuses an existing archive, and proves the move afterwards by hash. Every
+non-terminal state — active, ambiguous, conflicted, recovery-required, or any
+dirty control — is refused, because those are exactly the journals a later
+recover reads.
+
+Three package edges were added deliberately and their pinned manifest counts
+updated by hand: the owner now reaches the journal module for rotation, and
+admission, lifecycle and owner reach the transport module for the diagnostics
+type. Four pinned `package` API lists in the ownership, assembly and acquisition
+isolation tests were updated to name the new accessors. That friction is the
+mechanism working: no dependency edge or cross-module symbol can appear here
+without a person editing a number.
+
+Ten rotation and diagnostics tests raise the package total to 354, all passing
+with none skipped. They cover archive-and-prove, every refused state, foreign
+lease, change-after-review, existing archive, symlinked journal, absent journal,
+a frame that arrived but was not routed, a routed notification, and a frame from
+a foreign epoch that must not be counted as observed. A fresh signed menu-app
+build verifies on disk and satisfies its designated requirement. No live HID
+operation was run.

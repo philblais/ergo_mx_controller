@@ -368,12 +368,20 @@ package enum PrecisionRuntimeCompositionFactory {
     }
 }
 
+extension PrecisionRuntimeControlling {
+    /// Diagnostics are evidence, not a capability. A runtime that cannot
+    /// produce them is valid; it simply reports nothing.
+    package func inputDiagnostics() async -> PrecisionInputDiagnostics? { nil }
+}
+
 package protocol PrecisionRuntimeControlling: AnyObject, Sendable {
     func lifecycleState() async throws -> PrecisionTemporaryDiversionLifecycleState
     func activate() async throws -> DeviceTransactionEnvelope
     func deactivate() async throws -> DeviceTransactionEnvelope
     func recoverExplicitly() async throws -> DeviceTransactionRecoveryReport
     func shutdown() async -> PrecisionRuntimeShutdownReport
+    /// Read-only evidence about the input path. Never gates an operation.
+    func inputDiagnostics() async -> PrecisionInputDiagnostics?
 }
 
 /// Productless, package-only owner of the complete precision runtime graph.
@@ -444,6 +452,10 @@ package actor PrecisionRuntimeComposition: PrecisionRuntimeControlling {
         deviceDisconnected = true
         endpoint.setUnsolicitedHIDPPHandler(nil)
         await transport.disconnected()
+    }
+
+    package func inputDiagnostics() -> PrecisionInputDiagnostics? {
+        endpoint.inputDiagnostics()
     }
 
     package func shutdown() async -> PrecisionRuntimeShutdownReport {

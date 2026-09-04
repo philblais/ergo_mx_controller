@@ -134,6 +134,9 @@ let package = Package(
             dependencies: [
                 "MXErgoPrecisionRuntimeComposition",
                 "MXErgoPrecisionRuntimeJournal",
+                // Read-only input diagnostics only; no transport is constructed
+                // here and no packet type crosses this edge.
+                "MXErgoPrecisionTransport",
                 "MXErgoHIDPP",
             ]
         ),
@@ -155,6 +158,7 @@ let package = Package(
         .target(
             name: "MXErgoPrecisionRuntimeLifecycle",
             dependencies: [
+                "MXErgoPrecisionTransport",
                 "MXErgoHID",
                 "MXErgoPrecisionRuntimeAdmission",
                 "MXErgoPrecisionRuntimeHostHandoff",
@@ -167,12 +171,16 @@ let package = Package(
         .target(
             name: "MXErgoPrecisionRuntimeOwner",
             dependencies: [
+                "MXErgoPrecisionTransport",
                 "MXErgoCore",
                 "MXErgoHID",
                 "MXErgoHIDPP",
                 "MXErgoPrecisionRuntimeLifecycle",
                 "MXErgoPrecisionRuntimeAdmission",
                 "MXErgoPrecisionRuntimeHostHandoff",
+                // Journal rotation only. The canonical journal source stays the
+                // single authority; the owner must not grow a second reader.
+                "MXErgoPrecisionRuntimeJournal",
             ]
         ),
         .executableTarget(

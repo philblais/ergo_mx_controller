@@ -179,6 +179,10 @@ final class PrecisionIOHIDDeviceAssembly:
         endpoint.setUnsolicitedHIDPPHandler(handler)
     }
 
+    package func inputDiagnostics() -> PrecisionInputDiagnostics? {
+        endpoint.inputDiagnostics()
+    }
+
     func setDisconnectHandler(_ handler: (@Sendable () -> Void)?) {
         endpoint.setDisconnectHandler(handler)
     }

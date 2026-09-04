@@ -231,6 +231,12 @@ final class PrecisionIOHIDInputSession:
         callbackChannel.setUnsolicitedHIDPPHandler(handler)
     }
 
+    /// The only place that can answer what the device actually sent. Everything
+    /// above this point forwards; nothing above it observes.
+    package func inputDiagnostics() -> PrecisionInputDiagnostics? {
+        callbackChannel.inputDiagnostics
+    }
+
     func setDisconnectHandler(_ handler: (@Sendable () -> Void)?) {
         lifecycleCondition.lock()
         extraDisconnectHandler = handler

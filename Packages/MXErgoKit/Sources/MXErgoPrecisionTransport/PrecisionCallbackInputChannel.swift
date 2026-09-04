@@ -48,6 +48,12 @@ package final class PrecisionCallbackInputChannel:
     private var unsolicitedHandler:
         (@Sendable (PrecisionTransportInputFrame) -> Void)?
     private var unsolicitedCountStorage = 0
+    /// Frames that passed identity, epoch, report-type and length checks,
+    /// counted before the unsolicited-notification test. The gap between
+    /// this and `unsolicitedCount` is what distinguishes "the device sent
+    /// nothing" from "the device sent something we refused to route".
+    private var observedCountStorage = 0
+    private var lastObservedBytesStorage: [UInt8]?
 
     package init(
         expectedDevice: JournalDeviceIdentity,
@@ -112,6 +118,13 @@ package final class PrecisionCallbackInputChannel:
               rootGeneration == expectedRootGeneration else {
             queue.sync { droppedCountStorage += 1 }
             return false
+        }
+
+        // Record every accepted-shape frame before deciding what it is. This is
+        // diagnostic only: it drives no routing and gates nothing.
+        queue.sync {
+            observedCountStorage += 1
+            lastObservedBytesStorage = copiedBytes
         }
 
         let frame = PrecisionTransportInputFrame(
@@ -287,6 +300,21 @@ package final class PrecisionCallbackInputChannel:
     package var acceptedCount: Int { queue.sync { acceptedCountStorage } }
     package var droppedCount: Int { queue.sync { droppedCountStorage } }
     package var unsolicitedCount: Int { queue.sync { unsolicitedCountStorage } }
+    package var observedCount: Int { queue.sync { observedCountStorage } }
+    package var inputDiagnostics: PrecisionInputDiagnostics {
+        queue.sync {
+            PrecisionInputDiagnostics(
+                observedCount: observedCountStorage,
+                unsolicitedCount: unsolicitedCountStorage,
+                acceptedCount: acceptedCountStorage,
+                droppedCount: droppedCountStorage,
+                lastObservedFrameBytes: lastObservedBytesStorage
+            )
+        }
+    }
+    package var lastObservedFrameBytes: [UInt8]? {
+        queue.sync { lastObservedBytesStorage }
+    }
     package var resumeCount: Int { queue.sync { resumeCountStorage } }
     package var finishCount: Int { queue.sync { finishCountStorage } }
     package var cancelCount: Int { queue.sync { cancelCountStorage } }

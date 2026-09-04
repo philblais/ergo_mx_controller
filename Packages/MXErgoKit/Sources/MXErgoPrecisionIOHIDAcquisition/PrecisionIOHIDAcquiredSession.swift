@@ -49,9 +49,12 @@ package protocol PrecisionIOHIDAcquiredEndpoint:
         _ handler: (@Sendable (PrecisionTransportInputFrame) -> Void)?
     )
     func setDisconnectHandler(_ handler: (@Sendable () -> Void)?)
+    func inputDiagnostics() -> PrecisionInputDiagnostics?
 }
 
 extension PrecisionIOHIDAcquiredEndpoint {
+    func inputDiagnostics() -> PrecisionInputDiagnostics? { nil }
+
     func setUnsolicitedHIDPPHandler(
         _ handler: (@Sendable (PrecisionTransportInputFrame) -> Void)?
     ) {
@@ -241,6 +244,10 @@ final class PrecisionIOHIDAcquiredSession:
         _ handler: (@Sendable (PrecisionTransportInputFrame) -> Void)?
     ) {
         endpoint.setUnsolicitedHIDPPHandler(handler)
+    }
+
+    package func inputDiagnostics() -> PrecisionInputDiagnostics? {
+        endpoint.inputDiagnostics()
     }
 
     func setDisconnectHandler(_ handler: (@Sendable () -> Void)?) {

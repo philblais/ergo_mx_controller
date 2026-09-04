@@ -274,6 +274,10 @@ import Testing
     #expect(packageDeclarationLines(in: assemblySource) == [
         "package enum PrecisionIOHIDAssemblyFactory {",
         "package static func make(",
+        // Read-only input diagnostics, added 2026-09-04 so a hardware
+        // session can tell "the device sent nothing" from "the runtime
+        // refused what it sent". They gate nothing.
+        "package func inputDiagnostics() -> PrecisionInputDiagnostics? {",
     ])
 
     let inputSource = try sourceText(
@@ -292,6 +296,10 @@ import Testing
         )
     )
     #expect(packageDeclarationLines(in: inputSource) == [
+        // Read-only input diagnostics, added 2026-09-04 so a hardware
+        // session can tell "the device sent nothing" from "the runtime
+        // refused what it sent". They gate nothing.
+        "package func inputDiagnostics() -> PrecisionInputDiagnostics? {",
         "package enum PrecisionIOHIDInputFactory {",
         "package static func make(",
     ])
@@ -303,8 +311,15 @@ import Testing
         "package protocol PrecisionIOHIDInputLifetime:",
         "package protocol PrecisionIOHIDQuiescentReleaseAnchor: AnyObject, Sendable {",
         "package protocol PrecisionIOHIDAssembledEndpoint:",
+        // Read-only input diagnostics, added 2026-09-04 so a hardware
+        // session can tell "the device sent nothing" from "the runtime
+        // refused what it sent". They gate nothing.
+        "package func inputDiagnostics() -> PrecisionInputDiagnostics? { nil }",
+        "package func inputDiagnostics() -> PrecisionInputDiagnostics? { nil }",
         "package enum PrecisionIOHIDOwnershipFactory {",
         "package static func make(",
+        "package func inputDiagnostics() -> PrecisionInputDiagnostics? {",
+        "package func inputDiagnostics() -> PrecisionInputDiagnostics? {",
     ])
     #expect(outputSource.contains("fileprivate convenience init("))
     #expect(!outputSource.contains("package init("))

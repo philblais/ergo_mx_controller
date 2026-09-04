@@ -1,6 +1,7 @@
 import Foundation
 import MXErgoHIDPP
 import MXErgoPrecisionRuntimeComposition
+import MXErgoPrecisionTransport
 import MXErgoPrecisionRuntimeJournal
 
 package enum PrecisionRuntimeAdmissionError: Error, Sendable, Equatable {
@@ -535,6 +536,12 @@ package actor PrecisionRuntimeAdmission {
     private let rootGenerationProvider: @Sendable () async throws -> UInt64
     private let nowProvider: @Sendable () -> UInt64
     private var runtime: (any PrecisionRuntimeControlling)?
+
+    /// Diagnostics are readable whenever a runtime exists, including while an
+    /// operation is in flight. They gate nothing, so they take no reservation.
+    package func inputDiagnostics() async -> PrecisionInputDiagnostics? {
+        await runtime?.inputDiagnostics()
+    }
     private var operationLease: MXErgoDeviceOperationLease?
     private var stateStorage: PrecisionRuntimeAdmissionState = .admitting
     private var commandInProgress = false

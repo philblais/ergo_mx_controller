@@ -204,9 +204,12 @@ protocol PrecisionIOHIDOwnedInputEndpoint:
         _ handler: (@Sendable (PrecisionTransportInputFrame) -> Void)?
     )
     func setDisconnectHandler(_ handler: (@Sendable () -> Void)?)
+    func inputDiagnostics() -> PrecisionInputDiagnostics?
 }
 
 extension PrecisionIOHIDOwnedInputEndpoint {
+    func inputDiagnostics() -> PrecisionInputDiagnostics? { nil }
+
     func setUnsolicitedHIDPPHandler(
         _ handler: (@Sendable (PrecisionTransportInputFrame) -> Void)?
     ) {
@@ -236,6 +239,7 @@ package protocol PrecisionIOHIDInputLifetime:
         _ handler: (@Sendable (PrecisionTransportInputFrame) -> Void)?
     )
     func setDisconnectHandler(_ handler: (@Sendable () -> Void)?)
+    func inputDiagnostics() -> PrecisionInputDiagnostics?
 }
 
 /// A system-resource owner whose final synchronous release must occur only
@@ -257,9 +261,12 @@ package protocol PrecisionIOHIDAssembledEndpoint:
         _ handler: (@Sendable (PrecisionTransportInputFrame) -> Void)?
     )
     func setDisconnectHandler(_ handler: (@Sendable () -> Void)?)
+    func inputDiagnostics() -> PrecisionInputDiagnostics?
 }
 
 extension PrecisionIOHIDInputLifetime {
+    package func inputDiagnostics() -> PrecisionInputDiagnostics? { nil }
+
     func setUnsolicitedHIDPPHandler(
         _ handler: (@Sendable (PrecisionTransportInputFrame) -> Void)?
     ) {
@@ -272,6 +279,8 @@ extension PrecisionIOHIDInputLifetime {
 }
 
 extension PrecisionIOHIDAssembledEndpoint {
+    package func inputDiagnostics() -> PrecisionInputDiagnostics? { nil }
+
     func setUnsolicitedHIDPPHandler(
         _ handler: (@Sendable (PrecisionTransportInputFrame) -> Void)?
     ) {
@@ -416,6 +425,10 @@ final class PrecisionIOHIDOwnershipCoordinator:
         token.retainedInputEndpoint?.setUnsolicitedHIDPPHandler(handler)
     }
 
+    package func inputDiagnostics() -> PrecisionInputDiagnostics? {
+        token.retainedInputEndpoint?.inputDiagnostics()
+    }
+
     func setDisconnectHandler(_ handler: (@Sendable () -> Void)?) {
         token.retainedInputEndpoint?.setDisconnectHandler(handler)
     }
@@ -492,6 +505,10 @@ private final class PrecisionIOHIDReleasingInputEndpoint:
         _ handler: (@Sendable (PrecisionTransportInputFrame) -> Void)?
     ) {
         retainedInner()?.setUnsolicitedHIDPPHandler(handler)
+    }
+
+    package func inputDiagnostics() -> PrecisionInputDiagnostics? {
+        retainedInner()?.inputDiagnostics()
     }
 
     func setDisconnectHandler(_ handler: (@Sendable () -> Void)?) {

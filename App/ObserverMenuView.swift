@@ -22,6 +22,7 @@ struct ObserverMenuView: View {
     @State private var showingRuntimeOwnerRecoverConfirmation = false
     @State private var showingRuntimeOwnerDeactivateConfirmation = false
     @State private var showingRuntimeOwnerRolloverConfirmation = false
+    @State private var showingJournalRotationConfirmation = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -936,6 +937,72 @@ struct ObserverMenuView: View {
             } message: {
                 Text("This discards the bound runtime owner and lifts the restart fence so the observer can start on a new connection. It sends no HID command and does not restore CID 00ED. If Precision may still be diverted on the hardware, recover it on the new connection before relying on the button.")
             }
+
+            if let summary = model.inputDiagnosticsSummary {
+                Divider()
+                Text("Input evidence")
+                    .font(.caption.weight(.semibold))
+                Text(summary)
+                    .font(.system(.caption2, design: .monospaced))
+                    .textSelection(.enabled)
+                if let frame = model.inputDiagnosticsLastFrame {
+                    Text("last frame  \(frame)")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let interpretation = model.inputDiagnosticsInterpretation {
+                    Text(interpretation)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text("Read-only. These counts gate nothing and change no behaviour.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+
+            Divider()
+
+            Text("Completed runtime journal")
+                .font(.caption.weight(.semibold))
+            Text(model.journalRotationStatusText)
+                .font(.caption2)
+                .foregroundStyle(model.journalRotationAvailable ? .orange : .secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let summary = model.journalRotationSummary {
+                Text(summary)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button("Retire completed runtime journal…") {
+                showingJournalRotationConfirmation = true
+            }
+            .controlSize(.small)
+            .disabled(model.journalRotationGateFailureText != nil)
+            .confirmationDialog(
+                "Retire the completed runtime journal?",
+                isPresented: $showingJournalRotationConfirmation
+            ) {
+                Button("Cancel", role: .cancel) {}
+                Button("Archive and retire") {
+                    model.confirmJournalRotation()
+                }
+            } message: {
+                Text("This renames the completed journal so a fresh one can bootstrap from the unchanged recovery baseline. It is never deleted, sends no HID command, opens no device, and refuses any journal still holding active, ambiguous, conflicted, or recovery-required evidence.")
+            }
+            if let gate = model.journalRotationGateFailureText,
+               model.journalRotationAvailable {
+                Text(gate)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
 
             Text("While admitted, Precision tap mutes and hold+scroll changes volume when Audio test is on. If the trackball disconnects, this app shuts down without a restore SET and shows recovery-required. After rollover, start the observer on the new connection, review readiness, bind, then confirm Recover Precision to send one restore SET. Reconnect never auto-retries. Other buttons stay with the OS/BetterTouchTool.")
                 .font(.caption2)

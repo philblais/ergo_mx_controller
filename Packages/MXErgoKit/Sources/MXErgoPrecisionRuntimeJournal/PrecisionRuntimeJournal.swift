@@ -16,6 +16,11 @@ package enum PrecisionRuntimeJournalError: Error, Sendable, Equatable {
     case runtimeJournalTooLarge
     case existingRuntimeJournalMismatch
     case commitReceiptMismatch
+    case runtimeJournalMissing
+    case runtimeJournalNotRotatable
+    case rotationArchiveAlreadyExists
+    case rotationSourceChanged
+    case rotationFailed
 }
 
 package struct PrecisionRuntimeJournalSnapshot: Sendable, Equatable {
@@ -423,7 +428,7 @@ actor DurablePrecisionRuntimeJournalSource:
 
 private let maximumRuntimeJournalByteCount = 1_048_576
 
-private func readRegularFile(
+func readRegularFile(
     at url: URL,
     missingError: PrecisionRuntimeJournalError,
     nonRegularError: PrecisionRuntimeJournalError
@@ -476,6 +481,6 @@ private func readRegularFile(
     return Data(bytes)
 }
 
-private func sha256(_ data: Data) -> String {
+func sha256(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
 }

@@ -2,6 +2,7 @@ import Foundation
 import MXErgoHID
 import MXErgoHIDPP
 import MXErgoPrecisionRuntimeAdmission
+import MXErgoPrecisionTransport
 import MXErgoPrecisionRuntimeComposition
 import MXErgoPrecisionRuntimeHostHandoff
 
@@ -34,6 +35,13 @@ package protocol PrecisionRuntimeLifecycleSession: AnyObject, Sendable {
         authorization: PrecisionRuntimeAdmissionAuthorization
     ) async throws
     func shutdown() async -> PrecisionRuntimeShutdownReport
+    func inputDiagnostics() async -> PrecisionInputDiagnostics?
+}
+
+extension PrecisionRuntimeLifecycleSession {
+    /// Diagnostics are evidence, not a capability. A session that cannot
+    /// produce them is valid; it simply reports nothing.
+    package func inputDiagnostics() async -> PrecisionInputDiagnostics? { nil }
 }
 
 extension PrecisionRuntimeAdmission: PrecisionRuntimeLifecycleSession {}
@@ -56,6 +64,11 @@ package actor PrecisionRuntimeLifecycle {
     private let hostHandoff: any PrecisionRuntimeHostHandoff
     private let releaseFence: FenceReleaser
     private var session: (any PrecisionRuntimeLifecycleSession)?
+
+    /// Read-only. Available whenever a session exists, regardless of phase.
+    package func inputDiagnostics() async -> PrecisionInputDiagnostics? {
+        await session?.inputDiagnostics()
+    }
     private var phaseStorage: PrecisionRuntimeLifecyclePhase = .bound
     private var lastShutdownReportStorage: PrecisionRuntimeShutdownReport?
 

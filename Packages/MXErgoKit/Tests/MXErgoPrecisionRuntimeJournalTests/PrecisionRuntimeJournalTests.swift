@@ -320,7 +320,9 @@ import Testing
     #expect(!products.contains("MXErgoPrecisionRuntimeJournal"))
     #expect(manifest.components(
         separatedBy: "\"MXErgoPrecisionRuntimeJournal\""
-    ).count - 1 == 6)
+    // 7 since the public owner gained the rotation facade. This count is
+    // pinned deliberately so a new dependency edge cannot appear unnoticed.
+    ).count - 1 == 7)
     #expect(manifest.components(
         separatedBy: "\"MXErgoPrecisionRuntimeJournalTests\""
     ).count - 1 == 1)

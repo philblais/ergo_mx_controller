@@ -86,6 +86,14 @@ final class AppModel: ObservableObject {
     /// The bound intent's deadline is fixed at bind time, so retrying the
     /// same operation can never succeed; the owner must be re-bound.
     @Published private(set) var runtimeOwnerAuthorizationExpired = false
+    @Published private(set) var journalRotationStatusText =
+        "No completed runtime journal to retire"
+    @Published private(set) var journalRotationSummary: String?
+    @Published private(set) var journalRotationAvailable = false
+    @Published private(set) var journalRotationInProgress = false
+    @Published private(set) var inputDiagnosticsSummary: String?
+    @Published private(set) var inputDiagnosticsInterpretation: String?
+    @Published private(set) var inputDiagnosticsLastFrame: String?
     @Published private(set) var runtimeOwnerCanDeactivate = false
     @Published private(set) var runtimeOwnerNeedsRecovery = false
     @Published private(set) var runtimeOwnerDeviceDisconnected = false
@@ -165,6 +173,7 @@ final class AppModel: ObservableObject {
         guard !didBootstrap else { return }
         didBootstrap = true
         requestInputMonitoringIfNeeded()
+        refreshJournalRotationReview()
         start()
     }
 
@@ -928,6 +937,90 @@ final class AppModel: ObservableObject {
         return true
     }
 
+    /// A spent runtime journal blocks every later operation, because activate
+    /// needs `prepared`/`baselineVerified` and recover needs evidence a
+    /// completed journal no longer has. Reviewing costs nothing and is safe at
+    /// any time, so it runs whenever the runtime owner is idle.
+    func refreshJournalRotationReview() {
+        guard runtimeOwner == nil, !journalRotationInProgress else { return }
+        do {
+            guard let review = try PrecisionRuntimeJournalRotator.review(
+                runtimeJournalURL: Self.runtimeJournalFileURL
+            ) else {
+                journalRotationAvailable = false
+                journalRotationSummary = nil
+                journalRotationStatusText =
+                    "No runtime journal on disk; the next admission creates one"
+                return
+            }
+            journalRotationAvailable = true
+            journalRotationSummary = review.summary
+            journalRotationStatusText =
+                "A completed runtime journal is blocking further operations. Retiring it archives the file and lets a fresh journal bootstrap from the unchanged baseline."
+        } catch {
+            journalRotationAvailable = false
+            journalRotationSummary = nil
+            journalRotationStatusText = journalRotationFailureText(error)
+        }
+    }
+
+    var journalRotationGateFailureText: String? {
+        if runtimeOwner != nil {
+            return "Release the runtime owner for session rollover before retiring its journal"
+        }
+        if journalRotationInProgress {
+            return "Retiring the completed runtime journal…"
+        }
+        guard journalRotationAvailable else {
+            return journalRotationStatusText
+        }
+        return nil
+    }
+
+    func confirmJournalRotation() {
+        guard journalRotationGateFailureText == nil else { return }
+        journalRotationInProgress = true
+        defer { journalRotationInProgress = false }
+        do {
+            guard let review = try PrecisionRuntimeJournalRotator.review(
+                runtimeJournalURL: Self.runtimeJournalFileURL
+            ) else {
+                journalRotationAvailable = false
+                journalRotationStatusText =
+                    "No runtime journal on disk; nothing was retired"
+                return
+            }
+            let receipt = try PrecisionRuntimeJournalRotator.rotate(review)
+            journalRotationAvailable = false
+            journalRotationSummary = nil
+            journalRotationStatusText =
+                "Retired transaction \(receipt.archivedTransactionID.uuidString) to \(receipt.archiveURL.lastPathComponent). SHA-256 \(receipt.archivedSHA256). No HID command was sent and the recovery baseline is unchanged."
+        } catch {
+            journalRotationStatusText = journalRotationFailureText(error)
+        }
+        refreshJournalRotationReview()
+    }
+
+    private func journalRotationFailureText(_ error: Error) -> String {
+        guard let rotationError = error as? PrecisionRuntimeJournalRotationError else {
+            return "Journal rotation failed closed: \(error)"
+        }
+        switch rotationError {
+        case .notRotatable:
+            return "This runtime journal still holds active, ambiguous, conflicted, or recovery-required evidence. It will not be retired."
+        case .archiveAlreadyExists:
+            return "An archive for this transaction already exists; nothing was changed."
+        case .changedAfterReview:
+            return "The journal changed after it was reviewed; nothing was changed."
+        case .notARegularFile:
+            return "The runtime journal is not a regular file; nothing was changed."
+        case .leaseUnavailable:
+            return "Another process holds the device-operation lease; nothing was changed."
+        case let .failed(detail):
+            return "Journal rotation failed closed: \(detail)"
+        }
+    }
+
     func confirmRuntimeOwnerAdmission() async {
         guard runtimeOwnerCanAdmit,
               !runtimeOwnerOperationInProgress,
@@ -1038,6 +1131,7 @@ final class AppModel: ObservableObject {
             runtimeOwner = nil
             runtimeOwnerSession = nil
             runtimeOwnerRootGeneration = nil
+            refreshJournalRotationReview()
             await refreshRuntimeOwnerFlags()
             runtimeOwnerStatusText =
                 "Session rollover released the restart fence; the observer may start again"
@@ -1732,6 +1826,9 @@ final class AppModel: ObservableObject {
 
     private func refreshRuntimeOwnerFlags() async {
         guard let owner = runtimeOwner else {
+            inputDiagnosticsSummary = nil
+            inputDiagnosticsInterpretation = nil
+            inputDiagnosticsLastFrame = nil
             runtimeOwnerBlocksRestart = false
             runtimeOwnerCanRollover = false
             runtimeOwnerCanAdmit = false
@@ -1769,6 +1866,15 @@ final class AppModel: ObservableObject {
             && runtimeOwnerControlIsDiverted
         runtimeOwnerCanRollover = phase == .bound || phase == .shutDown
         runtimeOwnerDeviceDisconnected = disconnected
+        if let diagnostics = await owner.inputDiagnostics() {
+            inputDiagnosticsSummary = diagnostics.summary
+            inputDiagnosticsInterpretation = diagnostics.interpretation
+            inputDiagnosticsLastFrame = diagnostics.lastObservedFrameHex
+        } else {
+            inputDiagnosticsSummary = nil
+            inputDiagnosticsInterpretation = nil
+            inputDiagnosticsLastFrame = nil
+        }
         switch diversion {
         case .recoveryRequired, .shutDown(recoveryRequired: true):
             runtimeOwnerNeedsRecovery = true

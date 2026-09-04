@@ -90,3 +90,77 @@ genuine diversion candidate.
 
 Record the result in `Evidence/VALIDATION-RECORDS.md` before designing any
 mapped-control SET path.
+
+---
+
+## Precision audio verification
+
+Confirms tap-to-mute, hold+scroll volume, and the scroll swallow, and captures
+the evidence for the validation record. One full admit cycle.
+
+**Before starting**
+
+- Quit BetterTouchTool and Logi Options completely, and power-cycle the
+  trackball.
+- Rebuild in Xcode. The `last press` line in the input-evidence panel is recent;
+  an older build silently omits it.
+- Confirm the schema-v2 baseline is still
+  `60ab614927d20871994ad0ebe7368158af9a26b2c1d60f7a2ab3c51635f77097`.
+
+**1. Launch and read the permission rows — before anything else**
+
+Note whether **Accessibility** says granted. This matters: the scroll swallow
+uses a `CGEvent` tap created with `.defaultTap`, which can suppress events, and a
+suppressing tap requires Accessibility rather than Input Monitoring alone. If it
+is not granted, expect the page to scroll while Precision is held even when
+volume works.
+
+**2. Retire the spent journal**
+
+A completed journal blocks admission. **Retire completed runtime journal…** →
+*Archive and retire*. It renames rather than deletes and sends no HID command.
+
+**3. Read-only chain — keep the Audio test OFF for all of it**
+
+Each is review-then-confirm:
+
+1. Review one-shot query… → *Send exactly once* — expect feature index `0x0A`, version 3
+2. Review firmware discovery… → *Discover exactly once*
+3. Review offline restore packets… → *Build without sending*
+4. Review dormant trial self-test… → *Run isolated trial*
+5. Review live Precision preflight… → *Send one read-only GET* — expect exact baseline
+6. Review Precision lifecycle readiness… — must say `NOT AUTHORIZED`
+
+**4. Bind and admit — back to back, no pause**
+
+The one-use authorization is minted at bind with a ten-minute lifetime, so any
+delay between these two expires it and the bound intent can never succeed.
+
+7. **Bind dormant runtime owner…** → *Bind without admitting*
+8. **Admit Precision runtime…** → *Admit and send SET*
+
+Status should read `Precision diverted (active)`.
+
+**5. The measurement**
+
+9. Turn **on** "Execute mute and volume".
+10. **Tap Precision quickly** — under a third of a second. A slower press is a
+    hold by design and emits no mute intent.
+11. **Hold Precision and scroll** over a long page. Volume should change and the
+    page should not move.
+12. Click **Refresh input evidence**.
+
+**6. Record**
+
+Capture the input-evidence panel: the counts, `last frame`, and `last press`.
+A press frame reading `11 FF 0A 00 00 ED …` confirms the notification carries
+Precision's CID. Note what `Last preview` showed for each action.
+
+**7. Finish**
+
+13. **Deactivate Precision…** → *Deactivate and send SET*. Status should turn
+    green: `Precision restored to baseline; runtime still admitted`.
+14. Quit. Quit alone never sends an inverse SET, so deactivating first is what
+    returns the button.
+15. Confirm the runtime journal reads `restoredVerified` and the schema-v2
+    baseline hash is unchanged.

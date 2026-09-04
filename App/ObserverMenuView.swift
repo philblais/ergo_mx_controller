@@ -988,9 +988,14 @@ struct ObserverMenuView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Text("Read-only. These counts gate nothing and change no behaviour.")
+                Button("Refresh input evidence") {
+                    Task { await model.refreshInputDiagnostics() }
+                }
+                .controlSize(.small)
+                Text("Read-only. These counts gate nothing and change no behaviour. They refresh only when asked or when runtime state changes, so press the control you are testing first, then refresh.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Divider()

@@ -932,6 +932,16 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Re-reads the runtime's input evidence on demand.
+    ///
+    /// The counters only otherwise refresh when owner state changes, so if no
+    /// control event is being delivered — precisely the case under
+    /// investigation — the panel would sit at stale zeros and appear to confirm
+    /// whatever the reader already believed.
+    func refreshInputDiagnostics() async {
+        await refreshRuntimeOwnerFlags()
+    }
+
     /// Records that a one-use authorization expired. Its deadline is minted in
     /// `bind()`, so the bound intent is permanently dead and the only way
     /// forward is a session rollover followed by a fresh bind.

@@ -21,18 +21,23 @@ package struct PrecisionInputDiagnostics: Sendable, Equatable {
     package let acceptedCount: Int
     package let droppedCount: Int
     package let lastObservedFrameBytes: [UInt8]?
+    /// Last routed notification with a non-zero payload — a press rather than a
+    /// release.
+    package let lastPayloadNotificationBytes: [UInt8]?
 
     package init(
         observedCount: Int,
         unsolicitedCount: Int,
         acceptedCount: Int,
         droppedCount: Int,
-        lastObservedFrameBytes: [UInt8]?
+        lastObservedFrameBytes: [UInt8]?,
+        lastPayloadNotificationBytes: [UInt8]?
     ) {
         self.observedCount = observedCount
         self.unsolicitedCount = unsolicitedCount
         self.acceptedCount = acceptedCount
         self.droppedCount = droppedCount
         self.lastObservedFrameBytes = lastObservedFrameBytes
+        self.lastPayloadNotificationBytes = lastPayloadNotificationBytes
     }
 }

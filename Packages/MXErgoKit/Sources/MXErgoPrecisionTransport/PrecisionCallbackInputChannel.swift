@@ -54,6 +54,11 @@ package final class PrecisionCallbackInputChannel:
     /// nothing" from "the device sent something we refused to route".
     private var observedCountStorage = 0
     private var lastObservedBytesStorage: [UInt8]?
+    /// The last routed notification carrying a non-zero payload. A release
+    /// notification has all-zero parameters, so without this the last frame
+    /// captured is almost always a release and says nothing about which
+    /// control was pressed.
+    private var lastPayloadNotificationBytesStorage: [UInt8]?
 
     package init(
         expectedDevice: JournalDeviceIdentity,
@@ -139,6 +144,9 @@ package final class PrecisionCallbackInputChannel:
             let handler = queue.sync { () -> (@Sendable (PrecisionTransportInputFrame) -> Void)? in
                 guard !stopped, !removed else { return nil }
                 unsolicitedCountStorage += 1
+                if copiedBytes.dropFirst(4).contains(where: { $0 != 0 }) {
+                    lastPayloadNotificationBytesStorage = copiedBytes
+                }
                 return unsolicitedHandler
             }
             handler?(frame)
@@ -308,7 +316,8 @@ package final class PrecisionCallbackInputChannel:
                 unsolicitedCount: unsolicitedCountStorage,
                 acceptedCount: acceptedCountStorage,
                 droppedCount: droppedCountStorage,
-                lastObservedFrameBytes: lastObservedBytesStorage
+                lastObservedFrameBytes: lastObservedBytesStorage,
+                lastPayloadNotificationBytes: lastPayloadNotificationBytesStorage
             )
         }
     }

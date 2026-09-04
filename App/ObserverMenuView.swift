@@ -982,6 +982,13 @@ struct ObserverMenuView: View {
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if let press = model.inputDiagnosticsLastPress {
+                    Text("last press   \(press)")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.primary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if let interpretation = model.inputDiagnosticsInterpretation {
                     Text(interpretation)
                         .font(.caption2)

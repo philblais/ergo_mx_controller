@@ -560,6 +560,8 @@ public struct PrecisionInputDiagnosticsSnapshot: Sendable, Equatable {
     public let acceptedCount: Int
     public let droppedCount: Int
     public let lastObservedFrameHex: String?
+    /// Last notification carrying a payload — a press rather than a release.
+    public let lastPressFrameHex: String?
 
     init(_ diagnostics: PrecisionInputDiagnostics) {
         observedCount = diagnostics.observedCount
@@ -567,6 +569,9 @@ public struct PrecisionInputDiagnosticsSnapshot: Sendable, Equatable {
         acceptedCount = diagnostics.acceptedCount
         droppedCount = diagnostics.droppedCount
         lastObservedFrameHex = diagnostics.lastObservedFrameBytes.map { bytes in
+            bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
+        }
+        lastPressFrameHex = diagnostics.lastPayloadNotificationBytes.map { bytes in
             bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
         }
     }

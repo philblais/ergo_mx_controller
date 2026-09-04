@@ -101,6 +101,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var inputDiagnosticsSummary: String?
     @Published private(set) var inputDiagnosticsInterpretation: String?
     @Published private(set) var inputDiagnosticsLastFrame: String?
+    @Published private(set) var inputDiagnosticsLastPress: String?
     @Published private(set) var runtimeOwnerCanDeactivate = false
     @Published private(set) var runtimeOwnerNeedsRecovery = false
     @Published private(set) var runtimeOwnerDeviceDisconnected = false
@@ -1861,6 +1862,7 @@ final class AppModel: ObservableObject {
             inputDiagnosticsSummary = nil
             inputDiagnosticsInterpretation = nil
             inputDiagnosticsLastFrame = nil
+            inputDiagnosticsLastPress = nil
             runtimeOwnerBlocksRestart = false
             runtimeOwnerCanRollover = false
             runtimeOwnerCanAdmit = false
@@ -1902,10 +1904,12 @@ final class AppModel: ObservableObject {
             inputDiagnosticsSummary = diagnostics.summary
             inputDiagnosticsInterpretation = diagnostics.interpretation
             inputDiagnosticsLastFrame = diagnostics.lastObservedFrameHex
+            inputDiagnosticsLastPress = diagnostics.lastPressFrameHex
         } else {
             inputDiagnosticsSummary = nil
             inputDiagnosticsInterpretation = nil
             inputDiagnosticsLastFrame = nil
+            inputDiagnosticsLastPress = nil
         }
         switch diversion {
         case .recoveryRequired, .shutDown(recoveryRequired: true):

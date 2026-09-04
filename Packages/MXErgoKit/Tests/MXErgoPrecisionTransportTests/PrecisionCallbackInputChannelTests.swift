@@ -517,3 +517,43 @@ private enum CallbackTestWaitError: Error {
     #expect(diagnostics.lastObservedFrameBytes == nil)
     #expect(diagnostics.droppedCount == 1)
 }
+
+@Test func diagnosticsKeepThePressFrameRatherThanTheReleaseThatFollowsIt() {
+    let fixture = callbackFixture()
+    let channel = fixture.channel
+    channel.setUnsolicitedHIDPPHandler { _ in }
+
+    func deliver(_ bytes: [UInt8]) {
+        _ = bytes.withUnsafeBytes { raw in
+            channel.receiveCallback(
+                reportType: .input,
+                reportID: HIDPP20LongMessage.reportID,
+                bytes: raw,
+                device: fixture.device,
+                connectionEpoch: fixture.connectionEpoch,
+                rootGeneration: fixture.rootGeneration
+            )
+        }
+    }
+
+    // A press carrying a control ID, then the all-zero release that follows.
+    var press = [UInt8](repeating: 0, count: HIDPP20LongMessage.byteCount)
+    press[0] = HIDPP20LongMessage.reportID
+    press[1] = 0xFF
+    press[2] = 0x0A
+    press[4] = 0x00
+    press[5] = 0xED
+    var release = press
+    release[4] = 0
+    release[5] = 0
+
+    deliver(press)
+    deliver(release)
+
+    let diagnostics = channel.inputDiagnostics
+    #expect(diagnostics.unsolicitedCount == 2)
+    // The release is the most recent frame...
+    #expect(diagnostics.lastObservedFrameBytes == release)
+    // ...but the press is the one that identifies the control, so it is kept.
+    #expect(diagnostics.lastPayloadNotificationBytes == press)
+}

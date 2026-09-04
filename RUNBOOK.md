@@ -51,3 +51,42 @@ inverse command. See [SAFETY.md](SAFETY.md).
 29. After that new observer run, resolve Root and firmware again, then run Precision preflight. If live Precision still differs from baseline, the app should keep that GET as recover evidence. Review readiness, bind, then confirm **Recover Precision…**. That can send one restore SET. It must not retry if the SET is ambiguous. If Recover reports an unknown SET outcome, the control stays locked; use a GET-only probe and do not send another SET.
 30. With a clean firmware-bound baseline, select **Review mapped-control diversion…**. With BetterTouchTool and Logi Options fully quit, confirm it lists wheel click, both thumbs, and both tilts with apply flags `03`, restore flags `02`, and independent GET/VERIFY packets, shows the journal SHA-256, lists desktop left/right, back/forward, and Mission Control as the BTT-replacement actions, reports event delivery as `0 of 5` CIDs admitted, says `NOT AUTHORIZED`, and does not change the MX Ergo or post those events. Launching a competitor must invalidate the result.
 31. After that review, select **Send mapped-control GET preflight…**. Confirm five sequential `GetCidReporting` requests, exact baseline matches, `NOT AUTHORIZED`, no SET, and an unchanged journal. Any mismatch, timeout, or disconnect must stop the sequence with no retry.
+
+---
+
+## Read-only diagnostic: which buttons need HID++ diversion at all?
+
+Zero risk. No SET, no admission, no diversion — just the observer and the
+calibration panel, which prints the raw hex of every report it receives
+(`ObserverMenuView.swift`, calibration section).
+
+**Why this matters.** The 2026-08-27 baseline snapshot recorded all nine
+reprogrammable controls at `flags 0000` — nothing diverted — while
+BetterTouchTool was in daily use. BetterTouchTool therefore does **not** use
+HID++ diversion for the thumb buttons, wheel tilt, or wheel click. It must be
+acting on events macOS already delivers, which means those controls appear in
+the MX Ergo's ordinary HID reports.
+
+If that is so, the five mapped CIDs may not need HID++ diversion at all, and the
+planned multi-CID SET path would be solving a problem that does not exist. Only
+the Precision button (CID `00ED`), which has no ordinary representation, would
+genuinely require diversion.
+
+**Procedure.**
+
+1. Quit BetterTouchTool and Logi Options so nothing else consumes the buttons.
+2. Start the observer. Do **not** bind, admit, or send anything.
+3. In **Control calibration**, press one control at a time, pausing between
+   each: left, right, wheel click, lower thumb, upper thumb, wheel tilt left,
+   wheel tilt right, Precision.
+4. For each, record the raw hex line.
+
+**Reading the result.** A report beginning `02` is the ordinary mouse report;
+its second byte is an 8-bit button mask (`Observation.swift`,
+`standardMouseButtonMask`). A control that changes a bit in that mask is already
+visible to macOS and needs no diversion. A control that produces nothing, or
+produces only a `11 …` vendor report, has no ordinary representation and is a
+genuine diversion candidate.
+
+Record the result in `Evidence/VALIDATION-RECORDS.md` before designing any
+mapped-control SET path.

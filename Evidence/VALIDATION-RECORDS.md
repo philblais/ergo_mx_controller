@@ -218,10 +218,21 @@ The cause was **not** determined in this session, and two candidates remain open
    device index `0xFF` (`PrecisionCallbackInputChannel` and
    `LogitechControlEventDecoder.decodeNotification`). Every request and response
    frame observed from this MX Ergo over direct BLE uses device index `0x00`.
-2. Against that, the calibration panel decodes through the same
-   `decodeNotification` and has historically named Logitech controls while
-   BetterTouchTool held them diverted, which suggests `0xFF` is correct for this
-   device's notifications and the fault lies further down the delivery path.
+2. The fault lies further down the delivery path — control-event decoding,
+   intent resolution, or execution — and the filter is correct.
+
+**Correction, same day.** This record originally cited the calibration panel as
+evidence for the second candidate, on the grounds that it decodes through the
+same `decodeNotification` and had "historically named Logitech controls". That
+was not evidence and should not have been written here. Its only basis was a
+hardware-validation *instruction* in the runbook and a capability bullet
+describing what the code does — not an observation. No HID++ notification frame
+has ever been captured by this project: every frame in this record is a request
+or a response, all with device index `0x00`.
+
+The first candidate therefore stands without a counterweight. It is still not
+proven, and the filter must not be changed on that basis; the input diagnostics
+added afterwards exist precisely to settle it with an observation.
 
 These cannot be distinguished from source. `PrecisionCallbackInputChannel`
 already maintains `unsolicitedCount` and `droppedCount`, but neither is surfaced

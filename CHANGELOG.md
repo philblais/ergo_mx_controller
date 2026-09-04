@@ -871,9 +871,13 @@ notification stream feeds.
 
 The cause was not determined and is deliberately not guessed at. The unsolicited
 filter and the notification decoder both require device index `0xFF` while every
-observed request and response from this device uses `0x00`; against that, the
-calibration panel decodes through the same function and has historically named
-Logitech controls while BetterTouchTool held them diverted. `PrecisionCallbackInputChannel`
+observed request and response from this device uses `0x00`; the alternative is
+that the filter is correct and the fault lies further down the delivery path.
+
+A claim originally made here — that the calibration panel had historically named
+Logitech controls and so demonstrated `0xFF` was correct — has been withdrawn.
+It rested on a runbook instruction and a capability bullet, not an observation.
+No HID++ notification frame has ever been captured by this project. `PrecisionCallbackInputChannel`
 already counts unsolicited and dropped frames, but neither count is surfaced
 through composition, the owner facade, or the app, so the runtime cannot say
 whether frames arrived and were rejected or never arrived at all. Surfacing that

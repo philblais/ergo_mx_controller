@@ -994,3 +994,33 @@ the wheel observer decodes only vertical motion today.
 The existing mapped-control diversion plan, readiness audit, action plan, event
 pump and GET-only preflight are superseded rather than wrong. They remain as
 reviewed evidence and stay `notAuthorizedForExecution`. No code changed.
+
+The Accessibility gate and horizontal scroll milestone adds the two things the
+cancelled SET path left on the critical path. Both are observation and
+permission only: nothing posts an event, and no HID output was added.
+
+Wheel tilt now has a decoder. `HIDElementValueDecoder.horizontalScrollNotches`
+matches AC Pan on the Consumer page, which is how this device reports tilt —
+confirmed on hardware and consistent with its exposing CIDs `005B`/`005D`, Left
+Scroll and Right Scroll. The observer previously installed a single input-value
+matching dictionary for the generic-desktop wheel, which silently missed the
+other axis; it now installs both through
+`IOHIDManagerSetInputValueMatchingMultiple`. A new `horizontalScroll` observation
+carries it to the app, where it is counted and displayed beside the vertical
+wheel. It resolves no intent and suppresses nothing: macOS already delivers tilt,
+and the app has no business interfering with it yet.
+
+The Accessibility gate mirrors the existing Input Monitoring one:
+`AXIsProcessTrusted()` on launch and on every foreground refresh, a status row,
+and a button that opens the Accessibility pane. It deliberately does not call
+`AXIsProcessTrustedWithOptions` with the prompt option — an unrequested
+permission dialog is the wrong shape for this app, and the grant matters only
+once event posting exists. The row states plainly that nothing in this build
+posts events and that the MX Ergo is unaffected either way.
+
+Three decoder tests raise the package total to 357, all passing with none
+skipped. They cover AC Pan decoding in both directions, stationary and unrelated
+consumer usages, and — most importantly — that the two scroll axes never decode
+each other, since keeping them distinguishable is what makes tilt usable without
+diversion. A fresh signed menu-app build verifies on disk and satisfies its
+designated requirement. No live HID operation was run and no CGEvent was posted.

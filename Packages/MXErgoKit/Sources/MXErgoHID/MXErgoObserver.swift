@@ -610,10 +610,19 @@ private final class InputLoop: @unchecked Sendable {
             IOHIDManagerRegisterDeviceMatchingCallback(manager, deviceMatchedCallback, context)
             IOHIDManagerRegisterDeviceRemovalCallback(manager, deviceRemovedCallback, context)
             IOHIDManagerRegisterInputReportCallback(manager, inputReportCallback, context)
-            IOHIDManagerSetInputValueMatching(manager, [
-                kIOHIDElementUsagePageKey: kHIDPage_GenericDesktop,
-                kIOHIDElementUsageKey: kHIDUsage_GD_Wheel,
-            ] as CFDictionary)
+            // Both scroll axes. Tilt arrives as AC Pan on the Consumer page
+            // rather than as a button, so a single matching dictionary would
+            // silently miss it.
+            IOHIDManagerSetInputValueMatchingMultiple(manager, [
+                [
+                    kIOHIDElementUsagePageKey: kHIDPage_GenericDesktop,
+                    kIOHIDElementUsageKey: kHIDUsage_GD_Wheel,
+                ],
+                [
+                    kIOHIDElementUsagePageKey: kHIDPage_Consumer,
+                    kIOHIDElementUsageKey: kHIDUsage_Csmr_ACPan,
+                ],
+            ] as CFArray)
             IOHIDManagerRegisterInputValueCallback(manager, inputValueCallback, context)
             IOHIDManagerScheduleWithRunLoop(manager, currentRunLoop, CFRunLoopMode.defaultMode.rawValue)
 
@@ -2195,6 +2204,17 @@ private final class InputLoop: @unchecked Sendable {
     fileprivate func receivedValue(result: IOReturn, value: IOHIDValue) {
         guard result == kIOReturnSuccess else { return }
         let element = IOHIDValueGetElement(value)
+        let usagePage = IOHIDElementGetUsagePage(element)
+        let usage = IOHIDElementGetUsage(element)
+        let integerValue = IOHIDValueGetIntegerValue(value)
+        if let horizontal = HIDElementValueDecoder.horizontalScrollNotches(
+            usagePage: usagePage,
+            usage: usage,
+            integerValue: integerValue
+        ) {
+            handler(.horizontalScroll(notches: horizontal))
+            return
+        }
         guard let notches = HIDElementValueDecoder.verticalScrollNotches(
             usagePage: IOHIDElementGetUsagePage(element),
             usage: IOHIDElementGetUsage(element),

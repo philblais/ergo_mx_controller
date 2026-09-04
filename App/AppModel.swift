@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import CoreGraphics
 import Foundation
 import MXErgoCore
@@ -17,9 +18,15 @@ final class AppModel: ObservableObject {
     @Published private(set) var lastIntent: ControllerIntent?
     @Published private(set) var wheelEventCount = 0
     @Published private(set) var lastWheelNotches: Int?
+    @Published private(set) var tiltEventCount = 0
+    @Published private(set) var lastTiltNotches: Int?
     @Published private(set) var audioExecutionEnabled = false
     @Published private(set) var audioStatus: AudioExecutionStatus = .disabled
     @Published private(set) var inputMonitoringGranted = CGPreflightListenEventAccess()
+    /// Posting synthetic events needs Accessibility, a separate grant from
+    /// Input Monitoring. Nothing in this build posts events yet; the gate
+    /// exists so the requirement is visible before anything depends on it.
+    @Published private(set) var accessibilityGranted = AXIsProcessTrusted()
     @Published private(set) var recoveryJournalStatus = "No device changes recorded"
     @Published private(set) var recoveryJournalNeedsAttention = false
     @Published private(set) var recoveryJournalExists = false
@@ -208,6 +215,7 @@ final class AppModel: ObservableObject {
         lastIntent = nil
         wheelEventCount = 0
         lastWheelNotches = nil
+        lastTiltNotches = nil
         lastStandardMouseButtonMask = nil
         intentResolver = ControllerIntentResolver()
         if audioExecutionEnabled {
@@ -225,6 +233,7 @@ final class AppModel: ObservableObject {
     func refreshPermissionStatus() {
         let wasGranted = inputMonitoringGranted
         inputMonitoringGranted = CGPreflightListenEventAccess()
+        accessibilityGranted = AXIsProcessTrusted()
         refreshRecoveryJournalStatus()
         revalidatePrecisionReadinessEvidence()
         revalidateMappedControlDiversionEvidence()
@@ -1152,6 +1161,19 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Opens the Accessibility pane. Deliberately does not use
+    /// `AXIsProcessTrustedWithOptions` with the prompt option: a permission
+    /// dialog the user did not ask for is the wrong shape for this app, and the
+    /// grant is only needed once event posting exists.
+    func openAccessibilitySettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ) else {
+            return
+        }
+        NSWorkspace.shared.open(url)
+    }
+
     func openInputMonitoringSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") else {
             return
@@ -2015,6 +2037,11 @@ final class AppModel: ObservableObject {
                 .verticalScroll(notches: notches),
                 at: ProcessInfo.processInfo.systemUptime
             ))
+        case let .horizontalScroll(notches):
+            // Observation only. macOS already delivers wheel tilt as horizontal
+            // scroll, so nothing is suppressed and no intent is resolved.
+            tiltEventCount += 1
+            lastTiltNotches = notches
         }
     }
 

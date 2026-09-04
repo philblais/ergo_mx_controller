@@ -41,4 +41,8 @@ public enum MXErgoObservation: Sendable, Equatable {
     case outputReportCapabilities(deviceID: String, capabilities: [HIDOutputReportCapability])
     case report(HIDReportSnapshot)
     case verticalScroll(notches: Int)
+    /// Wheel tilt, positive to the right. Observation only: the app does
+    /// not suppress or replace the horizontal scroll macOS already
+    /// delivers.
+    case horizontalScroll(notches: Int)
 }

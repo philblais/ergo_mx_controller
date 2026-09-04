@@ -108,6 +108,32 @@ struct ObserverMenuView: View {
                 }
                 .controlSize(.small)
             }
+
+            Label {
+                Text(
+                    model.accessibilityGranted
+                        ? "Accessibility granted"
+                        : "Accessibility not granted (not needed yet)"
+                )
+            } icon: {
+                Image(
+                    systemName: model.accessibilityGranted
+                        ? "checkmark.circle.fill"
+                        : "circle.dashed"
+                )
+                .foregroundStyle(model.accessibilityGranted ? .green : .secondary)
+            }
+
+            if !model.accessibilityGranted {
+                Button("Open Accessibility Settings") {
+                    model.openAccessibilitySettings()
+                }
+                .controlSize(.small)
+                Text("Required only to post synthetic events, which this build never does. Replacing BetterTouchTool for the thumb buttons, wheel tilt and wheel click will need it; the MX Ergo itself is not affected either way.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -142,6 +168,10 @@ struct ObserverMenuView: View {
                     if let wheelNotches = model.lastWheelNotches {
                         detailRow("Wheel events", String(model.wheelEventCount))
                         detailRow("Last wheel", wheelDescription(wheelNotches))
+                    }
+                    if let tiltNotches = model.lastTiltNotches {
+                        detailRow("Tilt events", String(model.tiltEventCount))
+                        detailRow("Last tilt", tiltDescription(tiltNotches))
                     }
                 }
                 .font(.caption.monospacedDigit())
@@ -1419,6 +1449,13 @@ struct ObserverMenuView: View {
     private func wheelDescription(_ notches: Int) -> String {
         let direction = notches > 0 ? "up" : "down"
         return "\(direction) (\(notches.formatted(.number.sign(strategy: .always()))))"
+    }
+
+    /// Wheel tilt is an ordinary horizontal scroll axis on this device, not a
+    /// button. Positive is a right tilt.
+    private func tiltDescription(_ notches: Int) -> String {
+        let direction = notches > 0 ? "right" : "left"
+        return "\(direction) (\(notches > 0 ? "+" : "")\(notches))"
     }
 
     private var intentPreviewSection: some View {

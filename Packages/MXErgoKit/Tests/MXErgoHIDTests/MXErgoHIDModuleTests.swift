@@ -136,6 +136,51 @@ import Testing
     ) == -2)
 }
 
+// Wheel tilt was confirmed on hardware 2026-09-04 to arrive as AC Pan on the
+// Consumer page, not as a button. It is why no mapped control needs HID++
+// diversion, so the two axes must stay distinguishable.
+
+@Test func consumerACPanValuesDecodeToTiltNotches() {
+    #expect(HIDElementValueDecoder.horizontalScrollNotches(
+        usagePage: 0x0C,
+        usage: 0x0238,
+        integerValue: 1
+    ) == 1)
+    #expect(HIDElementValueDecoder.horizontalScrollNotches(
+        usagePage: 0x0C,
+        usage: 0x0238,
+        integerValue: -3
+    ) == -3)
+}
+
+@Test func theTwoScrollAxesNeverDecodeEachOther() {
+    // A vertical wheel value must not read as tilt.
+    #expect(HIDElementValueDecoder.horizontalScrollNotches(
+        usagePage: 0x01,
+        usage: 0x38,
+        integerValue: 1
+    ) == nil)
+    // And tilt must not read as vertical.
+    #expect(HIDElementValueDecoder.verticalScrollNotches(
+        usagePage: 0x0C,
+        usage: 0x0238,
+        integerValue: 1
+    ) == nil)
+}
+
+@Test func stationaryOrUnrelatedTiltValuesAreIgnored() {
+    #expect(HIDElementValueDecoder.horizontalScrollNotches(
+        usagePage: 0x0C,
+        usage: 0x0238,
+        integerValue: 0
+    ) == nil)
+    #expect(HIDElementValueDecoder.horizontalScrollNotches(
+        usagePage: 0x0C,
+        usage: 0x00E9,
+        integerValue: 1
+    ) == nil)
+}
+
 @Test func unrelatedOrStationaryHIDValuesAreIgnored() {
     #expect(HIDElementValueDecoder.verticalScrollNotches(
         usagePage: 0x01,

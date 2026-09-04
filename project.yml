@@ -1,0 +1,142 @@
+name: MXErgoController
+
+options:
+  bundleIdPrefix: com.phib
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "15.0"
+
+packages:
+  MXErgoKit:
+    path: Packages/MXErgoKit
+
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    MACOSX_DEPLOYMENT_TARGET: 15.0
+
+targets:
+  MXErgoController:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+    dependencies:
+      - package: MXErgoKit
+        product: MXErgoCore
+      - package: MXErgoKit
+        product: MXErgoHIDPP
+      - package: MXErgoKit
+        product: MXErgoHID
+      - package: MXErgoKit
+        product: MXErgoPrecisionRuntimeOwner
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.phib.MXErgoController
+        PRODUCT_NAME: MX Ergo Controller
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_CFBundleDisplayName: MX Ergo Controller
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_LSUIElement: true
+        INFOPLIST_KEY_NSInputMonitoringUsageDescription: MX Ergo Controller needs Input Monitoring permission to observe buttons and scrolling from your MX Ergo.
+        ENABLE_APP_SANDBOX: false
+        ENABLE_HARDENED_RUNTIME: true
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: XW848M73T3
+  MXErgoRestoreTrialProbe:
+    type: application
+    platform: macOS
+    sources:
+      - path: HelperProbe
+    dependencies:
+      - sdk: IOKit.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.phib.MXErgoRestoreTrialProbe
+        PRODUCT_NAME: MX Ergo Restore Trial Probe
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_CFBundleDisplayName: MX Ergo Restore Trial Probe
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_LSUIElement: true
+        INFOPLIST_KEY_NSInputMonitoringUsageDescription: MX Ergo Restore Trial Probe needs Input Monitoring permission to perform one explicitly confirmed read-only Precision check.
+        ENABLE_APP_SANDBOX: false
+        ENABLE_HARDENED_RUNTIME: true
+        DEAD_CODE_STRIPPING: true
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: MXERGO_READ_ONLY_PROBE
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: XW848M73T3
+  MXErgoPrecisionRestoreTrial:
+    type: application
+    platform: macOS
+    sources:
+      - path: HelperProbe
+      - path: HelperTrial
+      - path: Packages/MXErgoKit/Sources/MXErgoRestoreTrialIOHID/DormantPrecisionTrialIOHIDAdapter.swift
+    dependencies:
+      - package: MXErgoKit
+        product: MXErgoHIDPP
+      - sdk: IOKit.framework
+      - sdk: AppKit.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.phib.MXErgoPrecisionRestoreTrial
+        PRODUCT_NAME: MX Ergo Precision Restore Trial
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_CFBundleDisplayName: MX Ergo Precision Restore Trial
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_LSUIElement: true
+        INFOPLIST_KEY_NSInputMonitoringUsageDescription: MX Ergo Precision Restore Trial needs Input Monitoring permission for one explicitly confirmed Precision restore and independent verification.
+        ENABLE_APP_SANDBOX: false
+        ENABLE_HARDENED_RUNTIME: true
+        DEAD_CODE_STRIPPING: true
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: MXERGO_WRITE_TRIAL
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: XW848M73T3
+  MXErgoPrecisionTrialReconciler:
+    type: application
+    platform: macOS
+    sources:
+      - path: HelperReconcile
+    dependencies:
+      - package: MXErgoKit
+        product: MXErgoHIDPP
+      - sdk: AppKit.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.phib.MXErgoPrecisionTrialReconciler
+        PRODUCT_NAME: MX Ergo Precision Trial Reconciler
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_CFBundleDisplayName: MX Ergo Precision Trial Reconciler
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_LSUIElement: true
+        ENABLE_APP_SANDBOX: false
+        ENABLE_HARDENED_RUNTIME: true
+        DEAD_CODE_STRIPPING: true
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: XW848M73T3
+
+schemes:
+  MXErgoController:
+    build:
+      targets:
+        MXErgoController: all
+    run:
+      config: Debug
+  MXErgoRestoreTrialProbe:
+    build:
+      targets:
+        MXErgoRestoreTrialProbe: all
+    run:
+      config: Release
+  MXErgoPrecisionRestoreTrial:
+    build:
+      targets:
+        MXErgoPrecisionRestoreTrial: all
+    run:
+      config: Release
+  MXErgoPrecisionTrialReconciler:
+    build:
+      targets:
+        MXErgoPrecisionTrialReconciler: all
+    run:
+      config: Release

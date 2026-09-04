@@ -1,0 +1,770 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00EDD116090D6243CF9D1A61 /* MXErgoPrecisionRestoreTrialMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16336507DE31113F277B2F6 /* MXErgoPrecisionRestoreTrialMain.swift */; };
+		1A3FB0EA6D7A5822E6F5042D /* MXErgoPrecisionTrialReconcilerMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17AC497E0D5D1B4DE5930E4 /* MXErgoPrecisionTrialReconcilerMain.swift */; };
+		1FF8E46B8385F0C286E2F3C4 /* MXErgoHID in Frameworks */ = {isa = PBXBuildFile; productRef = FAD352C55ADA1384D1E019F3 /* MXErgoHID */; };
+		2512CA0EC9E6FFA49D811B26 /* MXErgoRestoreTrialProbeMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2DE9A1C82554584878C502 /* MXErgoRestoreTrialProbeMain.swift */; };
+		330D1B1086829E699E9A6D62 /* MXErgoRestoreTrialProbeMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2DE9A1C82554584878C502 /* MXErgoRestoreTrialProbeMain.swift */; };
+		3B2AF5C1C9C58EABE8D6ACB9 /* SystemAudioController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD28653404612B540652D52E /* SystemAudioController.swift */; };
+		4E2942025AC908EEE5BAD64A /* ObserverMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FEE79EFE5F56DE29757335A /* ObserverMenuView.swift */; };
+		4FB6F95669FB93C097D5B3BD /* DormantPrecisionTrialIOHIDAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBDB53288DAE70670DFE03D4 /* DormantPrecisionTrialIOHIDAdapter.swift */; };
+		61D415B9DBFF16DA8FF01C00 /* MXErgoControllerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E22D7BEB46F2A0DE6E3471D2 /* MXErgoControllerApp.swift */; };
+		6956655B3D1C3B4855A5618B /* MXErgoHIDPP in Frameworks */ = {isa = PBXBuildFile; productRef = 8C307B3CA2E433D32D85ABFC /* MXErgoHIDPP */; };
+		9FDAE12A29269D9E1AD8DF66 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87F68AD7261860C6617DF429 /* AppModel.swift */; };
+		B2258B3000C7BA7D2A5F3E4C /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8594F8F14B3862793C321423 /* AppKit.framework */; };
+		B3954FF14E27817C28344B51 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F96A2D4FFAF3203B1ED5557E /* IOKit.framework */; };
+		C96F33BADDA8523341471B0A /* MXErgoHIDPP in Frameworks */ = {isa = PBXBuildFile; productRef = A4A6116A2D881C331AD4C9A2 /* MXErgoHIDPP */; };
+		D64A38362EE0A36741AEE0BB /* MXErgoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 24D83B2D8F0F1469A1935BA6 /* MXErgoCore */; };
+		D7D57A903E050B1DD5048F9D /* MXErgoPrecisionRuntimeOwner in Frameworks */ = {isa = PBXBuildFile; productRef = BE24317AD10B4703CB4C3D96 /* MXErgoPrecisionRuntimeOwner */; };
+		E1F9CFAEC6F1FFE54AD4C74C /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8594F8F14B3862793C321423 /* AppKit.framework */; };
+		E767DAB503857E354FC37B0C /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F96A2D4FFAF3203B1ED5557E /* IOKit.framework */; };
+		EBF277F53D0035FB8A14DDAD /* MXErgoHIDPP in Frameworks */ = {isa = PBXBuildFile; productRef = 773B67F0837B968E7E467491 /* MXErgoHIDPP */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0B9EC81B52D1AF7E7332EBB0 /* MXErgoController.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MXErgoController.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		729B08141702C731B22E9165 /* MXErgoPrecisionTrialReconciler.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MXErgoPrecisionTrialReconciler.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		822F1BAD0B238E12E62286BA /* MXErgoKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MXErgoKit; path = Packages/MXErgoKit; sourceTree = SOURCE_ROOT; };
+		8594F8F14B3862793C321423 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		87F68AD7261860C6617DF429 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		8FEE79EFE5F56DE29757335A /* ObserverMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObserverMenuView.swift; sourceTree = "<group>"; };
+		C16336507DE31113F277B2F6 /* MXErgoPrecisionRestoreTrialMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MXErgoPrecisionRestoreTrialMain.swift; sourceTree = "<group>"; };
+		CC7C593CB498BC8C443241DA /* MXErgoPrecisionRestoreTrial.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MXErgoPrecisionRestoreTrial.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CD28653404612B540652D52E /* SystemAudioController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioController.swift; sourceTree = "<group>"; };
+		DA2DE9A1C82554584878C502 /* MXErgoRestoreTrialProbeMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MXErgoRestoreTrialProbeMain.swift; sourceTree = "<group>"; };
+		E22D7BEB46F2A0DE6E3471D2 /* MXErgoControllerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MXErgoControllerApp.swift; sourceTree = "<group>"; };
+		EF4703B00D391A9B02681D73 /* MXErgoRestoreTrialProbe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MXErgoRestoreTrialProbe.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F17AC497E0D5D1B4DE5930E4 /* MXErgoPrecisionTrialReconcilerMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MXErgoPrecisionTrialReconcilerMain.swift; sourceTree = "<group>"; };
+		F96A2D4FFAF3203B1ED5557E /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		FBDB53288DAE70670DFE03D4 /* DormantPrecisionTrialIOHIDAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DormantPrecisionTrialIOHIDAdapter.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		0535F2BDEE80B550049B0023 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C96F33BADDA8523341471B0A /* MXErgoHIDPP in Frameworks */,
+				E1F9CFAEC6F1FFE54AD4C74C /* AppKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6DFBFB63493E0C25C912CCA0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E767DAB503857E354FC37B0C /* IOKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9C2EA475879080BEBDC51618 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6956655B3D1C3B4855A5618B /* MXErgoHIDPP in Frameworks */,
+				B3954FF14E27817C28344B51 /* IOKit.framework in Frameworks */,
+				B2258B3000C7BA7D2A5F3E4C /* AppKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA69895F439D6348E28439A2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D64A38362EE0A36741AEE0BB /* MXErgoCore in Frameworks */,
+				EBF277F53D0035FB8A14DDAD /* MXErgoHIDPP in Frameworks */,
+				1FF8E46B8385F0C286E2F3C4 /* MXErgoHID in Frameworks */,
+				D7D57A903E050B1DD5048F9D /* MXErgoPrecisionRuntimeOwner in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		09D77C0E99F11BD0A7C877E4 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				0B9EC81B52D1AF7E7332EBB0 /* MXErgoController.app */,
+				CC7C593CB498BC8C443241DA /* MXErgoPrecisionRestoreTrial.app */,
+				729B08141702C731B22E9165 /* MXErgoPrecisionTrialReconciler.app */,
+				EF4703B00D391A9B02681D73 /* MXErgoRestoreTrialProbe.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		0B94918347BBF982BD84ABFA /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				822F1BAD0B238E12E62286BA /* MXErgoKit */,
+				EAA95B85B76C8942E18E5EB7 /* MXErgoKit */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		23EDAFC41B18DCC2EF3BE14F /* HelperReconcile */ = {
+			isa = PBXGroup;
+			children = (
+				F17AC497E0D5D1B4DE5930E4 /* MXErgoPrecisionTrialReconcilerMain.swift */,
+			);
+			path = HelperReconcile;
+			sourceTree = "<group>";
+		};
+		3C233179CC78F16A19641BCB /* App */ = {
+			isa = PBXGroup;
+			children = (
+				87F68AD7261860C6617DF429 /* AppModel.swift */,
+				E22D7BEB46F2A0DE6E3471D2 /* MXErgoControllerApp.swift */,
+				8FEE79EFE5F56DE29757335A /* ObserverMenuView.swift */,
+				CD28653404612B540652D52E /* SystemAudioController.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		5B678A4551A5E2139258C3CD /* HelperTrial */ = {
+			isa = PBXGroup;
+			children = (
+				C16336507DE31113F277B2F6 /* MXErgoPrecisionRestoreTrialMain.swift */,
+			);
+			path = HelperTrial;
+			sourceTree = "<group>";
+		};
+		61B8D6A89CFAF0D8EDD45E90 /* MXErgoRestoreTrialIOHID */ = {
+			isa = PBXGroup;
+			children = (
+				FBDB53288DAE70670DFE03D4 /* DormantPrecisionTrialIOHIDAdapter.swift */,
+			);
+			path = MXErgoRestoreTrialIOHID;
+			sourceTree = "<group>";
+		};
+		62C3EE9A4D3AAB107468A481 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				61B8D6A89CFAF0D8EDD45E90 /* MXErgoRestoreTrialIOHID */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		B4163B93A28F257CF4DD5AA1 /* HelperProbe */ = {
+			isa = PBXGroup;
+			children = (
+				DA2DE9A1C82554584878C502 /* MXErgoRestoreTrialProbeMain.swift */,
+			);
+			path = HelperProbe;
+			sourceTree = "<group>";
+		};
+		BEB0774FEBFFF69F88149507 = {
+			isa = PBXGroup;
+			children = (
+				3C233179CC78F16A19641BCB /* App */,
+				B4163B93A28F257CF4DD5AA1 /* HelperProbe */,
+				23EDAFC41B18DCC2EF3BE14F /* HelperReconcile */,
+				5B678A4551A5E2139258C3CD /* HelperTrial */,
+				0B94918347BBF982BD84ABFA /* Packages */,
+				D79CAC2BDDACB65B47033FB0 /* Frameworks */,
+				09D77C0E99F11BD0A7C877E4 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D79CAC2BDDACB65B47033FB0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8594F8F14B3862793C321423 /* AppKit.framework */,
+				F96A2D4FFAF3203B1ED5557E /* IOKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		EAA95B85B76C8942E18E5EB7 /* MXErgoKit */ = {
+			isa = PBXGroup;
+			children = (
+				62C3EE9A4D3AAB107468A481 /* Sources */,
+			);
+			path = MXErgoKit;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		24CF3C0569FC89CBE76529FC /* MXErgoController */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0345191D9083308B172FFA1D /* Build configuration list for PBXNativeTarget "MXErgoController" */;
+			buildPhases = (
+				31A1E6C369AECB94C6A0488E /* Sources */,
+				FA69895F439D6348E28439A2 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MXErgoController;
+			packageProductDependencies = (
+				24D83B2D8F0F1469A1935BA6 /* MXErgoCore */,
+				773B67F0837B968E7E467491 /* MXErgoHIDPP */,
+				FAD352C55ADA1384D1E019F3 /* MXErgoHID */,
+				BE24317AD10B4703CB4C3D96 /* MXErgoPrecisionRuntimeOwner */,
+			);
+			productName = MXErgoController;
+			productReference = 0B9EC81B52D1AF7E7332EBB0 /* MXErgoController.app */;
+			productType = "com.apple.product-type.application";
+		};
+		274AE57EA7C33CA44BBC4484 /* MXErgoRestoreTrialProbe */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CD9A5FC5B348C553FF6656D5 /* Build configuration list for PBXNativeTarget "MXErgoRestoreTrialProbe" */;
+			buildPhases = (
+				EF0C6B3137EC8F2097EBC557 /* Sources */,
+				6DFBFB63493E0C25C912CCA0 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MXErgoRestoreTrialProbe;
+			packageProductDependencies = (
+			);
+			productName = MXErgoRestoreTrialProbe;
+			productReference = EF4703B00D391A9B02681D73 /* MXErgoRestoreTrialProbe.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5AE4F8AF231F62710E020262 /* MXErgoPrecisionRestoreTrial */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 73E3FFFA2A2023299D288A67 /* Build configuration list for PBXNativeTarget "MXErgoPrecisionRestoreTrial" */;
+			buildPhases = (
+				5B201B1424D4002B3DEE5EC1 /* Sources */,
+				9C2EA475879080BEBDC51618 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MXErgoPrecisionRestoreTrial;
+			packageProductDependencies = (
+				8C307B3CA2E433D32D85ABFC /* MXErgoHIDPP */,
+			);
+			productName = MXErgoPrecisionRestoreTrial;
+			productReference = CC7C593CB498BC8C443241DA /* MXErgoPrecisionRestoreTrial.app */;
+			productType = "com.apple.product-type.application";
+		};
+		FBFE3443C83DD066CFA91B1A /* MXErgoPrecisionTrialReconciler */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F217C2B1C29A52A1F2396C4E /* Build configuration list for PBXNativeTarget "MXErgoPrecisionTrialReconciler" */;
+			buildPhases = (
+				C6687BB8BC919DF1343184FA /* Sources */,
+				0535F2BDEE80B550049B0023 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MXErgoPrecisionTrialReconciler;
+			packageProductDependencies = (
+				A4A6116A2D881C331AD4C9A2 /* MXErgoHIDPP */,
+			);
+			productName = MXErgoPrecisionTrialReconciler;
+			productReference = 729B08141702C731B22E9165 /* MXErgoPrecisionTrialReconciler.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C6D1335CF8EA816C527087D8 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					24CF3C0569FC89CBE76529FC = {
+						DevelopmentTeam = XW848M73T3;
+						ProvisioningStyle = Automatic;
+					};
+					274AE57EA7C33CA44BBC4484 = {
+						DevelopmentTeam = XW848M73T3;
+						ProvisioningStyle = Automatic;
+					};
+					5AE4F8AF231F62710E020262 = {
+						DevelopmentTeam = XW848M73T3;
+						ProvisioningStyle = Automatic;
+					};
+					FBFE3443C83DD066CFA91B1A = {
+						DevelopmentTeam = XW848M73T3;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = B9F1CDC22C8F76B47F8C852D /* Build configuration list for PBXProject "MXErgoController" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = BEB0774FEBFFF69F88149507;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				47D99C97942448B4EBD4B451 /* XCLocalSwiftPackageReference "Packages/MXErgoKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 09D77C0E99F11BD0A7C877E4 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				24CF3C0569FC89CBE76529FC /* MXErgoController */,
+				5AE4F8AF231F62710E020262 /* MXErgoPrecisionRestoreTrial */,
+				FBFE3443C83DD066CFA91B1A /* MXErgoPrecisionTrialReconciler */,
+				274AE57EA7C33CA44BBC4484 /* MXErgoRestoreTrialProbe */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		31A1E6C369AECB94C6A0488E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9FDAE12A29269D9E1AD8DF66 /* AppModel.swift in Sources */,
+				61D415B9DBFF16DA8FF01C00 /* MXErgoControllerApp.swift in Sources */,
+				4E2942025AC908EEE5BAD64A /* ObserverMenuView.swift in Sources */,
+				3B2AF5C1C9C58EABE8D6ACB9 /* SystemAudioController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5B201B1424D4002B3DEE5EC1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4FB6F95669FB93C097D5B3BD /* DormantPrecisionTrialIOHIDAdapter.swift in Sources */,
+				00EDD116090D6243CF9D1A61 /* MXErgoPrecisionRestoreTrialMain.swift in Sources */,
+				330D1B1086829E699E9A6D62 /* MXErgoRestoreTrialProbeMain.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C6687BB8BC919DF1343184FA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A3FB0EA6D7A5822E6F5042D /* MXErgoPrecisionTrialReconcilerMain.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF0C6B3137EC8F2097EBC557 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2512CA0EC9E6FFA49D811B26 /* MXErgoRestoreTrialProbeMain.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		14395C3871B0503AEC144FF5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = XW848M73T3;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MX Ergo Restore Trial Probe";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSInputMonitoringUsageDescription = "MX Ergo Restore Trial Probe needs Input Monitoring permission to perform one explicitly confirmed read-only Precision check.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.phib.MXErgoRestoreTrialProbe;
+				PRODUCT_NAME = "MX Ergo Restore Trial Probe";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = MXERGO_READ_ONLY_PROBE;
+			};
+			name = Debug;
+		};
+		16D04AC5BD4D7E3E54C92FB4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = XW848M73T3;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MX Ergo Precision Restore Trial";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSInputMonitoringUsageDescription = "MX Ergo Precision Restore Trial needs Input Monitoring permission for one explicitly confirmed Precision restore and independent verification.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.phib.MXErgoPrecisionRestoreTrial;
+				PRODUCT_NAME = "MX Ergo Precision Restore Trial";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = MXERGO_WRITE_TRIAL;
+			};
+			name = Release;
+		};
+		1E948D273645A20D8EC57C6E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		4EBBBDD7B08B9944930003E3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = XW848M73T3;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MX Ergo Restore Trial Probe";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSInputMonitoringUsageDescription = "MX Ergo Restore Trial Probe needs Input Monitoring permission to perform one explicitly confirmed read-only Precision check.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.phib.MXErgoRestoreTrialProbe;
+				PRODUCT_NAME = "MX Ergo Restore Trial Probe";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = MXERGO_READ_ONLY_PROBE;
+			};
+			name = Release;
+		};
+		8E087CF73414C33C39B7C806 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		9B8ABB4F5AD546694690FE1E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = XW848M73T3;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MX Ergo Precision Restore Trial";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSInputMonitoringUsageDescription = "MX Ergo Precision Restore Trial needs Input Monitoring permission for one explicitly confirmed Precision restore and independent verification.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.phib.MXErgoPrecisionRestoreTrial;
+				PRODUCT_NAME = "MX Ergo Precision Restore Trial";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = MXERGO_WRITE_TRIAL;
+			};
+			name = Debug;
+		};
+		A5D0712299E80F80372D8575 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = XW848M73T3;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MX Ergo Precision Trial Reconciler";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.phib.MXErgoPrecisionTrialReconciler;
+				PRODUCT_NAME = "MX Ergo Precision Trial Reconciler";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		BFB4F7CBEE977B094F7782E8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = XW848M73T3;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MX Ergo Precision Trial Reconciler";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.phib.MXErgoPrecisionTrialReconciler;
+				PRODUCT_NAME = "MX Ergo Precision Trial Reconciler";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		D099AB64E310785F7E1C5E68 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = XW848M73T3;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MX Ergo Controller";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSInputMonitoringUsageDescription = "MX Ergo Controller needs Input Monitoring permission to observe buttons and scrolling from your MX Ergo.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.phib.MXErgoController;
+				PRODUCT_NAME = "MX Ergo Controller";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		E2C9714A76DB151DD52672D6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = XW848M73T3;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MX Ergo Controller";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSInputMonitoringUsageDescription = "MX Ergo Controller needs Input Monitoring permission to observe buttons and scrolling from your MX Ergo.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.phib.MXErgoController;
+				PRODUCT_NAME = "MX Ergo Controller";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0345191D9083308B172FFA1D /* Build configuration list for PBXNativeTarget "MXErgoController" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D099AB64E310785F7E1C5E68 /* Debug */,
+				E2C9714A76DB151DD52672D6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		73E3FFFA2A2023299D288A67 /* Build configuration list for PBXNativeTarget "MXErgoPrecisionRestoreTrial" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9B8ABB4F5AD546694690FE1E /* Debug */,
+				16D04AC5BD4D7E3E54C92FB4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B9F1CDC22C8F76B47F8C852D /* Build configuration list for PBXProject "MXErgoController" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8E087CF73414C33C39B7C806 /* Debug */,
+				1E948D273645A20D8EC57C6E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CD9A5FC5B348C553FF6656D5 /* Build configuration list for PBXNativeTarget "MXErgoRestoreTrialProbe" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				14395C3871B0503AEC144FF5 /* Debug */,
+				4EBBBDD7B08B9944930003E3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F217C2B1C29A52A1F2396C4E /* Build configuration list for PBXNativeTarget "MXErgoPrecisionTrialReconciler" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A5D0712299E80F80372D8575 /* Debug */,
+				BFB4F7CBEE977B094F7782E8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		47D99C97942448B4EBD4B451 /* XCLocalSwiftPackageReference "Packages/MXErgoKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/MXErgoKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		24D83B2D8F0F1469A1935BA6 /* MXErgoCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MXErgoCore;
+		};
+		773B67F0837B968E7E467491 /* MXErgoHIDPP */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MXErgoHIDPP;
+		};
+		8C307B3CA2E433D32D85ABFC /* MXErgoHIDPP */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MXErgoHIDPP;
+		};
+		A4A6116A2D881C331AD4C9A2 /* MXErgoHIDPP */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MXErgoHIDPP;
+		};
+		BE24317AD10B4703CB4C3D96 /* MXErgoPrecisionRuntimeOwner */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MXErgoPrecisionRuntimeOwner;
+		};
+		FAD352C55ADA1384D1E019F3 /* MXErgoHID */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MXErgoHID;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = C6D1335CF8EA816C527087D8 /* Project object */;
+}

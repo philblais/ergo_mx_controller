@@ -37,13 +37,19 @@ runtime can now report it: input diagnostics show how many frames arrived, how
 many were routed as notifications, and the last frame's bytes. One short
 hardware session should settle it.
 
-**Open design question:** whether the five mapped CIDs need HID++ diversion at
-all. The 2026-08-27 baseline recorded every control at `flags 0000` while
-BetterTouchTool was in daily use, so BTT does not divert — it must act on
-ordinary HID reports macOS already delivers. If those controls appear in the
-standard mouse button mask, the planned multi-CID SET path is unnecessary and
-only Precision genuinely requires diversion. [RUNBOOK.md](RUNBOOK.md) has a
-zero-risk read-only procedure to settle it.
+**Largely answered 2026-09-04:** most mapped controls do **not** need HID++
+diversion. A read-only observation showed both thumb buttons arriving as
+ordinary HID buttons 4 and 5 (`0x08`, `0x10`), while the Precision button
+produces no ordinary report at all. BetterTouchTool remaps the ordinary ones at
+the event layer rather than diverting anything, consistent with the 2026-08-27
+baseline recording every control at `flags 0000` during daily BTT use.
+
+Wheel tilt is still unobserved and is the last piece. If it is also ordinary,
+the planned multi-CID SET path is unnecessary: replacing BetterTouchTool becomes
+an event-tap problem with no device write, and Precision remains the only
+control that ever needs a SET. See
+[Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md); the procedure
+is in [RUNBOOK.md](RUNBOOK.md).
 
 **Reviewed but deliberately unauthorized:** the five BetterTouchTool-mapped CIDs
 (`0052`, `0053`, `0056`, `005B`, `005D`). Their diversion plan, readiness audit,

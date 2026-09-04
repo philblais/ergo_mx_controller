@@ -947,3 +947,24 @@ a frame that arrived but was not routed, a routed notification, and a frame from
 a foreign epoch that must not be counted as observed. A fresh signed menu-app
 build verifies on disk and satisfies its designated requirement. No live HID
 operation was run.
+
+A zero-risk read-only observation on 2026-09-04 substantially changed the
+mapped-control plan. With BetterTouchTool quit and no diversion in play, both
+thumb buttons were observed arriving as ordinary HID buttons `0x08` and `0x10`
+in report `0x02`, while the Precision button produced no ordinary report at all.
+
+This is consistent with the 2026-08-27 baseline, which recorded all nine
+reprogrammable controls at `flags 0000` while BetterTouchTool was in daily use:
+BetterTouchTool never diverted anything, and remaps at the event layer instead.
+
+Precision is therefore the only control on this device with no representation
+outside HID++, which is why it required temporary diversion and why that runtime
+was worth building. Conversely, if wheel tilt — still unobserved — also proves
+ordinary, then none of the five mapped CIDs require diversion, and the planned
+multi-CID SET path would be solving a problem this hardware does not have.
+Replacing BetterTouchTool for those controls becomes an event-tap problem with
+no device write, which is categorically lower risk than anything attempted so
+far.
+
+No code changed and the five mapped CIDs remain `notAuthorizedForExecution`. The
+conclusion is held open pending the wheel-tilt observation.

@@ -258,3 +258,49 @@ Two further defects were confirmed:
 The status-line fix from earlier in the day was confirmed on hardware: after the
 verified restore the app reported `Precision restored to baseline; runtime still
 admitted` rather than the previous incorrect `Precision diverted (active)`.
+
+### Read-only observation — 2026-09-04, ordinary HID button masks
+
+Zero-risk observer-only session with BetterTouchTool and Logi Options quit. No
+bind, no admission, no SET, no diversion. The calibration panel prints the raw
+bytes of each report; controls were pressed one at a time with the buffer
+cleared between presses.
+
+| Control | Report | Result |
+|---|---|---|
+| Left click | `02 01 00 00 00 00 00 00` | ordinary, button mask `0x01` |
+| Thumb button (first pressed) | `02 08 00 00 00 00 00 00` | ordinary, button mask `0x08` |
+| Thumb button (second pressed) | `02 10 00 00 00 00 00 00` | ordinary, button mask `0x10` |
+| Precision | *(no report at all)* | **no ordinary representation** |
+
+Release in every case returned `02 00 00 00 00 00 00 00`. Vertical wheel motion
+was observed separately through the existing wheel path.
+
+**Not observed in this session:** right click, wheel click, wheel tilt left, and
+wheel tilt right. The wheel tilt is the one that still matters architecturally.
+Which thumb produced `0x08` and which produced `0x10` was inferred from press
+order and is not independently confirmed; it decides which thumb receives which
+action but changes nothing structural.
+
+#### What this establishes
+
+Both thumb buttons are ordinary HID buttons 4 and 5. macOS already delivers
+them, and BetterTouchTool remaps them at the event layer rather than by
+diverting anything — consistent with the 2026-08-27 baseline, which recorded all
+nine reprogrammable controls at `flags 0000` while BetterTouchTool was in daily
+use.
+
+Precision produces no ordinary report. It is the one control on this device with
+no representation outside HID++, which is why it required temporary diversion
+and why that work was necessary.
+
+The consequence for the mapped-control milestone is large. If wheel tilt also
+proves ordinary, then **none** of the five mapped CIDs require HID++ diversion,
+and the planned multi-CID SET path — a widened transport allowlist, per-CID
+packet tables, multi-CID admission policy, a mapped lifecycle actor — would be
+solving a problem this hardware does not have. Replacing BetterTouchTool for
+those controls becomes an event-tap problem with no device write at all, which
+is a categorically lower risk than anything attempted so far.
+
+That conclusion is held open pending the wheel-tilt observation. Until then the
+five mapped CIDs remain `notAuthorizedForExecution`, unchanged.

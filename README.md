@@ -130,6 +130,19 @@ Audio execution is disabled after every launch and must be explicitly enabled.
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeOwner/` — public executable façade for bind, quit, and session rollover; it does not expose admit or a SET sender
 - `Packages/MXErgoKit/Tests/` — unit and boundary tests, including observer handoff/drain races, admission authorization, composition validation, acquisition failure cleanup, source-assembly rollback, teardown, cancellation, abandonment, and build-graph isolation
 
+For daily use the app lives in `/Applications`, built Release:
+
+```bash
+xcodebuild -project MXErgoController.xcodeproj -scheme MXErgoController \
+    -configuration Release -derivedDataPath DerivedData build
+cp -R "DerivedData/Build/Products/Release/MX Ergo Controller.app" /Applications/
+```
+
+Both permissions are keyed to the app's location, so a copy in `/Applications`
+needs Accessibility and Input Monitoring granted separately from any build run
+out of DerivedData. Launch at login also wants a stable location: registering
+from a temporary path reports `notFound`.
+
 The stable bundle identifier is `com.phib.MXErgoController`, and local development builds use Personal Team `XW848M73T3`. App Sandbox is disabled because direct HID observation is required; Hardened Runtime remains enabled.
 
 ## Generate, build, and test

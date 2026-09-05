@@ -358,11 +358,13 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func setEventLayerEnabled(_ isEnabled: Bool) {
-        setEventLayerEnabled(isEnabled, remembering: true)
-    }
-
-    private func setEventLayerEnabled(_ isEnabled: Bool, remembering: Bool) {
+    /// `remembering` has no default on purpose.
+    ///
+    /// It briefly did, and quitting the app called the convenience overload,
+    /// so every quit persisted "off" and the remembered switch could never
+    /// have survived a launch. Making each caller say which it means is the
+    /// only version of this that cannot silently do the wrong thing.
+    func setEventLayerEnabled(_ isEnabled: Bool, remembering: Bool) {
         if remembering {
             eventLayerRemembered = isEnabled
             UserDefaults.standard.set(
@@ -1430,8 +1432,9 @@ final class AppModel: ObservableObject {
             }
             stopWheelObserver()
             // Unlike a diverted control, this needs no inverse anything: the
-            // remapping exists only while the tap does.
-            setEventLayerEnabled(false)
+            // remapping exists only while the tap does. It must not be
+            // *forgotten*, though — quitting is not the user turning it off.
+            setEventLayerEnabled(false, remembering: false)
             stop()
             NSApplication.shared.terminate(nil)
         }

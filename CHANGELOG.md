@@ -1614,3 +1614,28 @@ is what the system believes rather than what this app last asked for.
 Three tests raise the package total to 404, all passing with none skipped. The
 pinned facade API list needed four entries added by hand. No live HID operation
 was run, and neither toggle has been exercised across an actual restart yet.
+
+The app is installed to `/Applications`, built Release, and that immediately
+found a defect in the feature added an hour earlier: **quitting always forgot
+the remembered switch.** `quit()` called the convenience `setEventLayerEnabled(_:)`,
+which persisted "off", so a remembered "on" could never have survived a launch.
+The feature was broken from the moment it was written and no test could have
+caught it — the pure autostart function it was built around was correct, and the
+bug was entirely in which overload one line happened to call.
+
+The fix is to delete the overload. `remembering:` now has no default, so every
+caller states whether this is the user turning the layer off or the app merely
+stopping it. Quitting is not the user turning it off.
+
+A launch and quit cycle now preserves the preference. That test used an
+AppleScript quit, which may not route through the in-app Quit path where the bug
+lived, so it confirms persistence rather than the fix; the fix rests on there no
+longer being an overload that can silently mean the wrong thing.
+
+`README.md` gains the install steps and the two things that follow from them:
+both permissions are keyed to the app's location, so a copy in `/Applications`
+needs them granted separately from any DerivedData build, and launch at login
+wants a stable location because registering from a temporary path reports
+`notFound`.
+
+Package total stays 404. No live HID operation was run.

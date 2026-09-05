@@ -231,7 +231,7 @@ struct ObserverMenuView: View {
         VStack(alignment: .leading, spacing: 6) {
             Toggle(isOn: Binding(
                 get: { model.eventLayerEnabled },
-                set: { model.setEventLayerEnabled($0) }
+                set: { model.setEventLayerEnabled($0, remembering: true) }
             )) {
                 Text("Replace BetterTouchTool for thumb, tilt and wheel click")
                     .font(.subheadline.weight(.medium))

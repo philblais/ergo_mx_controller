@@ -1668,3 +1668,23 @@ Accessibility and Input Monitoring lists — which is exactly where a person nee
 to recognise it while granting something a suppressing event tap.
 
 Package total stays 404. No live HID operation was run.
+
+The icon is now the supplied composite rather than the drawn mark. `Design/app-icon-source.jpg`
+is the artwork and `Tools/MakeAppIcon.swift` composites it into the macOS plate
+geometry — the rounded square at 824/1024 of the canvas, corner radius
+185.4/1024, the margin carrying the shadow — and renders all ten sizes. It is
+not a resize: each size is composited at its own resolution, and the plate's
+shadow and rim are drawn per size rather than scaled with the bitmap.
+
+The drawn mark it replaces stays in the history. It was more legible at 16
+points, where a photograph becomes mush and a silhouette does not, but the
+composite is the one that looks like the actual device on the actual desk, and
+that is a reasonable thing to want from an icon that mostly appears at 32 points
+and above in Finder and the privacy panes.
+
+One thing to be aware of rather than to act on: the artwork carries Logitech's
+product render and wordmark. For a personal utility on one machine that is
+unremarkable. It could not ship publicly with that on it, and this repository has
+no remote, so nothing is published by committing it.
+
+Package total stays 404. No live HID operation was run.

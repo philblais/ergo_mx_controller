@@ -1411,3 +1411,38 @@ settles that, and it was never the diagnostic buttons: whether wheel click
 itself opens Mission Control.
 
 Package total stays 398. No live HID operation was run.
+
+Resolved, and the toggle explanation was wrong too. Asked which of the two
+conflicting A/B runs stood, the operator confirmed the second: Control+Up as the
+tap built it does nothing, and the same chord carrying the numeric-pad and
+secondary-function flags opens Mission Control.
+
+So the reconciliation offered in the previous entry — that both chords work and
+a toggle merely flips the observable — is withdrawn as well. It fitted both
+reports, which made it attractive, but it was an inference from a contradiction
+rather than anything seen, and it went into the ledger as the likely cause when
+it should have gone to the operator as a question. Three entries in a row now
+have the same shape: a plausible story written down at the confidence of an
+observation.
+
+The finding itself is small and specific. macOS reaches the arrow keys through
+Fn and reports them in the keypad group, so a real Control+Up carries the
+numeric-pad and secondary-function flags alongside Control, and the window
+server's hotkey matcher requires them. A synthetic arrow carrying Control alone
+is ignored. `SyntheticKeyChordPlanner` derives those flags from the key code
+now, because they belong to the key rather than to anyone's fingers, and a test
+asserts all four arrows carry them while an ordinary key does not.
+
+It affected all three chords in the plan, all of which are arrows. Neither thumb
+button could have worked either — and with one Space on this machine, that would
+never have shown.
+
+The deferred delivery is now explaining nothing: chord A failed posted from a
+button, outside any callback at all, so the flags account for the entire
+failure. It stays, because posting into the tap point currently being serviced
+is a documented hazard and the build/deliver split costs nothing and is pinned
+by a test, but it is no longer described as a fix for anything observed.
+
+One test raises the package total to 399, all passing with none skipped. No live
+HID operation was run. Whether wheel click now opens Mission Control through the
+tap is not established by any of this, and only pressing it will say.

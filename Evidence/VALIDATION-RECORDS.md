@@ -559,3 +559,42 @@ hazard, and the fail-open behaviour is unchanged by it — but it is no longer
 supported by this evidence, and it is not known whether it fixes the failure.
 That is settled by one thing only: whether wheel click now opens Mission
 Control.
+
+### Resolution — 2026-09-05, the chord needs a real arrow key's flags
+
+The two A/B runs above disagreed. Asked which stood, the operator confirmed the
+**second**: chord A, Control+Up as the tap built it, does nothing; chord B, the
+same chord carrying the numeric-pad and secondary-function flags, opens Mission
+Control.
+
+So the toggle explanation offered for the disagreement — that both chords work
+and the observable simply flips — is **wrong**, and is withdrawn in turn. It was
+a plausible reconciliation of two conflicting reports, not an observation, and
+it should have been offered as a question rather than written into the record as
+the likely cause.
+
+**The finding.** A synthetic arrow key must carry the flags a real one does.
+macOS reaches the arrows through Fn and reports them in the keypad group, so a
+real Control+Up carries the numeric-pad and secondary-function flags alongside
+Control. The window server's hotkey matcher evidently requires them; a chord
+with Control alone is ignored.
+
+This affected all three chords in the plan, since all three are arrows — wheel
+click to Control+Up, and both thumbs to Control+Left and Control+Right. Neither
+thumb could have worked either, and on this machine, with one Space, that would
+have gone unnoticed.
+
+`SyntheticKeyChordPlanner` now derives the flags from the key code rather than
+taking them from the plan, because they are a property of the key and not
+something a person presses. A test asserts all four arrows carry them and that
+an ordinary key does not.
+
+**Still unknown.** Whether deferring delivery until after the tap callback
+returns was ever necessary. Chord A failed when posted from a button, entirely
+outside any callback, so the flags alone explain the whole failure and the
+deferral explains nothing that needs explaining. It stays because posting into
+the tap point being serviced is a documented hazard and the split costs nothing,
+but it is not a fix for this and is not recorded as one.
+
+**Not yet established.** Whether wheel click now opens Mission Control through
+the tap. Nothing above shows that; only pressing it does.

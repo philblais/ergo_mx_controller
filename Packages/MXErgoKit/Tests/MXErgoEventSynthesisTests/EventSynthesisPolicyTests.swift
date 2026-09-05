@@ -247,10 +247,14 @@ private func reviewedPolicy(
         keyCode: 126,
         modifiers: .control
     )
+    // Up Arrow is a keypad-group key, so it carries those flags without the
+    // plan asking: a synthetic Control+Up without them does not open Mission
+    // Control on this machine, and one with them does.
+    let upFlags: SynthesizedModifiers = [.control, .numericPad, .secondaryFunction]
     #expect(strokes == [
         SynthesizedKeyStroke(virtualKey: 0x3B, isKeyDown: true, modifiers: .control),
-        SynthesizedKeyStroke(virtualKey: 126, isKeyDown: true, modifiers: .control),
-        SynthesizedKeyStroke(virtualKey: 126, isKeyDown: false, modifiers: .control),
+        SynthesizedKeyStroke(virtualKey: 126, isKeyDown: true, modifiers: upFlags),
+        SynthesizedKeyStroke(virtualKey: 126, isKeyDown: false, modifiers: upFlags),
         SynthesizedKeyStroke(virtualKey: 0x3B, isKeyDown: false, modifiers: []),
     ])
 }
@@ -266,7 +270,10 @@ private func reviewedPolicy(
             keyCode: 123,
             modifiers: modifiers
         )
-        #expect(strokes.last?.modifiers == [])
+        // No *pressable* modifier may be left down. Keypad flags are a
+        // property of the key, not something anyone is holding, so they may
+        // and do appear on a trailing key-up.
+        #expect(strokes.last?.modifiers.intersection(.pressable) == [])
         // Each modifier appears exactly once down and once up.
         for (modifier, virtualKey) in SyntheticKeyChordPlanner.modifierOrder
         where modifiers.contains(modifier) {
@@ -275,19 +282,32 @@ private func reviewedPolicy(
             #expect(matching.first?.isKeyDown == true)
             #expect(matching.last?.isKeyDown == false)
         }
-        // The key itself is pressed with every modifier already down.
+        // The key itself is pressed with every modifier already down, plus the
+        // flags its own key code implies.
         let keyStrokes = strokes.filter { $0.virtualKey == 123 }
         #expect(keyStrokes.count == 2)
-        #expect(keyStrokes.allSatisfy { $0.modifiers == modifiers })
+        let expected = modifiers.union([.numericPad, .secondaryFunction])
+        #expect(keyStrokes.allSatisfy { $0.modifiers == expected })
         #expect(strokes.count == 2 + 2 * modifiers.rawValue.nonzeroBitCount)
     }
 }
 
 @Test func anUnmodifiedChordIsJustTheKeyItself() {
+    // Space is not a keypad-group key, so it picks up nothing extra.
+    #expect(SyntheticKeyChordPlanner.keypadFlags(forKeyCode: 49) == [])
     #expect(SyntheticKeyChordPlanner.strokes(keyCode: 49, modifiers: []) == [
         SynthesizedKeyStroke(virtualKey: 49, isKeyDown: true, modifiers: []),
         SynthesizedKeyStroke(virtualKey: 49, isKeyDown: false, modifiers: []),
     ])
+}
+
+@Test func everyBoundArrowCarriesTheFlagsItsRealCounterpartHas() {
+    // All three chords in the plan are arrows, so all three were affected.
+    for keyCode: UInt16 in [123, 124, 125, 126] {
+        #expect(SyntheticKeyChordPlanner.keypadFlags(forKeyCode: keyCode)
+            == [.numericPad, .secondaryFunction])
+    }
+    #expect(SyntheticKeyChordPlanner.keypadFlags(forKeyCode: 0) == [])
 }
 
 @Test func keypadFlagsRideOnTheKeyAndAreNeverPressedAsModifiers() {

@@ -44,13 +44,37 @@ package enum SyntheticKeyChordPlanner {
         (.shift, shiftVirtualKey),
     ]
 
+    /// Keys macOS reports as part of the keypad group.
+    ///
+    /// A real arrow key carries the numeric-pad and secondary-function flags —
+    /// it is reached through Fn and lives in that group — and on this machine a
+    /// synthetic Control+Up **without** them does not open Mission Control
+    /// while one **with** them does (2026-09-05). The flags are a property of
+    /// the key, so they are added here rather than asked for by the plan, and
+    /// a chord that names a non-keypad key is unaffected.
+    ///
+    /// Only the four arrows are listed because only arrows are bound. The
+    /// navigation cluster and numeric keypad belong to the same group and would
+    /// need adding before anything binds them.
+    package static let keypadGroupKeyCodes: Set<UInt16> = [123, 124, 125, 126]
+
+    package static func keypadFlags(
+        forKeyCode keyCode: UInt16
+    ) -> SynthesizedModifiers {
+        keypadGroupKeyCodes.contains(keyCode)
+            ? [.numericPad, .secondaryFunction]
+            : []
+    }
+
     package static func strokes(
         keyCode: UInt16,
         modifiers: SynthesizedModifiers
     ) -> [SynthesizedKeyStroke] {
         let active = modifierOrder.filter { modifiers.contains($0.0) }
-        // Flags that ride on the key without ever being pressed.
+        // Flags that ride on the key without ever being pressed: those asked
+        // for, plus those the key carries by virtue of which key it is.
         let passive = modifiers.subtracting(.pressable)
+            .union(keypadFlags(forKeyCode: keyCode))
         var strokes: [SynthesizedKeyStroke] = []
         var state: SynthesizedModifiers = []
 

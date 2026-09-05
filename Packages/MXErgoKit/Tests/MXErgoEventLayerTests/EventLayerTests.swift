@@ -134,9 +134,9 @@ import MXErgoEventTap
         "public func start(naturalScrollingEnabled: Bool) throws {",
         "public func setNaturalScrolling(enabled: Bool) {",
         "public func stop() {",
-        "public enum DiagnosticChord: String, Sendable, Equatable, CaseIterable {",
+        "public enum DiagnosticInjection: String, Sendable, Equatable, CaseIterable {",
         "public var label: String {",
-        "public func postDiagnosticChord(_ chord: DiagnosticChord) throws -> Bool {",
+        "public func postDiagnosticInjection(",
         "public var diagnostics: EventLayerDiagnostics? {",
     ])
 }

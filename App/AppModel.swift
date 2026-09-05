@@ -336,19 +336,16 @@ final class AppModel: ObservableObject {
         return nil
     }
 
-    /// Posts the wheel click's chord directly, outside the tap callback.
+    /// Posts one reviewed replacement directly, outside the tap callback.
     ///
-    /// A real Control+Up opens Mission Control and the tap's synthetic one does
-    /// not. Either the chord is not something the system will act on, or a
-    /// chord posted from inside an event-tap callback is dropped. These two
-    /// buttons separate those, which reading the code cannot.
-    func postDiagnosticChord(_ chord: EventLayer.DiagnosticChord) {
+    /// The injected click is the one path nothing else exercises: only wheel
+    /// tilt uses it. Posting it from a button separates "the click is not what
+    /// the system acts on" from "the tilt was never seen in the first place".
+    func postDiagnosticInjection(_ injection: EventLayer.DiagnosticInjection) {
         do {
-            let posted = try eventLayer.postDiagnosticChord(chord)
-            eventLayerStatusText = posted
-                ? "Posted Control+Up \(chord.label). Did Mission Control open?"
-                : "The system refused the chord posted \(chord.label)."
-            eventLayerNeedsAttention = !posted
+            let sent = try eventLayer.postDiagnosticInjection(injection)
+            eventLayerStatusText = "Posted \(injection.label): \(sent)"
+            eventLayerNeedsAttention = false
         } catch let error as EventLayerError {
             eventLayerStatusText = "Diagnostic post failed: \(error.message)"
             eventLayerNeedsAttention = true

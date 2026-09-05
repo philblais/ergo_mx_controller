@@ -117,6 +117,11 @@ package final class CoreGraphicsSyntheticEventPoster: SyntheticEventPosting, @un
                     .mouseEventButtonNumber,
                     value: Int64(buttonNumber)
                 )
+                // A real press carries a click count. Leaving it at zero says
+                // "no click happened", which is not what a keyboard-equivalent
+                // of a button press should say — the same unfaithfulness that
+                // stopped a synthetic arrow key from matching a hotkey.
+                event.setIntegerValueField(.mouseEventClickState, value: 1)
             }
             return stamped([down, up])
         }

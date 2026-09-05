@@ -145,54 +145,64 @@ public final class EventLayer: @unchecked Sendable {
         tap.stop()
     }
 
-    /// Which variant of the wheel click's chord to post for diagnosis.
-    public enum DiagnosticChord: String, Sendable, Equatable, CaseIterable {
-        /// Byte-for-byte what the tap posts today.
-        case asTheTapPostsIt
-        /// The same chord with the numeric-pad and secondary-function flags a
-        /// real arrow key carries.
-        case withKeypadFlags
+    /// Which of the reviewed replacements to post directly, for diagnosis.
+    ///
+    /// The keypad-flag variant that these buttons once compared is gone: it won
+    /// and is now what the planner always builds. What remains untested is the
+    /// injected *click*, which only wheel tilt uses, so posting one from here
+    /// separates "the click is wrong" from "the tilt was never seen".
+    public enum DiagnosticInjection: String, Sendable, Equatable, CaseIterable {
+        case wheelClickChord
+        case tiltLeftClick
+        case tiltRightClick
 
         public var label: String {
             switch self {
-            case .asTheTapPostsIt: "exactly as the tap posts it"
-            case .withKeypadFlags: "with a real arrow key's keypad flags"
+            case .wheelClickChord: "wheel click's chord"
+            case .tiltLeftClick: "tilt left's click"
+            case .tiltRightClick: "tilt right's click"
+            }
+        }
+
+        fileprivate var trigger: EventSynthesisTrigger {
+            switch self {
+            case .wheelClickChord:
+                .otherMouseButton(number: EventSynthesisPlan.wheelClickButtonNumber)
+            case .tiltLeftClick: .horizontalTilt(direction: .left)
+            case .tiltRightClick: .horizontalTilt(direction: .right)
             }
         }
     }
 
-    /// Posts the wheel click's replacement directly, from the caller's thread
-    /// rather than from inside the tap callback.
+    /// Posts one reviewed replacement directly, from the caller's thread rather
+    /// than from inside the tap callback, and reports what it sent.
     ///
-    /// A real Control+Up opens Mission Control and the tap's synthetic one does
-    /// not, which leaves two candidates: the chord itself is not what the
-    /// system will act on, or a chord posted from inside an event-tap callback
-    /// is dropped. Those need different fixes and look identical from outside.
-    /// Posting the same chord from here, and posting a variant carrying the
-    /// flags a real arrow key has, separates them.
-    public func postDiagnosticChord(_ chord: DiagnosticChord) throws -> Bool {
+    /// The description is returned rather than assumed, so a report of what
+    /// happened can be matched against what was actually injected.
+    public func postDiagnosticInjection(
+        _ injection: DiagnosticInjection
+    ) throws -> String {
         let plan: EventSynthesisPlan
         do {
             plan = try EventSynthesisPlan.reviewed()
         } catch {
             throw EventLayerError(error)
         }
-        guard let binding = plan.binding(
-            for: .otherMouseButton(number: EventSynthesisPlan.wheelClickButtonNumber)
-        ), case let .keyChord(keyCode, modifiers) = binding.replacement else {
-            throw EventLayerError.planInvalid("the wheel click has no chord binding")
+        guard let binding = plan.binding(for: injection.trigger) else {
+            throw EventLayerError.planInvalid(
+                "no binding for \(injection.label)"
+            )
         }
-        let event = SyntheticEvent.keyChord(
-            keyCode: keyCode,
-            modifiers: chord == .withKeypadFlags
-                ? modifiers.union([.numericPad, .secondaryFunction])
-                : modifiers
-        )
         do {
-            return try SyntheticEventDiagnosticPost.post(event)
+            guard try SyntheticEventDiagnosticPost.post(binding.replacement) else {
+                throw EventLayerError.eventSourceUnavailable
+            }
+        } catch let error as EventLayerError {
+            throw error
         } catch {
             throw EventLayerError(error)
         }
+        return binding.replacement.description
     }
 
     public var diagnostics: EventLayerDiagnostics? {

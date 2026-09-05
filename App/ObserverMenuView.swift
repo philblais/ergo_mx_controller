@@ -232,16 +232,23 @@ struct ObserverMenuView: View {
                     Button("Refresh event counts") {
                         model.refreshEventLayerDiagnostics()
                     }
-                    Button("Post chord A") {
-                        model.postDiagnosticChord(.asTheTapPostsIt)
-                    }
-                    Button("Post chord B") {
-                        model.postDiagnosticChord(.withKeypadFlags)
+                    Button("Post wheel-click chord") {
+                        model.postDiagnosticInjection(.wheelClickChord)
                     }
                 }
                 .controlSize(.small)
 
-                Text("A posts Control+Up exactly as the tap does, but from this button instead of from inside the tap callback. B adds the keypad flags a real arrow key carries. Watch whether Mission Control opens.")
+                HStack {
+                    Button("Post tilt-left click") {
+                        model.postDiagnosticInjection(.tiltLeftClick)
+                    }
+                    Button("Post tilt-right click") {
+                        model.postDiagnosticInjection(.tiltRightClick)
+                    }
+                }
+                .controlSize(.small)
+
+                Text("These post the same replacements the tap posts, but from a button rather than from inside the tap callback. Point the cursor at a web page with history and try the tilt clicks: back and forward should happen.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)

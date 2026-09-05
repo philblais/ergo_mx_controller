@@ -1446,3 +1446,35 @@ by a test, but it is no longer described as a fix for anything observed.
 One test raises the package total to 399, all passing with none skipped. No live
 HID operation was run. Whether wheel click now opens Mission Control through the
 tap is not established by any of this, and only pressing it will say.
+
+All three chords work on hardware. Wheel click opens Mission Control, and both
+thumbs switch desktops once a second Space existed to switch to. The keypad
+flags were the whole of that failure.
+
+Wheel tilt does not. It is the only binding that injects a **mouse click**
+rather than a chord, so it is the one path nothing else has ever exercised.
+Reported symptom: tilt left does nothing, tilt right sometimes acts as a click,
+apparently at random and sometimes repeating.
+
+"At random" is the informative part. The click is constructed as `.center` —
+`CGMouseButton` in Swift spells only left, right and center — with the real
+button number written into the field afterwards. If that override does not take,
+both tilts post a **middle click**, which does nothing over blank page area and
+opens a new tab over a link. Cursor-dependent behaviour is exactly what that
+looks like. Unverified.
+
+Two changes. The click now carries a click state of 1, because a real press
+does and leaving it at zero says no click happened — the same unfaithfulness
+that stopped a synthetic arrow from matching a hotkey, and correct on those
+grounds whether or not it is this failure. And the diagnostic buttons now post
+the tilt clicks as well as the wheel click's chord, returning the description of
+what was actually sent, so a report of what happened can be matched against what
+was injected.
+
+Those buttons separate the two candidates that reading the code cannot: the
+injected click is not what the system acts on, or the tilt was never observed
+and nothing was injected at all. The A/B pair they replace is gone — the
+keypad-flag variant won and is now simply what the planner builds.
+
+Package total stays 399, all passing with none skipped. No live HID operation
+was run.

@@ -1580,3 +1580,37 @@ session, and the difference now is only that it is written down as what it is.
 
 With that, every open question on the event layer is closed and no control is
 left unverified. Package total stays 401. No live HID operation was run.
+
+The layer's switch is remembered, and the app can launch at login. Together
+those are what turn a thing that works into a thing that is simply on.
+
+Remembering is not just a stored boolean, because the interesting case is a
+remembered "on" meeting a revoked permission. Losing Accessibility between
+launches is ordinary — a macOS update or a rebuild to a different path is
+enough — and the wrong answers are a silent no-op and an attempt that fails
+somewhere deeper. `EventLayerAutostart` is a pure function over the remembered
+preference, the grant, and whether the layer already runs, so the four outcomes
+are decided in one place and tested. A blocked start says so in the menu and is
+deliberately not abandoned: granting the permission arms it without a relaunch.
+A remembered "off" is never overridden by anything, which is asserted across
+every combination of the other two inputs.
+
+Arming happens in the model's initialiser rather than when the menu first
+opens, since the point of remembering is that the trackball works before anyone
+looks at it. A failure that a permission will not fix is abandoned once, so a
+foreground refresh does not retry it forever.
+
+`LoginItemRegistration` has four cases rather than a boolean because macOS does.
+`requiresApproval` is the one that matters: registering succeeds, the app
+appears in Login Items, and macOS silently declines to launch it until a person
+approves it there. Reporting that as "on" would be a lie discovered only after
+the next restart, so it reads as needing attention and offers the button that
+opens the right settings pane. `notFound` is the honest answer for a build run
+from a temporary location, which is exactly how this app is being run today.
+
+The status shown is read from `SMAppService` each time rather than cached, so it
+is what the system believes rather than what this app last asked for.
+
+Three tests raise the package total to 404, all passing with none skipped. The
+pinned facade API list needed four entries added by hand. No live HID operation
+was run, and neither toggle has been exercised across an actual restart yet.

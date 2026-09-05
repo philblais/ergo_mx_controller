@@ -36,6 +36,7 @@ struct ObserverMenuView: View {
             protocolSafetySection
             reportSection
             eventLayerSection
+            loginItemSection
             scrollAxisSection
             calibrationSection
             intentPreviewSection
@@ -187,8 +188,35 @@ struct ObserverMenuView: View {
         }
     }
 
-    /// The BetterTouchTool replacement. Off after every launch, because
-    /// enabling it takes over five controls globally.
+    private var loginItemSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(
+                get: { model.loginItemStatus.isRegistered },
+                set: { model.setLoginItemRegistered($0) }
+            )) {
+                Text("Launch at login")
+                    .font(.subheadline.weight(.medium))
+            }
+            .toggleStyle(.switch)
+
+            Text(model.loginItemStatusText)
+                .font(.caption)
+                .foregroundStyle(
+                    model.loginItemStatus.needsAttention ? .orange : .secondary
+                )
+                .fixedSize(horizontal: false, vertical: true)
+
+            if model.loginItemStatus.needsAttention {
+                Button("Open Login Items Settings") {
+                    model.openLoginItemsSettings()
+                }
+                .controlSize(.small)
+            }
+        }
+    }
+
+    /// The BetterTouchTool replacement. Its switch is remembered across
+    /// launches; turning it on takes over five controls globally.
     private var eventLayerSection: some View {
         eventLayerBody
             .onReceive(
@@ -221,6 +249,13 @@ struct ObserverMenuView: View {
                 Text(model.eventLayerStatusText)
                     .font(.caption)
                     .foregroundStyle(model.eventLayerNeedsAttention ? .orange : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if !model.eventLayerEnabled, model.eventLayerRemembered {
+                Text("Remembered as on. It arms itself once Accessibility is granted.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 

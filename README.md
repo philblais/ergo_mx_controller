@@ -55,11 +55,21 @@ at all — and `MXErgoEventTap` acts, holding the project's only `CGEvent.post`
 call site. Both remain productless and `package`-only; the app reaches them
 through the `MXErgoEventLayer` facade, whose public surface is a pinned list.
 
-A toggle in the menu turns it on, off after every launch, requiring
-Accessibility. The escape hatch is structural rather than promised: the tap's
-event mask excludes the primary and secondary buttons, so an ordinary click can
-never be swallowed and the menu always stays reachable. Stopping the layer
-restores everything at once — there is no inverse command to send.
+A toggle in the menu turns it on, and since 2026-09-05 that switch is
+remembered, so the trackball works before anyone opens the menu. A remembered
+"on" still requires Accessibility and says so plainly rather than failing
+quietly if the grant has gone — and arms itself once the grant returns, without
+a relaunch. A remembered "off" is never overridden by anything.
+
+The escape hatch is structural rather than promised: the tap's event mask
+excludes the primary and secondary buttons, so an ordinary click can never be
+swallowed and the menu always stays reachable. Stopping the layer restores
+everything at once — there is no inverse command to send.
+
+**Launch at login** is a separate toggle. It reports what macOS currently
+believes rather than what the app last asked for, because registration can
+succeed and still sit in `requiresApproval`, where the app is listed in Login
+Items and silently never starts until a person approves it.
 
 Three findings from making it work, each recorded in
 [Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md):

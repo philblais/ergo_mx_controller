@@ -38,6 +38,13 @@ final class AppModel: ObservableObject {
     @Published private(set) var eventLayerDiagnosticsSummary: String?
     @Published private(set) var eventLayerLastDecision: String?
     @Published private(set) var eventLayerNeedsAttention = false
+    /// What the layer should be on next launch. Kept separate from
+    /// `eventLayerEnabled`, which is what it is doing right now: a remembered
+    /// "on" that Accessibility currently blocks must stay remembered.
+    @Published private(set) var eventLayerRemembered =
+        UserDefaults.standard.bool(forKey: EventLayerAutostart.preferenceKey)
+    @Published private(set) var loginItemStatus: LoginItemRegistration = .notRegistered
+    @Published private(set) var loginItemStatusText = "Not launching at login"
     /// Scroll-axis diagnostics. They exist to settle one question the code
     /// cannot answer by reasoning: which sign of the horizontal CGEvent delta
     /// a *left* wheel tilt produces on this machine. Off after every launch,
@@ -159,6 +166,10 @@ final class AppModel: ObservableObject {
     private let wheelObserver = MXErgoWheelObserver()
     private let eventLayer = EventLayer()
     private let frontmostApplication = FrontmostApplicationTracker()
+    private let loginItem = LoginItemController()
+    /// Set once when an autostart fails for a reason granting a permission
+    /// will not fix, so a foreground refresh does not retry it forever.
+    private var eventLayerAutostartAbandoned = false
     private let launchID = UUID()
     private var runtimeOwner: PrecisionRuntimeOwner?
     private var runtimeOwnerSession: DeviceTransactionSession?
@@ -187,6 +198,10 @@ final class AppModel: ObservableObject {
 
     init() {
         refreshRecoveryJournalStatus()
+        refreshLoginItemStatus()
+        // A remembered "on" arms here, not on first menu open: the point of
+        // remembering is that the trackball works before anyone looks at it.
+        autostartEventLayerIfRemembered()
         workspaceLaunchObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification,
             object: nil,
@@ -271,6 +286,8 @@ final class AppModel: ObservableObject {
         // running layer would otherwise navigate backwards until restarted.
         eventLayer.setNaturalScrolling(enabled: naturalScrollingEnabled)
         refreshEventLayerDiagnostics()
+        refreshLoginItemStatus()
+        autostartEventLayerIfRemembered()
         refreshRecoveryJournalStatus()
         revalidatePrecisionReadinessEvidence()
         revalidateMappedControlDiversionEvidence()
@@ -294,7 +311,66 @@ final class AppModel: ObservableObject {
     /// The escape hatch is structural rather than promised: the tap's event
     /// mask excludes the primary and secondary buttons, so an ordinary click
     /// can never be swallowed and this menu stays reachable to switch it off.
+    func refreshLoginItemStatus() {
+        loginItemStatus = loginItem.status
+        loginItemStatusText = loginItemStatus.message
+    }
+
+    func setLoginItemRegistered(_ isRegistered: Bool) {
+        do {
+            try loginItem.setRegistered(isRegistered)
+        } catch {
+            refreshLoginItemStatus()
+            loginItemStatusText =
+                "Could not change it: \(error.localizedDescription)"
+            return
+        }
+        refreshLoginItemStatus()
+    }
+
+    func openLoginItemsSettings() {
+        loginItem.openLoginItemsSettings()
+    }
+
+    /// Arms the layer at launch, and again if Accessibility appears later.
+    ///
+    /// A remembered "on" plus a revoked permission must explain itself rather
+    /// than fail quietly. Losing Accessibility between launches is ordinary: a
+    /// macOS update or a rebuild to a different path is enough.
+    func autostartEventLayerIfRemembered() {
+        guard !eventLayerAutostartAbandoned else { return }
+        switch EventLayerAutostart.decide(
+            rememberedPreference: eventLayerRemembered,
+            accessibilityGranted: accessibilityGranted,
+            alreadyRunning: eventLayerEnabled
+        ) {
+        case .stayOff, .alreadyRunning:
+            return
+        case .blockedOnAccessibility:
+            // Deliberately not abandoned: granting the permission should bring
+            // it back without a relaunch.
+            eventLayerStatusText =
+                "On at last quit, but Accessibility is not granted. Grant it and this arms itself."
+            eventLayerNeedsAttention = true
+        case .start:
+            setEventLayerEnabled(true, remembering: false)
+            if !eventLayerEnabled { eventLayerAutostartAbandoned = true }
+        }
+    }
+
     func setEventLayerEnabled(_ isEnabled: Bool) {
+        setEventLayerEnabled(isEnabled, remembering: true)
+    }
+
+    private func setEventLayerEnabled(_ isEnabled: Bool, remembering: Bool) {
+        if remembering {
+            eventLayerRemembered = isEnabled
+            UserDefaults.standard.set(
+                isEnabled,
+                forKey: EventLayerAutostart.preferenceKey
+            )
+            eventLayerAutostartAbandoned = false
+        }
         guard isEnabled else {
             eventLayer.stop()
             eventLayerEnabled = false

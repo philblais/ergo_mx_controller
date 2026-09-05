@@ -140,5 +140,10 @@ import MXErgoEventTap
         "public var label: String {",
         "public func postDiagnosticInjection(",
         "public var diagnostics: EventLayerDiagnostics? {",
+        // Autostart, added 2026-09-05 so a remembered "on" survives a launch.
+        "public enum EventLayerAutostartDecision: Sendable, Equatable {",
+        "public enum EventLayerAutostart {",
+        "public static func decide(",
+        "public static let preferenceKey = \"com.phib.MXErgoController.eventLayerEnabled\"",
     ])
 }

@@ -324,12 +324,6 @@ private final class Loop: @unchecked Sendable {
         stateLock.unlock()
         return outcome == .suppress ? nil : passThrough
     }
-
-    private func record(_ mutate: (inout EventSynthesisDiagnostics) -> Void) {
-        stateLock.lock()
-        mutate(&diagnostics)
-        stateLock.unlock()
-    }
 }
 
 private let synthesisTapCallback: CGEventTapCallBack = { _, type, event, refcon in

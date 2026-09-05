@@ -1244,3 +1244,34 @@ Sixteen tests raise the package total to 394, all passing with none skipped, and
 all four signed targets build. No live HID operation was run. Synthetic events
 can now be posted for the first time in this project's history, but only while
 the toggle is on, and none was posted by the test suite.
+
+The first live run of the event layer found that a key chord was not being
+emitted faithfully. Wheel click did not open Mission Control. The system side
+was ruled out first: the Spaces shortcuts are explicitly enabled in
+`com.apple.symbolichotkeys` and Mission Control sits at its enabled default, so
+the shortcut existed and something in the injection was wrong.
+
+The defect is that a modifier flag was set on the arrow key event and nowhere
+else. That satisfies an ordinary application, which reads the flags off the
+event it receives, but it never makes Control *be* down — and Mission Control
+and the Spaces shortcuts are symbolic hotkeys, matched by the window server
+against the modifier state it believes is current. A flag appearing out of
+nowhere on one key event does not change that state.
+
+`SyntheticKeyChordPlanner` now expands a chord into the transitions a real
+keyboard emits: each modifier pressed in a fixed order, the key pressed and
+released with all of them down, then each modifier released in reverse. It
+lives in the policy half and produces plain values, so the sequence is pinned by
+tests rather than only observed in behaviour — including that every chord ends
+with all modifiers released, since one left down would make the whole machine
+behave as though a key were stuck, which is worse than the remap not working.
+
+The own-event counter is now shown in the layer's summary. The layer both
+swallows mouse buttons 3 and 4 and injects them, so it must recognise its own
+events by their marker; that marker had never run, and a failure would have
+shown up only as tilt switching desktops rather than navigating.
+
+Three tests raise the package total to 397, all passing with none skipped. No
+live HID operation was run. Whether the chord now reaches Mission Control is
+not yet established — that needs the next physical session, and this entry is
+written before it.

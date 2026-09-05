@@ -237,3 +237,55 @@ private func reviewedPolicy(
         at: 1.01
     ) == .suppressAndPost([.otherMouseClick(buttonNumber: 4)]))
 }
+
+@Test func aChordPressesAndReleasesTheModifierAroundTheKey() {
+    // Wheel click's replacement. Setting a flag on the arrow alone satisfies an
+    // ordinary application but never makes Control *be* down, and Mission
+    // Control is a symbolic hotkey matched against the modifier state the
+    // window server believes is current. So the modifier gets real transitions.
+    let strokes = SyntheticKeyChordPlanner.strokes(
+        keyCode: 126,
+        modifiers: .control
+    )
+    #expect(strokes == [
+        SynthesizedKeyStroke(virtualKey: 0x3B, isKeyDown: true, modifiers: .control),
+        SynthesizedKeyStroke(virtualKey: 126, isKeyDown: true, modifiers: .control),
+        SynthesizedKeyStroke(virtualKey: 126, isKeyDown: false, modifiers: .control),
+        SynthesizedKeyStroke(virtualKey: 0x3B, isKeyDown: false, modifiers: []),
+    ])
+}
+
+@Test func aChordAlwaysEndsWithEveryModifierReleased() {
+    // A chord that left a modifier down would leave the whole machine behaving
+    // as though a key were stuck, which is far worse than the remap not
+    // working.
+    for modifiers: SynthesizedModifiers in [
+        [], .control, [.control, .shift], [.command, .option, .shift, .control],
+    ] {
+        let strokes = SyntheticKeyChordPlanner.strokes(
+            keyCode: 123,
+            modifiers: modifiers
+        )
+        #expect(strokes.last?.modifiers == [])
+        // Each modifier appears exactly once down and once up.
+        for (modifier, virtualKey) in SyntheticKeyChordPlanner.modifierOrder
+        where modifiers.contains(modifier) {
+            let matching = strokes.filter { $0.virtualKey == virtualKey }
+            #expect(matching.count == 2)
+            #expect(matching.first?.isKeyDown == true)
+            #expect(matching.last?.isKeyDown == false)
+        }
+        // The key itself is pressed with every modifier already down.
+        let keyStrokes = strokes.filter { $0.virtualKey == 123 }
+        #expect(keyStrokes.count == 2)
+        #expect(keyStrokes.allSatisfy { $0.modifiers == modifiers })
+        #expect(strokes.count == 2 + 2 * modifiers.rawValue.nonzeroBitCount)
+    }
+}
+
+@Test func anUnmodifiedChordIsJustTheKeyItself() {
+    #expect(SyntheticKeyChordPlanner.strokes(keyCode: 49, modifiers: []) == [
+        SynthesizedKeyStroke(virtualKey: 49, isKeyDown: true, modifiers: []),
+        SynthesizedKeyStroke(virtualKey: 49, isKeyDown: false, modifiers: []),
+    ])
+}

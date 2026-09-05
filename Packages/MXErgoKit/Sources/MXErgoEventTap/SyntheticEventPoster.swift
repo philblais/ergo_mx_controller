@@ -56,21 +56,26 @@ package final class CoreGraphicsSyntheticEventPoster: SyntheticEventPosting, @un
     private func emit(_ event: SyntheticEvent) -> Bool {
         switch event {
         case let .keyChord(keyCode, modifiers):
-            guard let down = CGEvent(
-                keyboardEventSource: source,
-                virtualKey: CGKeyCode(keyCode),
-                keyDown: true
-            ), let up = CGEvent(
-                keyboardEventSource: source,
-                virtualKey: CGKeyCode(keyCode),
-                keyDown: false
-            ) else {
-                return false
+            // The modifier is pressed and released around the key, because a
+            // flag set on the key event alone never makes Control *be* down,
+            // and the symbolic hotkeys this layer targets are matched against
+            // the modifier state the window server believes is current.
+            var events: [CGEvent] = []
+            for stroke in SyntheticKeyChordPlanner.strokes(
+                keyCode: keyCode,
+                modifiers: modifiers
+            ) {
+                guard let event = CGEvent(
+                    keyboardEventSource: source,
+                    virtualKey: CGKeyCode(stroke.virtualKey),
+                    keyDown: stroke.isKeyDown
+                ) else {
+                    return false
+                }
+                event.flags = Self.flags(for: stroke.modifiers)
+                events.append(event)
             }
-            let flags = Self.flags(for: modifiers)
-            down.flags = flags
-            up.flags = flags
-            return dispatch([down, up])
+            return dispatch(events)
 
         case let .otherMouseClick(buttonNumber):
             guard let location = CGEvent(source: nil)?.location,

@@ -353,3 +353,52 @@ scroll path — the wheel observer currently decodes only vertical motion.
 The existing mapped-control diversion plan, readiness audit, action plan, event
 pump and GET-only preflight are superseded rather than wrong. They remain as
 reviewed evidence and stay `notAuthorizedForExecution`.
+
+### Live validation record — 2026-09-04, Precision audio works
+
+The Precision audio path works on hardware. A quick tap mutes and unmutes;
+holding Precision and scrolling changes the system volume; and the page
+underneath does not scroll while Precision is held. This supersedes the finding
+recorded earlier the same day that the audio path did not work.
+
+Input evidence captured while diverted and active:
+
+```text
+observed 21 · notifications 18 · matched 3 · dropped 18
+last frame  11 FF 0A 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+last press  11 FF 0A 00 00 ED 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+```
+
+The press notification carries device index `0xFF`, feature index `0x0A`,
+function `0x00` (`divertedButtonsEvent`) and control ID `00ED`. The release that
+follows carries an all-zero payload. `Action preview` showed `Volume up ×2`, and
+the audio panel reported a live system volume, so decoding, intent resolution
+and execution all function.
+
+Both permissions read granted: Input Monitoring and **Accessibility**.
+
+#### Why the earlier session failed
+
+Not established with certainty, and worth stating as such. The leading
+explanation is the Accessibility grant. The scroll swallow uses a `CGEvent` tap
+created with `.defaultTap`, which can suppress events, and a suppressing tap
+requires Accessibility rather than Input Monitoring alone. If `tapCreate`
+returned nil in the earlier session, the page would have scrolled while
+Precision was held — exactly what was observed. The permission row that makes
+this visible was added between the two sessions, so the grant plausibly happened
+because the requirement finally became legible.
+
+Two contributing factors are certain, because they were instruction errors
+rather than defects. The tap threshold is 0.3 s, and the earlier session was run
+under an instruction to press "slowly, with a clear pause" — a slow press is a
+hold by design and emits no mute intent. In the session after that, the Audio
+test was never enabled at all.
+
+What is now certain is that the notification filter was never at fault. The
+device does use device index `0xFF`, so the candidate raised earlier — that the
+filter should have matched `0x00` — is disproven. The withdrawal of the
+supposed counter-evidence for that candidate still stands: that reasoning was
+unsound even though its conclusion happened to be right.
+
+The diagnostics did their job. They converted an unfalsifiable argument between
+two hypotheses into a frame of hex that settled it.

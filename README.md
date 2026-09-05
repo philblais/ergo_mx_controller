@@ -28,14 +28,11 @@ independent GET, one restore SET verified back to the exact baseline, both
 evidence and only a GET as proof. See
 [Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md).
 
-**Tried and does not work:** Precision tap-to-mute and hold+scroll volume. With
-Precision verified diverted (`flags 01`) and audio execution enabled, tapping did
-not mute and hold+scroll did not change volume — the page underneath scrolled
-normally, so the scroll swallow never engaged either. No diverted control
-notification reaches the intent path. The cause is still undetermined, but the
-runtime can now report it: input diagnostics show how many frames arrived, how
-many were routed as notifications, and the last frame's bytes. One short
-hardware session should settle it.
+**Working, proved on hardware 2026-09-04:** Precision tap-to-mute, hold+scroll
+volume, and the scroll swallow. The press notification carries CID `00ED`, and
+decoding, intent resolution and execution all function. The app requires
+**Accessibility** as well as Input Monitoring: the scroll swallow uses a
+suppressing `CGEvent` tap, which Input Monitoring alone does not permit.
 
 **Answered 2026-09-04: no mapped control needs HID++ diversion.** Every one of
 the five is already delivered to macOS as an ordinary mouse button or scroll

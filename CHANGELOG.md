@@ -1024,3 +1024,31 @@ consumer usages, and — most importantly — that the two scroll axes never dec
 each other, since keeping them distinguishable is what makes tilt usable without
 diversion. A fresh signed menu-app build verifies on disk and satisfies its
 designated requirement. No live HID operation was run and no CGEvent was posted.
+
+The Precision audio path works on hardware. A quick tap mutes and unmutes,
+holding Precision and scrolling changes system volume, and the page underneath
+stays still. This supersedes the earlier finding on the same day that it did not
+work.
+
+The input diagnostics settled it. Captured while diverted and active:
+`observed 21 · notifications 18 · matched 3 · dropped 18`, with a press frame of
+`11 FF 0A 00 00 ED …` — device index `0xFF`, feature index `0x0A`, function
+`0x00`, control ID `00ED` — and an all-zero release following it. The
+notification filter was therefore never at fault, and the candidate raised
+earlier, that it should have matched device index `0x00`, is disproven.
+
+Why the earlier session failed is not established with certainty. The leading
+explanation is the Accessibility grant: the scroll swallow uses a `CGEvent` tap
+created with `.defaultTap`, which can suppress events, and a suppressing tap
+requires Accessibility rather than Input Monitoring alone. A failed `tapCreate`
+would produce exactly the observed symptom of the page scrolling while Precision
+was held. The permission row that makes the requirement visible was added
+between the two sessions.
+
+Two contributing factors are certain, and both were instruction errors rather
+than defects: the tap threshold is 0.3 s and the earlier session was run under an
+instruction to press slowly, which is a hold by design; and in the session after
+that the Audio test was never enabled.
+
+The app therefore has a hard dependency on Accessibility that was previously
+undocumented and, before the diagnostics existed, undiagnosable.

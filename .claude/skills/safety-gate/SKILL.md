@@ -67,13 +67,13 @@ Keep this accurate; it is the thing most likely to drift.
   through `MXErgoPrecisionRuntimeOwner`, and **ran successfully on hardware
   2026-09-04**: apply verified, restore verified, back at baseline. The durable
   runtime journal `precision-runtime-v3.json` now exists at revision 6,
-  `restoredVerified`. **Tap-to-mute and hold+scroll volume were tried and do
-  not work** — no diverted control notification reaches the intent path, cause
-  undetermined. The runtime now reports input diagnostics (observed vs routed
-  frame counts plus the last frame's bytes); a short hardware session should
-  settle it. A spent journal is retired with **Retire completed runtime
-  journal…**, which is HID-free and refuses any journal still holding active,
-  ambiguous, conflicted, or recovery-required evidence.
+  `restoredVerified`. **Tap-to-mute, hold+scroll volume and the scroll swallow
+  all work on hardware** (2026-09-04). The press notification carries CID `00ED`
+  with device index `0xFF`. The app needs **Accessibility** as well as Input
+  Monitoring, because the scroll swallow uses a suppressing `CGEvent` tap. A
+  spent journal is retired with **Retire completed runtime journal…**, which is
+  HID-free and refuses any journal still holding active, ambiguous, conflicted,
+  or recovery-required evidence.
 - **No mapped control needs diversion.** Observed 2026-09-04: thumb buttons are
   ordinary HID buttons `0x08`/`0x10`, both wheel tilts are ordinary horizontal
   scroll, wheel click is middle click. Only Precision (`00ED`) produces no

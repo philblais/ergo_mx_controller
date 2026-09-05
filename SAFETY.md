@@ -165,9 +165,17 @@ So every uncertainty resolves toward *letting the event through*.
   `scrollWheel`. The primary and secondary buttons are not in it and have no
   case in the observed-event type, so no state can swallow an ordinary click.
 * An unrecognised or undecodable event is passed through.
-* If injecting the replacement fails, the original is passed through rather
+* If the replacement cannot be **built**, the original is passed through rather
   than swallowed — losing the input outright is the one outcome worse than not
-  remapping at all.
+  remapping at all. Construction is the only failure this layer can detect;
+  `CGEvent.post` reports nothing.
+* Injection is **deferred until the callback has returned**. The window server
+  drops an event posted from inside a tap callback — established on hardware
+  2026-09-05, where the identical chord worked posted from a button and did
+  nothing posted from the callback. The decision is made synchronously, since
+  the callback must return suppress or pass-through; only delivery is deferred,
+  onto a block on the tap's own run loop, so it stays on one thread and keeps
+  the order events arrived in.
 * A release is suppressed only if *this policy suppressed its press*. Consulting
   the plan instead would hand the frontmost app a mouse-up it never saw a
   mouse-down for.

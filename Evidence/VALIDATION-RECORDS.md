@@ -477,3 +477,49 @@ not open Mission Control on the first two live runs of the event layer, and a
 binding keyed on a button number this device may never emit would produce
 exactly that: the tap sees the event, finds no binding for it, and passes it
 through untouched.
+
+### Live validation record — 2026-09-05, why the event layer's chords did nothing
+
+**Conditions.** BetterTouchTool and Logi Options quit. Event layer enabled. No
+device write, no lease, no SET; the trackball is untouched throughout.
+
+**Counters, after eleven wheel clicks:**
+`observed 2498 · passed 2476 · suppressed 22 · posted 11 · own 0`
+
+`suppressed` is exactly twice `posted` — one press, one release, one chord — so
+the wheel click was seen, matched, suppressed, and a chord was posted every
+time. `own 0` is correct rather than a fault: chords are keyboard events, and
+keyboard events are not in the tap's mask, so it never sees its own.
+
+**Calibration panel:** `#8,245 Wheel click down (mask 0x04)`. The constant
+inferred on 2026-09-05 was right; it was still an inference when it was written
+down as an observation.
+
+**Confound found:** this machine has exactly one Space, so Control+Left and
+Control+Right cannot switch desktops regardless of the code. Neither thumb
+button was ever evidence of anything.
+
+**The discriminating test.** A real Control+Up opens Mission Control. Two
+buttons then posted the same chord from the main thread instead of from inside
+the tap callback:
+
+| | posted | result |
+|---|---|---|
+| A | Control+Up exactly as the tap builds it | **Mission Control opened** |
+| B | the same plus the numeric-pad and secondary-function flags a real arrow key carries | **nothing** |
+
+**What this establishes.** The chord was always correct. The window server drops
+an event posted from *inside* an event-tap callback, and that alone is why five
+remapped controls did nothing.
+
+**What it also establishes, and matters more.** B disproves the fix that was
+about to be shipped. Adding a real arrow key's flags does not help; it *breaks*
+a chord that otherwise works. Two speculative fixes had already been committed
+for this failure without a measurement — a modifier-transition change and,
+before it, an inferred button mask. Building the measurement instead took one
+session and settled it in one press.
+
+The modifier-transition change stays: a chord that never presses its modifier is
+wrong regardless, and A confirms the current form works. Whether it was ever
+necessary is not established, and is recorded here as unknown rather than
+claimed either way.

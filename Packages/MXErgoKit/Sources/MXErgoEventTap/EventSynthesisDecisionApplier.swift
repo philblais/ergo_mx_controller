@@ -6,6 +6,17 @@ package enum SuppressionOutcome: Sendable, Equatable {
     case suppress
 }
 
+/// What the callback must do, and what it must hand to the run loop afterwards.
+///
+/// Delivery is separated from the decision because the window server drops an
+/// event posted from inside a tap callback. The decision has to be made now —
+/// the callback must return suppress or pass-through synchronously — while the
+/// injection has to happen once that return has been made.
+package enum AppliedDecision {
+    case passThrough
+    case suppress(delivery: (any PreparedSyntheticEvents)?)
+}
+
 /// Carries out a decision and records what happened.
 ///
 /// Split out of the tap callback so the consequential half — "when exactly is
@@ -16,7 +27,7 @@ package enum EventSynthesisDecisionApplier {
         _ decision: EventSynthesisDecision,
         poster: SyntheticEventPosting,
         diagnostics: inout EventSynthesisDiagnostics
-    ) -> SuppressionOutcome {
+    ) -> AppliedDecision {
         switch decision {
         case .passThrough:
             diagnostics.passedThroughCount += 1
@@ -26,24 +37,26 @@ package enum EventSynthesisDecisionApplier {
         case .suppress:
             diagnostics.suppressedCount += 1
             diagnostics.lastDecisionDescription = "suppressed"
-            return .suppress
+            return .suppress(delivery: nil)
 
         case let .suppressAndPost(events):
-            guard poster.post(events) else {
-                // Fail open. Swallowing the original after failing to replace
-                // it would lose the input outright, which is the one outcome
-                // worse than not remapping at all.
+            // Construction is the only failure this layer can detect —
+            // `CGEvent.post` reports nothing — so it stays here, inside the
+            // callback, and still fails open. Swallowing the original after
+            // failing to build its replacement would lose the input outright,
+            // which is the one outcome worse than not remapping at all.
+            guard let prepared = poster.prepare(events) else {
                 diagnostics.postFailureCount += 1
                 diagnostics.passedThroughCount += 1
                 diagnostics.lastDecisionDescription =
-                    "post failed; original passed through"
+                    "could not build the replacement; original passed through"
                 return .passThrough
             }
             diagnostics.suppressedCount += 1
             diagnostics.postedCount += events.count
             diagnostics.lastDecisionDescription = "posted "
                 + events.map(\.description).joined(separator: ", ")
-            return .suppress
+            return .suppress(delivery: prepared)
         }
     }
 }

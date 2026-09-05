@@ -1338,3 +1338,40 @@ property of the key. A test pins that.
 One test raises the package total to 398, all passing with none skipped. No live
 HID operation was run. The chord's fate is not yet established, and this entry
 is written before the session that settles it.
+
+Settled: the window server drops an event posted from inside an event-tap
+callback. That alone is why every remapped control did nothing.
+
+A real Control+Up opens Mission Control. Posting the identical chord from a
+button opened it too. Posting the same chord plus the numeric-pad and
+secondary-function flags a real arrow key carries did nothing at all. So the
+chord was always right, the position it was posted from was always wrong, and
+the fix that was about to be shipped would have broken a working chord.
+
+Delivery is now deferred until the callback has returned. Construction stays
+inside it, because construction is the only failure this layer can detect —
+`CGEvent.post` reports nothing — so the fail-open guarantee is unchanged: a
+replacement that cannot be built means the original passes through. What changed
+is that `apply` now hands back a prepared delivery instead of posting, and the
+callback runs it from a block on the tap's own run loop. Same thread, so events
+still reach the system in the order they arrived.
+
+A test pins the property that broke: applying a decision must build the
+replacement and **not** deliver it. Without that, a regression here stops the
+remap silently while every counter still reads as success, which is exactly how
+this failure presented.
+
+`SAFETY.md` rule 11 is amended rather than quietly widened. The fail-open clause
+now says *built* rather than *injected*, and the deferral is stated with the
+evidence for it.
+
+Two speculative fixes were committed for this failure before any measurement
+existed: a modifier-transition change, and before that an inferred button mask
+written into the audit trail as an observation. Both were plausible; neither was
+evidence. The measurement that settled it took one session and one press. The
+modifier-transition change stays, because a chord that never presses its
+modifier is wrong regardless and the working variant includes it — but whether
+it was ever necessary is unknown, and is recorded as unknown.
+
+Package total stays 398, all passing with none skipped. No live HID operation
+was run.

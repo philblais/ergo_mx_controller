@@ -5,26 +5,49 @@ import MXErgoEventSynthesis
 import Testing
 @testable import MXErgoEventTap
 
+private final class RecordingDelivery: PreparedSyntheticEvents {
+    let events: [SyntheticEvent]
+    private let onDeliver: ([SyntheticEvent]) -> Void
+
+    init(events: [SyntheticEvent], onDeliver: @escaping ([SyntheticEvent]) -> Void) {
+        self.events = events
+        self.onDeliver = onDeliver
+    }
+
+    func deliver() { onDeliver(events) }
+}
+
 private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable {
     private let lock = NSLock()
-    private let succeeds: Bool
-    private var storage: [SyntheticEvent] = []
+    private let canBuild: Bool
+    private var preparedStorage: [SyntheticEvent] = []
+    private var deliveredStorage: [SyntheticEvent] = []
 
-    init(succeeds: Bool = true) {
-        self.succeeds = succeeds
+    init(canBuild: Bool = true) {
+        self.canBuild = canBuild
     }
 
-    var posted: [SyntheticEvent] {
-        lock.lock()
-        defer { lock.unlock() }
-        return storage
+    /// Built but not yet handed to the system.
+    var prepared: [SyntheticEvent] {
+        lock.lock(); defer { lock.unlock() }; return preparedStorage
     }
 
-    func post(_ events: [SyntheticEvent]) -> Bool {
+    /// Actually handed to the system.
+    var delivered: [SyntheticEvent] {
+        lock.lock(); defer { lock.unlock() }; return deliveredStorage
+    }
+
+    func prepare(_ events: [SyntheticEvent]) -> (any PreparedSyntheticEvents)? {
+        guard canBuild else { return nil }
         lock.lock()
-        storage.append(contentsOf: events)
+        preparedStorage.append(contentsOf: events)
         lock.unlock()
-        return succeeds
+        return RecordingDelivery(events: events) { [weak self] delivered in
+            guard let self else { return }
+            lock.lock()
+            deliveredStorage.append(contentsOf: delivered)
+            lock.unlock()
+        }
     }
 }
 
@@ -144,55 +167,70 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
     }
 }
 
-@Test func applierPassesThroughAndSuppressesWithoutInjectingAnything() {
+@Test func applierPassesThroughAndSuppressesWithoutBuildingAnything() {
     let poster = RecordingPoster()
     var diagnostics = EventSynthesisDiagnostics()
 
-    #expect(EventSynthesisDecisionApplier.apply(
+    guard case .passThrough = EventSynthesisDecisionApplier.apply(
         .passThrough, poster: poster, diagnostics: &diagnostics
-    ) == .passThrough)
-    #expect(EventSynthesisDecisionApplier.apply(
+    ) else {
+        Issue.record("pass-through must not be suppressed"); return
+    }
+    guard case let .suppress(delivery) = EventSynthesisDecisionApplier.apply(
         .suppress, poster: poster, diagnostics: &diagnostics
-    ) == .suppress)
-
-    #expect(poster.posted.isEmpty)
+    ) else {
+        Issue.record("suppress must suppress"); return
+    }
+    #expect(delivery == nil)
+    #expect(poster.prepared.isEmpty)
     #expect(diagnostics.passedThroughCount == 1)
     #expect(diagnostics.suppressedCount == 1)
-    #expect(diagnostics.postedCount == 0)
 }
 
-@Test func applierSuppressesTheOriginalOnlyAfterTheReplacementIsInjected() {
+@Test func applyingADecisionBuildsTheReplacementButDoesNotYetDeliverIt() {
+    // The whole point of the split: the window server drops an event posted
+    // from inside the tap callback, so `apply` must build and hand back, never
+    // deliver. If this ever regresses, the remap silently stops working with
+    // every counter still reading as success.
     let poster = RecordingPoster()
     var diagnostics = EventSynthesisDiagnostics()
     let replacement = SyntheticEvent.keyChord(keyCode: 126, modifiers: .control)
 
-    #expect(EventSynthesisDecisionApplier.apply(
+    guard case let .suppress(delivery) = EventSynthesisDecisionApplier.apply(
         .suppressAndPost([replacement]), poster: poster, diagnostics: &diagnostics
-    ) == .suppress)
+    ) else {
+        Issue.record("a posted replacement must suppress the original"); return
+    }
 
-    #expect(poster.posted == [replacement])
+    #expect(poster.prepared == [replacement])
+    #expect(poster.delivered.isEmpty)
     #expect(diagnostics.suppressedCount == 1)
     #expect(diagnostics.postedCount == 1)
-    #expect(diagnostics.postFailureCount == 0)
     #expect(diagnostics.lastDecisionDescription == "posted Control+key 126")
+
+    try! #require(delivery).deliver()
+    #expect(poster.delivered == [replacement])
 }
 
-@Test func aFailedInjectionPassesTheOriginalThroughRatherThanSwallowingIt() {
-    let poster = RecordingPoster(succeeds: false)
+@Test func aReplacementThatCannotBeBuiltPassesTheOriginalThrough() {
+    let poster = RecordingPoster(canBuild: false)
     var diagnostics = EventSynthesisDiagnostics()
 
-    // Losing the input outright is the one outcome worse than not remapping,
-    // so every failure path in this layer fails open.
-    #expect(EventSynthesisDecisionApplier.apply(
+    // Construction is the only failure this layer can detect, since posting
+    // reports nothing. Losing the input outright is the one outcome worse than
+    // not remapping, so it stays fail-open.
+    guard case .passThrough = EventSynthesisDecisionApplier.apply(
         .suppressAndPost([.otherMouseClick(buttonNumber: 3)]),
         poster: poster,
         diagnostics: &diagnostics
-    ) == .passThrough)
+    ) else {
+        Issue.record("a failed build must not swallow the original"); return
+    }
 
     #expect(diagnostics.postFailureCount == 1)
     #expect(diagnostics.passedThroughCount == 1)
     #expect(diagnostics.suppressedCount == 0)
-    #expect(diagnostics.postedCount == 0)
+    #expect(poster.delivered.isEmpty)
 }
 
 @Test func endToEndDecisionsForOneFlickAndOneRemappedThumbPress() throws {
@@ -214,11 +252,18 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
             return .passThrough
         }
         diagnostics.observedCount += 1
-        return EventSynthesisDecisionApplier.apply(
+        switch EventSynthesisDecisionApplier.apply(
             policy.decide(kind, at: timestamp),
             poster: poster,
             diagnostics: &diagnostics
-        )
+        ) {
+        case .passThrough:
+            return .passThrough
+        case let .suppress(delivery):
+            // The tap defers this to its run loop; here it stands in for that.
+            delivery?.deliver()
+            return .suppress
+        }
     }
 
     #expect(feed(type: .otherMouseDown, buttonNumber: 4, at: 1) == .suppress)
@@ -230,7 +275,7 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
     #expect(feed(type: .scrollWheel, deltaAxis2: 1, at: 2.03) == .suppress)
     #expect(feed(type: .scrollWheel, deltaAxis2: 1, at: 2.06) == .suppress)
 
-    #expect(poster.posted == [
+    #expect(poster.delivered == [
         .keyChord(keyCode: 123, modifiers: .control),
         .otherMouseClick(buttonNumber: 3),
     ])

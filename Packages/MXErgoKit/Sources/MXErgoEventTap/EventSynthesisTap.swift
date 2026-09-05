@@ -308,21 +308,39 @@ private final class Loop: @unchecked Sendable {
         }
 
         let timestamp = ProcessInfo.processInfo.systemUptime
-        // One critical section covers deciding and acting, so a concurrent
-        // reader can never see a decision that has been counted but not yet
-        // carried out. Injection happens inside it: `CGEvent.post` enqueues
-        // rather than calling back, and a tap callback cannot re-enter itself
-        // on this thread, so the lock is held only across an enqueue.
+        // The lock covers deciding and building only. Delivery happens after
+        // the callback returns, so nothing slow or re-entrant runs under it.
         stateLock.lock()
         diagnostics.observedCount += 1
         let decision = policy.decide(kind, at: timestamp)
-        let outcome = EventSynthesisDecisionApplier.apply(
+        let applied = EventSynthesisDecisionApplier.apply(
             decision,
             poster: poster,
             diagnostics: &diagnostics
         )
+        let runLoop = self.runLoop
         stateLock.unlock()
-        return outcome == .suppress ? nil : passThrough
+
+        switch applied {
+        case .passThrough:
+            return passThrough
+        case let .suppress(delivery):
+            if let delivery, let runLoop {
+                // The window server drops an event posted from inside a tap
+                // callback. Delivering from a block on this same run loop puts
+                // it after the callback has returned, on the same thread, so
+                // ordering against later events is still exactly the order
+                // they arrived in.
+                CFRunLoopPerformBlock(
+                    runLoop,
+                    CFRunLoopMode.commonModes.rawValue
+                ) {
+                    delivery.deliver()
+                }
+                CFRunLoopWakeUp(runLoop)
+            }
+            return nil
+        }
     }
 }
 

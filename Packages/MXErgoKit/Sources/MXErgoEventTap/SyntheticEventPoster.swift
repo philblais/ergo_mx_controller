@@ -10,17 +10,31 @@ import MXErgoEventSynthesis
 /// own events is therefore load-bearing, not defensive.
 package let syntheticEventMarker: Int64 = 0x4D58_4552_474F_0001
 
+/// Events that are built and ready, but not yet handed to the system.
+///
+/// The split exists because the window server drops an event posted from
+/// inside an event-tap callback — established on hardware 2026-09-05, where
+/// the identical chord worked when posted from a button and did nothing when
+/// posted from the callback. Building stays inside the callback, because
+/// construction is the only failure that can be detected, and delivery is
+/// deferred until the callback has returned.
+package protocol PreparedSyntheticEvents {
+    func deliver()
+}
+
 package protocol SyntheticEventPosting: Sendable {
-    /// Returns false if anything could not be injected, so the caller can pass
-    /// the original event through instead of swallowing it for nothing.
-    func post(_ events: [SyntheticEvent]) -> Bool
+    /// Builds the events without handing them to the system. Returns nil if
+    /// any could not be constructed, so the caller can pass the original
+    /// through instead of swallowing it for nothing.
+    func prepare(_ events: [SyntheticEvent]) -> (any PreparedSyntheticEvents)?
 }
 
 package enum SyntheticEventPosterError: Error, Sendable, Equatable {
     case eventSourceUnavailable
 }
 
-/// The **only** place in this package that calls `CGEvent.post`.
+/// Builds the events. Delivery — the single `CGEvent.post` call site — lives
+/// in `PreparedCoreGraphicsEvents` below.
 ///
 /// It exists for the same reason `MXErgoPrecisionIOHIDOutput` holds the only
 /// `IOHIDDeviceSetReport` call site: "what can this app inject into my
@@ -45,15 +59,18 @@ package final class CoreGraphicsSyntheticEventPoster: SyntheticEventPosting, @un
         self.source = source
     }
 
-    package func post(_ events: [SyntheticEvent]) -> Bool {
-        var posted = true
+    package func prepare(
+        _ events: [SyntheticEvent]
+    ) -> (any PreparedSyntheticEvents)? {
+        var built: [CGEvent] = []
         for event in events {
-            posted = emit(event) && posted
+            guard let constructed = build(event) else { return nil }
+            built.append(contentsOf: constructed)
         }
-        return posted
+        return PreparedCoreGraphicsEvents(events: built)
     }
 
-    private func emit(_ event: SyntheticEvent) -> Bool {
+    private func build(_ event: SyntheticEvent) -> [CGEvent]? {
         switch event {
         case let .keyChord(keyCode, modifiers):
             // The modifier is pressed and released around the key, because a
@@ -70,12 +87,12 @@ package final class CoreGraphicsSyntheticEventPoster: SyntheticEventPosting, @un
                     virtualKey: CGKeyCode(stroke.virtualKey),
                     keyDown: stroke.isKeyDown
                 ) else {
-                    return false
+                    return nil
                 }
                 event.flags = Self.flags(for: stroke.modifiers)
                 events.append(event)
             }
-            return dispatch(events)
+            return stamped(events)
 
         case let .otherMouseClick(buttonNumber):
             guard let location = CGEvent(source: nil)?.location,
@@ -91,7 +108,7 @@ package final class CoreGraphicsSyntheticEventPoster: SyntheticEventPosting, @un
                     mouseCursorPosition: location,
                     mouseButton: .center
                   ) else {
-                return false
+                return nil
             }
             // `CGMouseButton` only spells left, right and center, so buttons
             // beyond the third are addressed through the field directly.
@@ -101,11 +118,11 @@ package final class CoreGraphicsSyntheticEventPoster: SyntheticEventPosting, @un
                     value: Int64(buttonNumber)
                 )
             }
-            return dispatch([down, up])
+            return stamped([down, up])
         }
     }
 
-    private func dispatch(_ events: [CGEvent]) -> Bool {
+    private func stamped(_ events: [CGEvent]) -> [CGEvent] {
         for event in events {
             // Belt and braces: the source already carries the marker, but an
             // event that lost its source association must still be
@@ -114,9 +131,8 @@ package final class CoreGraphicsSyntheticEventPoster: SyntheticEventPosting, @un
                 .eventSourceUserData,
                 value: syntheticEventMarker
             )
-            event.post(tap: .cghidEventTap)
         }
-        return true
+        return events
     }
 
     private static func flags(for modifiers: SynthesizedModifiers) -> CGEventFlags {
@@ -132,6 +148,24 @@ package final class CoreGraphicsSyntheticEventPoster: SyntheticEventPosting, @un
 }
 
 
+/// `@unchecked` because `CGEvent` predates `Sendable`. These are built and
+/// delivered on the same thread — the tap's own run loop — and the type exists
+/// only to carry them from the callback to the block that runs after it.
+private final class PreparedCoreGraphicsEvents: PreparedSyntheticEvents, @unchecked Sendable {
+    private let events: [CGEvent]
+
+    init(events: [CGEvent]) {
+        self.events = events
+    }
+
+    /// The **only** place in this package that calls `CGEvent.post`.
+    func deliver() {
+        for event in events {
+            event.post(tap: .cghidEventTap)
+        }
+    }
+}
+
 /// Posts one reviewed event directly, outside any tap callback.
 ///
 /// It exists to separate two failures that look identical from the outside: a
@@ -140,6 +174,11 @@ package final class CoreGraphicsSyntheticEventPoster: SyntheticEventPosting, @un
 /// different fixes, and no amount of reading the code distinguishes them.
 package enum SyntheticEventDiagnosticPost {
     package static func post(_ event: SyntheticEvent) throws -> Bool {
-        try CoreGraphicsSyntheticEventPoster().post([event])
+        guard let prepared = try CoreGraphicsSyntheticEventPoster()
+            .prepare([event]) else {
+            return false
+        }
+        prepared.deliver()
+        return true
     }
 }

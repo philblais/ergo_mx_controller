@@ -164,3 +164,61 @@ Precision's CID. Note what `Last preview` showed for each action.
     returns the button.
 15. Confirm the runtime journal reads `restoredVerified` and the schema-v2
     baseline hash is unchanged.
+
+## Settling the wheel-tilt sign
+
+The event layer must decide which physical tilt a positive
+`scrollWheelEventDeltaAxis2` means, and no amount of reading the HID spec
+settles it: the device reports tilt as AC Pan on the Consumer page, macOS
+re-publishes it as a scroll event, and that translation is affected by the
+**natural scrolling** preference. Guessing puts back and forward the wrong way
+round half the time.
+
+Nothing here writes to the device, opens the vendor interface, or takes the
+device-operation lease. No SET is sent and nothing is suppressed. It needs
+**Accessibility**, because the tap it reuses was created with `.defaultTap`.
+
+**1. Preconditions**
+
+1. BetterTouchTool and Logi Options quit, so nothing else is remapping tilt.
+2. Launch the app. Both permission rows should be green.
+3. Do **not** bind the Precision runtime. It owns the same wheel observer, and
+   the diagnostics toggle is disabled while an owner is bound.
+
+**2. Record the starting preference**
+
+4. Turn **on** "Scroll axis diagnostics".
+5. Read the `Preference` row and write it down. Every sign below is only true
+   for that setting.
+
+**3. The measurement**
+
+6. Tilt the wheel **left** once. Read `Last horizontal`.
+7. Tilt the wheel **right** once. Read `Last horizontal` again.
+
+Use the trackball only. A trackpad's horizontal scroll is continuous and the
+trackball's is discrete, which the `continuous` / `discrete` word in the sample
+distinguishes — but reading a trackpad sample by mistake would answer the wrong
+question entirely.
+
+Cross-check against the `Last tilt` row in **Input reports** above, which is the
+device's own AC Pan value and is filtered to this MX Ergo. If the two signs
+disagree, macOS is inverting, and that is the finding.
+
+**4. Establish whether the sign is a constant at all**
+
+8. Open System Settings and flip **natural scrolling**.
+9. Repeat steps 6 and 7.
+
+If the sign flips, the convention is not a property of the trackball and must be
+read from the preference at run time rather than compiled in. If it does not
+flip, one constant is correct and this is the evidence for it.
+
+10. Restore the preference to whatever it was at step 5.
+
+**5. Record**
+
+Capture both signs under both settings, the AC Pan value beside each, and the
+preference state. Append the result to `Evidence/VALIDATION-RECORDS.md`, then
+set `HorizontalScrollConvention` from it — that type is the single place the
+decision lives.

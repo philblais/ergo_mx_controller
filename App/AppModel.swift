@@ -27,6 +27,20 @@ final class AppModel: ObservableObject {
     /// Input Monitoring. Nothing in this build posts events yet; the gate
     /// exists so the requirement is visible before anything depends on it.
     @Published private(set) var accessibilityGranted = AXIsProcessTrusted()
+    /// Scroll-axis diagnostics. They exist to settle one question the code
+    /// cannot answer by reasoning: which sign of the horizontal CGEvent delta
+    /// a *left* wheel tilt produces on this machine. Off after every launch,
+    /// and they suppress nothing.
+    @Published private(set) var scrollDiagnosticsEnabled = false
+    @Published private(set) var scrollTapEventCount = 0
+    @Published private(set) var lastScrollTapSample: ScrollTapSample?
+    /// Kept separately so an ordinary vertical scroll cannot wipe the tilt
+    /// sample the session is trying to read.
+    @Published private(set) var lastHorizontalScrollTapSample: ScrollTapSample?
+    /// Recorded with the sample: natural scrolling inverts scroll deltas, so a
+    /// sign observed under one setting says nothing about the other.
+    @Published private(set) var naturalScrollingEnabled =
+        NaturalScrollDirection.isEnabled()
     @Published private(set) var recoveryJournalStatus = "No device changes recorded"
     @Published private(set) var recoveryJournalNeedsAttention = false
     @Published private(set) var recoveryJournalExists = false
@@ -80,6 +94,10 @@ final class AppModel: ObservableObject {
         MXErgoReadOnlyMappedControlPreflightSnapshot?
     @Published private(set) var runtimeOwnerStatusText = "No dormant runtime owner"
     @Published private(set) var runtimeOwnerBlocksRestart = false
+    /// Whether a dormant owner exists at all. The scroll diagnostics reuse the
+    /// same wheel observer the owner takes, so the UI needs a published signal
+    /// rather than reaching for the private reference.
+    @Published private(set) var runtimeOwnerIsBound = false
     @Published private(set) var runtimeOwnerCanRollover = false
     @Published private(set) var runtimeOwnerBindInProgress = false
     @Published private(set) var runtimeOwnerCanAdmit = false
@@ -235,6 +253,7 @@ final class AppModel: ObservableObject {
         let wasGranted = inputMonitoringGranted
         inputMonitoringGranted = CGPreflightListenEventAccess()
         accessibilityGranted = AXIsProcessTrusted()
+        naturalScrollingEnabled = NaturalScrollDirection.isEnabled()
         refreshRecoveryJournalStatus()
         revalidatePrecisionReadinessEvidence()
         revalidateMappedControlDiversionEvidence()
@@ -251,6 +270,54 @@ final class AppModel: ObservableObject {
         inputMonitoringGranted = CGRequestListenEventAccess()
         guard inputMonitoringGranted else { return }
         restartObserverAfterPermissionGrant()
+    }
+
+    /// Runs the existing wheel tap in a non-suppressing mode so the raw scroll
+    /// fields can be read.
+    ///
+    /// It reuses that tap rather than creating another: a third suppressing tap
+    /// would be a new capability, and this needs no capability at all. The
+    /// Precision runtime owns the same observer while admitted, so the two are
+    /// kept mutually exclusive rather than allowed to race for it.
+    func setScrollDiagnosticsEnabled(_ isEnabled: Bool) {
+        guard scrollDiagnosticsGateFailureText == nil || !isEnabled else { return }
+        scrollDiagnosticsEnabled = isEnabled
+        guard isEnabled else {
+            wheelObserver.stop()
+            return
+        }
+        scrollTapEventCount = 0
+        lastScrollTapSample = nil
+        lastHorizontalScrollTapSample = nil
+        naturalScrollingEnabled = NaturalScrollDirection.isEnabled()
+        wheelObserver.stop()
+        wheelObserver.start(
+            handler: { _ in },
+            shouldSuppressScroll: { false },
+            scrollTapObserver: { [weak self] sample in
+                Task { @MainActor in self?.record(scrollTapSample: sample) }
+            }
+        )
+    }
+
+    /// Nil when the toggle may be turned on.
+    var scrollDiagnosticsGateFailureText: String? {
+        if !accessibilityGranted {
+            return "Grant Accessibility first; a scroll tap needs it"
+        }
+        if runtimeOwnerIsBound {
+            return "Release the Precision runtime first; it owns the same tap"
+        }
+        return nil
+    }
+
+    private func record(scrollTapSample sample: ScrollTapSample) {
+        guard scrollDiagnosticsEnabled else { return }
+        scrollTapEventCount += 1
+        lastScrollTapSample = sample
+        if sample.isHorizontal {
+            lastHorizontalScrollTapSample = sample
+        }
     }
 
     func setAudioExecutionEnabled(_ isEnabled: Bool) {
@@ -1810,6 +1877,9 @@ final class AppModel: ObservableObject {
 
     private func startWheelObserver(owner: PrecisionRuntimeOwner) {
         let held = owner.precisionHeld
+        // The diagnostic mode holds the same observer. Clearing the flag here
+        // keeps the UI honest about which mode the single tap is in.
+        scrollDiagnosticsEnabled = false
         wheelObserver.stop()
         wheelObserver.start(
             handler: { notches in
@@ -1864,6 +1934,7 @@ final class AppModel: ObservableObject {
             inputDiagnosticsLastFrame = nil
             inputDiagnosticsLastPress = nil
             runtimeOwnerBlocksRestart = false
+            runtimeOwnerIsBound = false
             runtimeOwnerCanRollover = false
             runtimeOwnerCanAdmit = false
             runtimeOwnerCanRecover = false
@@ -1881,6 +1952,7 @@ final class AppModel: ObservableObject {
         let operation = await owner.boundOperation
         let recoverLocked = await owner.isRecoverLockedAfterAmbiguousSET
         runtimeOwnerBlocksRestart = await owner.blocksObserverRestart
+        runtimeOwnerIsBound = true
         runtimeOwnerIsAdmitted = phase == .admitted
         // The runtime stays admitted after a verified restore, so read the
         // diversion status rather than inferring it from admission.

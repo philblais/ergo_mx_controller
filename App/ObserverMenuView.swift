@@ -34,6 +34,7 @@ struct ObserverMenuView: View {
             connectionSection
             protocolSafetySection
             reportSection
+            scrollAxisSection
             calibrationSection
             intentPreviewSection
             audioTestSection
@@ -180,6 +181,61 @@ struct ObserverMenuView: View {
                 Text(reportPlaceholder)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// One measurement, deliberately kept next to the tilt counter it must be
+    /// read against: the IOHID row shows the device's own AC Pan value, this
+    /// one shows what macOS turned it into.
+    private var scrollAxisSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(
+                get: { model.scrollDiagnosticsEnabled },
+                set: { model.setScrollDiagnosticsEnabled($0) }
+            )) {
+                Text("Scroll axis diagnostics")
+                    .font(.subheadline.weight(.medium))
+            }
+            .toggleStyle(.switch)
+            .disabled(model.scrollDiagnosticsGateFailureText != nil
+                && !model.scrollDiagnosticsEnabled)
+
+            if let blocked = model.scrollDiagnosticsGateFailureText,
+               !model.scrollDiagnosticsEnabled {
+                Text(blocked)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            } else if model.scrollDiagnosticsEnabled {
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
+                    detailRow("Scroll events", String(model.scrollTapEventCount))
+                    detailRow(
+                        "Last scroll",
+                        model.lastScrollTapSample?.description ?? "None yet"
+                    )
+                    detailRow(
+                        "Last horizontal",
+                        model.lastHorizontalScrollTapSample?.description ?? "None yet"
+                    )
+                    detailRow(
+                        "Preference",
+                        NaturalScrollDirection.description(
+                            isEnabled: model.naturalScrollingEnabled
+                        )
+                    )
+                }
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+
+                Text("Tilt the wheel left, then right, and read \"Last horizontal\". Do not use the trackpad while this is on—a trackpad's horizontal scroll is continuous, the trackball's is discrete. Nothing is suppressed and the MX Ergo is not written to.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Off. Turn on only to record which sign of the horizontal scroll delta a left tilt produces.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

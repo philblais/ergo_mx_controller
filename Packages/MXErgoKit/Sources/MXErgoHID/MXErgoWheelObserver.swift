@@ -12,6 +12,11 @@ import MXErgoCore
 public final class MXErgoWheelObserver: @unchecked Sendable {
     public typealias NotchHandler = @Sendable (Int) -> Void
     public typealias SuppressCheck = @Sendable () -> Bool
+    /// Read-only report of every scroll CGEvent this tap saw, and what was
+    /// done with it. Optional because it exists for one measurement — which
+    /// sign of the horizontal delta a left tilt produces — and adds nothing to
+    /// the Precision path.
+    public typealias ScrollTapObserver = @Sendable (ScrollTapSample) -> Void
 
     private let lock = NSLock()
     private var inputLoop: Loop?
@@ -20,14 +25,19 @@ public final class MXErgoWheelObserver: @unchecked Sendable {
 
     public func start(
         handler: @escaping NotchHandler,
-        shouldSuppressScroll: @escaping SuppressCheck
+        shouldSuppressScroll: @escaping SuppressCheck,
+        scrollTapObserver: ScrollTapObserver? = nil
     ) {
         lock.lock()
         guard inputLoop == nil else {
             lock.unlock()
             return
         }
-        let loop = Loop(handler: handler, shouldSuppressScroll: shouldSuppressScroll)
+        let loop = Loop(
+            handler: handler,
+            shouldSuppressScroll: shouldSuppressScroll,
+            scrollTapObserver: scrollTapObserver
+        )
         inputLoop = loop
         lock.unlock()
         loop.start()
@@ -45,6 +55,7 @@ public final class MXErgoWheelObserver: @unchecked Sendable {
 private final class Loop: @unchecked Sendable {
     let handler: MXErgoWheelObserver.NotchHandler
     let shouldSuppressScroll: MXErgoWheelObserver.SuppressCheck
+    let scrollTapObserver: MXErgoWheelObserver.ScrollTapObserver?
     private let stateLock = NSLock()
     private var thread: Thread?
     private var runLoop: CFRunLoop?
@@ -52,10 +63,12 @@ private final class Loop: @unchecked Sendable {
 
     init(
         handler: @escaping MXErgoWheelObserver.NotchHandler,
-        shouldSuppressScroll: @escaping MXErgoWheelObserver.SuppressCheck
+        shouldSuppressScroll: @escaping MXErgoWheelObserver.SuppressCheck,
+        scrollTapObserver: MXErgoWheelObserver.ScrollTapObserver?
     ) {
         self.handler = handler
         self.shouldSuppressScroll = shouldSuppressScroll
+        self.scrollTapObserver = scrollTapObserver
     }
 
     func start() {
@@ -201,8 +214,17 @@ private let scrollTapCallback: CGEventTapCallBack = { _, type, event, refcon in
         return Unmanaged.passUnretained(event)
     }
     let loop = Unmanaged<Loop>.fromOpaque(refcon).takeUnretainedValue()
-    if loop.shouldSuppressScroll() {
-        return nil
+    let suppress = loop.shouldSuppressScroll()
+    // Reported after the decision so the sample says what actually happened,
+    // and only when someone asked: the Precision path passes no observer and
+    // is unchanged by this.
+    if let observe = loop.scrollTapObserver {
+        observe(ScrollTapSample(
+            deltaAxis1: Int(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)),
+            deltaAxis2: Int(event.getIntegerValueField(.scrollWheelEventDeltaAxis2)),
+            isContinuous: event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0,
+            wasSuppressed: suppress
+        ))
     }
-    return Unmanaged.passUnretained(event)
+    return suppress ? nil : Unmanaged.passUnretained(event)
 }

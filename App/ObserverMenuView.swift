@@ -1,6 +1,7 @@
 import AppKit
 import MXErgoCore
 import MXErgoHIDPP
+import Combine
 import SwiftUI
 
 struct ObserverMenuView: View {
@@ -189,6 +190,16 @@ struct ObserverMenuView: View {
     /// The BetterTouchTool replacement. Off after every launch, because
     /// enabling it takes over five controls globally.
     private var eventLayerSection: some View {
+        eventLayerBody
+            .onReceive(
+                Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+            ) { _ in
+                guard model.eventLayerEnabled else { return }
+                model.refreshEventLayerDiagnostics()
+            }
+    }
+
+    private var eventLayerBody: some View {
         VStack(alignment: .leading, spacing: 6) {
             Toggle(isOn: Binding(
                 get: { model.eventLayerEnabled },
@@ -218,9 +229,10 @@ struct ObserverMenuView: View {
                     ForEach(model.eventLayerBindings, id: \.trigger) { binding in
                         detailRow(binding.control, "\(binding.intent) · \(binding.replacement)")
                     }
-                    if let summary = model.eventLayerDiagnosticsSummary {
-                        detailRow("Events", summary)
-                    }
+                    detailRow(
+                        "Events",
+                        model.eventLayerDiagnosticsSummary ?? "none yet"
+                    )
                     if let last = model.eventLayerLastDecision {
                         detailRow("Last", last)
                     }
@@ -229,9 +241,6 @@ struct ObserverMenuView: View {
                 .foregroundStyle(.secondary)
 
                 HStack {
-                    Button("Refresh event counts") {
-                        model.refreshEventLayerDiagnostics()
-                    }
                     Button("Post wheel-click chord") {
                         model.postDiagnosticInjection(.wheelClickChord)
                     }

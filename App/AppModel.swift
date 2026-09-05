@@ -362,8 +362,15 @@ final class AppModel: ObservableObject {
             eventLayerLastDecision = nil
             return
         }
-        eventLayerDiagnosticsSummary = diagnostics.summary
-        eventLayerLastDecision = diagnostics.lastDecisionDescription
+        // Assigned only on change: this runs on a timer while the layer is
+        // enabled, and republishing identical values would redraw the menu
+        // once a second for nothing.
+        if eventLayerDiagnosticsSummary != diagnostics.summary {
+            eventLayerDiagnosticsSummary = diagnostics.summary
+        }
+        if eventLayerLastDecision != diagnostics.lastDecisionDescription {
+            eventLayerLastDecision = diagnostics.lastDecisionDescription
+        }
         if diagnostics.needsAttention {
             eventLayerNeedsAttention = true
             eventLayerStatusText = "Active, with "

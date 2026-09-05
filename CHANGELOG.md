@@ -1478,3 +1478,28 @@ keypad-flag variant won and is now simply what the planner builds.
 
 Package total stays 399, all passing with none skipped. No live HID operation
 was run.
+
+The injected click is correct. Posted from a button, tilt left goes back and
+tilt right goes forward, which also disposes of the middle-click theory offered
+for the "random" behaviour: a middle click opens tabs, and back and forward are
+what actually happen. So the button numbers were right all along, and whether
+the click state was ever the problem is unknown — it was added on faithfulness
+grounds and stays on them.
+
+The counters moved to a timer. Every diagnosis this session has turned on that
+one line, and it was hidden behind a button in a menu that also contains a
+differently-named log, which is where it was looked for. It now updates once a
+second while the layer runs and shows "none yet" rather than vanishing when
+empty. `refreshEventLayerDiagnostics` assigns only on change, so a menu that is
+open and idle is not redrawn every second for nothing.
+
+What remains unestablished is the thing the buttons deliberately factor out:
+whether *physically tilting the wheel* navigates. The button path skips the
+observation, the direction decoding, the latch, and the loop-prevention marker —
+and that marker matters here more than anywhere else, because the click the
+layer injects for tilt lands on buttons 3 and 4, which are the thumb buttons'
+own triggers. If the marker fails, a tilt does not fail quietly: it switches
+desktops.
+
+Package total stays 399, all passing with none skipped. No live HID operation
+was run.

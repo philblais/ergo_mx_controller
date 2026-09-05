@@ -77,7 +77,8 @@ package final class EventSynthesisTap: @unchecked Sendable {
         plan: EventSynthesisPlan,
         latch: HorizontalTiltLatch = HorizontalTiltLatch(),
         convention: HorizontalScrollConvention = .current(),
-        poster: SyntheticEventPosting? = nil
+        poster: SyntheticEventPosting? = nil,
+        frontmostBundleIdentifier: @escaping @Sendable () -> String? = { nil }
     ) throws {
         guard AXIsProcessTrusted() else {
             throw EventSynthesisTapError.accessibilityNotGranted
@@ -101,7 +102,8 @@ package final class EventSynthesisTap: @unchecked Sendable {
         let created = Loop(
             policy: EventSynthesisPolicy(plan: plan, tilt: latch),
             convention: convention,
-            poster: resolvedPoster
+            poster: resolvedPoster,
+            frontmostBundleIdentifier: frontmostBundleIdentifier
         )
         loop = created
         lock.unlock()
@@ -142,6 +144,9 @@ package final class EventSynthesisTap: @unchecked Sendable {
 private final class Loop: @unchecked Sendable {
     private let stateLock = NSLock()
     private let poster: SyntheticEventPosting
+    /// Read on the tap thread, so it must not touch AppKit. The host keeps a
+    /// value updated from workspace notifications and this only reads it.
+    private let frontmostBundleIdentifier: @Sendable () -> String?
     private var convention: HorizontalScrollConvention
     private var policy: EventSynthesisPolicy
     private var diagnostics = EventSynthesisDiagnostics()
@@ -155,11 +160,13 @@ private final class Loop: @unchecked Sendable {
     init(
         policy: EventSynthesisPolicy,
         convention: HorizontalScrollConvention,
-        poster: SyntheticEventPosting
+        poster: SyntheticEventPosting,
+        frontmostBundleIdentifier: @escaping @Sendable () -> String?
     ) {
         self.policy = policy
         self.convention = convention
         self.poster = poster
+        self.frontmostBundleIdentifier = frontmostBundleIdentifier
     }
 
     func start() throws {
@@ -308,11 +315,18 @@ private final class Loop: @unchecked Sendable {
         }
 
         let timestamp = ProcessInfo.processInfo.systemUptime
+        // Read outside the lock: it reaches into the host, and nothing else
+        // in this critical section needs to wait for it.
+        let frontmost = frontmostBundleIdentifier()
         // The lock covers deciding and building only. Delivery happens after
         // the callback returns, so nothing slow or re-entrant runs under it.
         stateLock.lock()
         diagnostics.observedCount += 1
-        let decision = policy.decide(kind, at: timestamp)
+        let decision = policy.decide(
+            kind,
+            at: timestamp,
+            frontmostBundleIdentifier: frontmost
+        )
         let applied = EventSynthesisDecisionApplier.apply(
             decision,
             poster: poster,

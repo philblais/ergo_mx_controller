@@ -17,6 +17,7 @@
 		4E2942025AC908EEE5BAD64A /* ObserverMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FEE79EFE5F56DE29757335A /* ObserverMenuView.swift */; };
 		4FB6F95669FB93C097D5B3BD /* DormantPrecisionTrialIOHIDAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBDB53288DAE70670DFE03D4 /* DormantPrecisionTrialIOHIDAdapter.swift */; };
 		61D415B9DBFF16DA8FF01C00 /* MXErgoControllerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E22D7BEB46F2A0DE6E3471D2 /* MXErgoControllerApp.swift */; };
+		64AF9F568D610E354EC96C4D /* FrontmostApplicationTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D130BB3AD1AAE9AC86150C7D /* FrontmostApplicationTracker.swift */; };
 		6956655B3D1C3B4855A5618B /* MXErgoHIDPP in Frameworks */ = {isa = PBXBuildFile; productRef = 8C307B3CA2E433D32D85ABFC /* MXErgoHIDPP */; };
 		9FDAE12A29269D9E1AD8DF66 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87F68AD7261860C6617DF429 /* AppModel.swift */; };
 		B2258B3000C7BA7D2A5F3E4C /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8594F8F14B3862793C321423 /* AppKit.framework */; };
@@ -39,6 +40,7 @@
 		C16336507DE31113F277B2F6 /* MXErgoPrecisionRestoreTrialMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MXErgoPrecisionRestoreTrialMain.swift; sourceTree = "<group>"; };
 		CC7C593CB498BC8C443241DA /* MXErgoPrecisionRestoreTrial.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MXErgoPrecisionRestoreTrial.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CD28653404612B540652D52E /* SystemAudioController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioController.swift; sourceTree = "<group>"; };
+		D130BB3AD1AAE9AC86150C7D /* FrontmostApplicationTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmostApplicationTracker.swift; sourceTree = "<group>"; };
 		DA2DE9A1C82554584878C502 /* MXErgoRestoreTrialProbeMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MXErgoRestoreTrialProbeMain.swift; sourceTree = "<group>"; };
 		E22D7BEB46F2A0DE6E3471D2 /* MXErgoControllerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MXErgoControllerApp.swift; sourceTree = "<group>"; };
 		EF4703B00D391A9B02681D73 /* MXErgoRestoreTrialProbe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MXErgoRestoreTrialProbe.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -122,6 +124,7 @@
 			isa = PBXGroup;
 			children = (
 				87F68AD7261860C6617DF429 /* AppModel.swift */,
+				D130BB3AD1AAE9AC86150C7D /* FrontmostApplicationTracker.swift */,
 				E22D7BEB46F2A0DE6E3471D2 /* MXErgoControllerApp.swift */,
 				8FEE79EFE5F56DE29757335A /* ObserverMenuView.swift */,
 				CD28653404612B540652D52E /* SystemAudioController.swift */,
@@ -331,6 +334,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9FDAE12A29269D9E1AD8DF66 /* AppModel.swift in Sources */,
+				64AF9F568D610E354EC96C4D /* FrontmostApplicationTracker.swift in Sources */,
 				61D415B9DBFF16DA8FF01C00 /* MXErgoControllerApp.swift in Sources */,
 				4E2942025AC908EEE5BAD64A /* ObserverMenuView.swift in Sources */,
 				3B2AF5C1C9C58EABE8D6ACB9 /* SystemAudioController.swift in Sources */,

@@ -1503,3 +1503,48 @@ desktops.
 
 Package total stays 399, all passing with none skipped. No live HID operation
 was run.
+
+The event layer works on hardware. Wheel click opens Mission Control, both
+thumbs switch Spaces, and both tilts navigate in Chrome and Brave. Every one of
+the five controls BetterTouchTool was holding is now served without a single
+device write.
+
+Physical tilt is the result that matters, because it exercises four things the
+diagnostic buttons deliberately skip: the observation, the direction decoding,
+the latch, and the loop-prevention marker. The marker especially — the click
+injected for a tilt lands on buttons 3 and 4, which are the thumb buttons' own
+triggers, so its failure mode is not silence but a tilt that switches Spaces.
+That code had never run until now.
+
+Safari ignores the tilt, and that is the substitution's bill arriving rather
+than a defect. The 2026-08-25 preset in this repository settles what
+BetterTouchTool actually did: `3F Swipe Left (Page Back)` and `3F Swipe Right
+(Page Forward)`, the system gesture, which every application honours. macOS
+exposes no public gesture synthesis, which is why the plan substituted the mouse
+buttons and why that substitution was written down as a substitution. Chrome and
+Brave honour them; Safari does not.
+
+Rather than trade one application for another, the binding now carries a
+keyboard alternative used only where the buttons are ignored. Safari, Safari
+Technology Preview and Finder get Command+Left and Command+Right; everything
+else keeps the mouse buttons, which apps that do not use them ignore harmlessly.
+Command+Arrow rather than Command+bracket, because a bracket's key code moves
+with the keyboard layout and an arrow's does not. Not knowing who is frontmost
+falls back to the reviewed default rather than to nothing.
+
+`FrontmostApplicationTracker` keeps that answer current from workspace
+notifications so the tap can read it without touching AppKit. The tap decides
+inside a callback the window server is waiting on; calling `NSWorkspace` from
+there would be both a main-thread violation and a latency risk.
+
+Widening the facade tripped its pinned public API list, which is the friction
+working: three new public members had to be added to that list by hand.
+
+One discrepancy is left open rather than guessed at. The same preset labels a
+trigger "Desktop Left" whose action is `Move Right a Space`, and the 2026-09-04
+record already noted that which thumb is `0x08` and which is `0x10` was inferred
+from press order. Both thumbs switch Spaces; whether each switches the way the
+operator wants is for the operator to say.
+
+Two tests raise the package total to 401, all passing with none skipped. No live
+HID operation was run. The Safari alternative is untested on hardware.

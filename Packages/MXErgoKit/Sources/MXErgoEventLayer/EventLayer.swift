@@ -9,6 +9,9 @@ public struct EventLayerBinding: Sendable, Equatable {
     public let intent: String
     public let trigger: String
     public let replacement: String
+    /// Injected instead of `replacement` in applications that ignore the
+    /// back/forward mouse buttons. Nil where there is no alternative.
+    public let keyboardAlternative: String?
 }
 
 /// What the layer would do, computable without starting anything.
@@ -21,6 +24,12 @@ public struct EventLayerBinding: Sendable, Equatable {
 public struct EventLayerReview: Sendable, Equatable {
     public let bindings: [EventLayerBinding]
 
+    /// Applications that get the keyboard alternative instead of the mouse
+    /// buttons, because they ignore those buttons for navigation.
+    public static var keyboardNavigationApplications: [String] {
+        EventSynthesisPlan.keyboardNavigationBundleIdentifiers.sorted()
+    }
+
     public static func reviewed() throws -> EventLayerReview {
         let plan = try EventSynthesisPlan.reviewed()
         return EventLayerReview(
@@ -29,7 +38,8 @@ public struct EventLayerReview: Sendable, Equatable {
                     control: $0.control.name,
                     intent: $0.intent.name,
                     trigger: $0.trigger.description,
-                    replacement: $0.replacement.description
+                    replacement: $0.replacement.description,
+                    keyboardAlternative: $0.keyboardAlternative?.description
                 )
             }
         )
@@ -121,13 +131,17 @@ public final class EventLayer: @unchecked Sendable {
     /// the sign of a horizontal scroll delta inverts with that preference —
     /// established on hardware 2026-09-05 — and the host already reads and
     /// republishes it. Passing it keeps one reader of the preference.
-    public func start(naturalScrollingEnabled: Bool) throws {
+    public func start(
+        naturalScrollingEnabled: Bool,
+        frontmostBundleIdentifier: @escaping @Sendable () -> String? = { nil }
+    ) throws {
         do {
             try tap.start(
                 plan: try EventSynthesisPlan.reviewed(),
                 convention: .forNaturalScrolling(
                     isEnabled: naturalScrollingEnabled
-                )
+                ),
+                frontmostBundleIdentifier: frontmostBundleIdentifier
             )
         } catch {
             throw EventLayerError(error)

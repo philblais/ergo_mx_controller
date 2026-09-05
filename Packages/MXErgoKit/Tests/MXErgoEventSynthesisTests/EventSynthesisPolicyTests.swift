@@ -333,3 +333,63 @@ private func reviewedPolicy(
     #expect(SynthesizedModifiers.pressable == [.control, .option, .command, .shift])
     #expect(!SynthesizedModifiers.pressable.contains(.numericPad))
 }
+
+@Test func safariGetsTheKeyboardAlternativeAndChromeGetsTheMouseButtons() throws {
+    var policy = try reviewedPolicy()
+
+    // BetterTouchTool's Back was a three-finger swipe, which every application
+    // honours. macOS cannot synthesize one, and the mouse-button substitution
+    // is ignored by Safari — confirmed on hardware, where Chrome and Brave
+    // navigated and Safari did nothing.
+    #expect(policy.decide(
+        .scroll(horizontalUnits: -1, verticalUnits: 0, isContinuous: false),
+        at: 10,
+        frontmostBundleIdentifier: "com.google.Chrome"
+    ) == .suppressAndPost([.otherMouseClick(buttonNumber: 3)]))
+
+    policy.reset()
+    #expect(policy.decide(
+        .scroll(horizontalUnits: -1, verticalUnits: 0, isContinuous: false),
+        at: 20,
+        frontmostBundleIdentifier: "com.apple.Safari"
+    ) == .suppressAndPost([.keyChord(keyCode: 123, modifiers: .command)]))
+
+    policy.reset()
+    #expect(policy.decide(
+        .scroll(horizontalUnits: 1, verticalUnits: 0, isContinuous: false),
+        at: 30,
+        frontmostBundleIdentifier: "com.apple.Safari"
+    ) == .suppressAndPost([.keyChord(keyCode: 124, modifiers: .command)]))
+
+    // Not knowing who is frontmost falls back to the reviewed default rather
+    // than to nothing.
+    policy.reset()
+    #expect(policy.decide(
+        .scroll(horizontalUnits: -1, verticalUnits: 0, isContinuous: false),
+        at: 40,
+        frontmostBundleIdentifier: nil
+    ) == .suppressAndPost([.otherMouseClick(buttonNumber: 3)]))
+}
+
+@Test func onlyTheSwipeSubstitutionHasAKeyboardAlternative() throws {
+    let plan = try EventSynthesisPlan.reviewed()
+    for binding in plan.bindings {
+        switch binding.trigger {
+        case .horizontalTilt:
+            // Command+Arrow rather than Command+bracket: a bracket's key code
+            // moves with the keyboard layout and an arrow's does not.
+            #expect(binding.keyboardAlternative != nil)
+        case .otherMouseButton:
+            // A chord already works everywhere; substituting would only add a
+            // second thing that can be wrong.
+            #expect(binding.keyboardAlternative == nil)
+        }
+    }
+    // A button press in Safari is unaffected by the alternative existing.
+    var policy = EventSynthesisPolicy(plan: plan)
+    #expect(policy.decide(
+        .otherMouseDown(buttonNumber: 2),
+        at: 1,
+        frontmostBundleIdentifier: "com.apple.Safari"
+    ) == .suppressAndPost([.keyChord(keyCode: 126, modifiers: .control)]))
+}

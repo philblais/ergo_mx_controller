@@ -26,6 +26,9 @@ package struct EventSynthesisBinding: Sendable, Equatable {
     package let intent: ControllerIntent
     package let trigger: EventSynthesisTrigger
     package let replacement: SyntheticEvent
+    /// Used instead of `replacement` in applications that ignore the
+    /// back/forward mouse buttons. Nil where no alternative is needed.
+    package let keyboardAlternative: SyntheticEvent?
 }
 
 /// The reviewed substitution table: five ordinary-HID controls, each observed
@@ -53,6 +56,37 @@ package struct EventSynthesisPlan: Sendable, Equatable {
     package static let wheelClickButtonNumber = 2
     package static let lowerThumbButtonNumber = 3
     package static let upperThumbButtonNumber = 4
+
+    /// Applications that ignore mouse buttons 4 and 5 for navigation.
+    ///
+    /// BetterTouchTool did not have this problem: its Back and Forward were
+    /// `3F Swipe Left (Page Back)` and `3F Swipe Right (Page Forward)`, the
+    /// system gesture, which every application honours. macOS exposes no
+    /// public gesture synthesis, so the reviewed substitution is the mouse
+    /// buttons — and Safari, confirmed on hardware 2026-09-05, does not act on
+    /// them. Chrome and Brave do.
+    ///
+    /// These get Command+Left and Command+Right instead. Arrow keys rather
+    /// than Command+bracket because a bracket's key code moves with the
+    /// keyboard layout and an arrow's does not.
+    package static let keyboardNavigationBundleIdentifiers: Set<String> = [
+        "com.apple.Safari",
+        "com.apple.SafariTechnologyPreview",
+        "com.apple.finder",
+    ]
+
+    /// Which replacement to inject, given who is frontmost.
+    package func replacement(
+        for binding: EventSynthesisBinding,
+        frontmostBundleIdentifier: String?
+    ) -> SyntheticEvent {
+        guard let identifier = frontmostBundleIdentifier,
+              Self.keyboardNavigationBundleIdentifiers.contains(identifier),
+              let alternative = binding.keyboardAlternative else {
+            return binding.replacement
+        }
+        return alternative
+    }
 
     package let bindings: [EventSynthesisBinding]
 
@@ -83,7 +117,10 @@ package struct EventSynthesisPlan: Sendable, Equatable {
                     control: binding.control,
                     intent: binding.intent,
                     trigger: trigger,
-                    replacement: try Self.replacement(for: binding.synthesizedAction)
+                    replacement: try Self.replacement(for: binding.synthesizedAction),
+                    keyboardAlternative: Self.keyboardAlternative(
+                        for: binding.synthesizedAction
+                    )
                 )
             )
         }
@@ -128,6 +165,19 @@ package struct EventSynthesisPlan: Sendable, Equatable {
     /// buttons the system already treats as back and forward — which is what
     /// this trackball's thumb buttons natively emit, and what those thumb
     /// buttons are being rebound away from. The swap is deliberate.
+    /// Command+Left and Command+Right, which Safari honours and the mouse
+    /// buttons are not. Only the swipe substitution needs one; a chord already
+    /// works everywhere.
+    private static func keyboardAlternative(
+        for action: MappedControlSynthesizedAction
+    ) -> SyntheticEvent? {
+        guard case let .threeFingerSwipe(_, direction) = action else { return nil }
+        switch direction {
+        case .left: return .keyChord(keyCode: 123, modifiers: .command)
+        case .right: return .keyChord(keyCode: 124, modifiers: .command)
+        }
+    }
+
     private static func replacement(
         for action: MappedControlSynthesizedAction
     ) throws -> SyntheticEvent {

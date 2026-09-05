@@ -158,6 +158,7 @@ final class AppModel: ObservableObject {
     private let observer = MXErgoObserver()
     private let wheelObserver = MXErgoWheelObserver()
     private let eventLayer = EventLayer()
+    private let frontmostApplication = FrontmostApplicationTracker()
     private let launchID = UUID()
     private var runtimeOwner: PrecisionRuntimeOwner?
     private var runtimeOwnerSession: DeviceTransactionSession?
@@ -307,7 +308,11 @@ final class AppModel: ObservableObject {
         do {
             eventLayerBindings = try EventLayerReview.reviewed().bindings
             naturalScrollingEnabled = NaturalScrollDirection.isEnabled()
-            try eventLayer.start(naturalScrollingEnabled: naturalScrollingEnabled)
+            let frontmost = frontmostApplication
+            try eventLayer.start(
+                naturalScrollingEnabled: naturalScrollingEnabled,
+                frontmostBundleIdentifier: { frontmost.bundleIdentifier }
+            )
             eventLayerEnabled = true
             eventLayerNeedsAttention = false
             eventLayerStatusText =

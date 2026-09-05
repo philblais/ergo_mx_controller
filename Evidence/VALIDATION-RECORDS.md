@@ -598,3 +598,48 @@ but it is not a fix for this and is not recorded as one.
 
 **Not yet established.** Whether wheel click now opens Mission Control through
 the tap. Nothing above shows that; only pressing it does.
+
+### Live validation record — 2026-09-05, the event layer works
+
+**Conditions.** BetterTouchTool and Logi Options quit. Two Spaces created, so
+the desktop shortcuts have somewhere to go. Event layer enabled from the menu.
+No device write, no lease, no SET; the trackball is untouched.
+
+| Control | Injected | Result |
+|---|---|---|
+| Wheel click | Control+Up | **Mission Control opens** |
+| Lower thumb | Control+Right | **switches Space** |
+| Upper thumb | Control+Left | **switches Space** |
+| Wheel tilt left | mouse button 4 | **Back**, in Chrome and Brave |
+| Wheel tilt right | mouse button 5 | **Forward**, in Chrome and Brave |
+| Wheel tilt, either | — | **nothing in Safari** |
+
+**What this establishes.** The layer works end to end. Physical tilt exercises
+four things the diagnostic buttons deliberately skip — the observation, the
+direction decoding, the latch, and the loop-prevention marker — and all four
+work.
+
+The marker is the one worth naming. The click injected for a tilt lands on
+buttons 3 and 4, which are the thumb buttons' own triggers, so a marker failure
+would not be quiet: a tilt would switch Spaces instead of navigating. It did
+not. That code had never run before this session.
+
+**Safari.** Not a defect in the layer; the cost of a substitution recorded when
+it was made. The 2026-08-25 BetterTouchTool preset in this repository shows its
+Back and Forward were `3F Swipe Left (Page Back)` and `3F Swipe Right (Page
+Forward)` — the system gesture, which every application honours. macOS exposes
+no public gesture synthesis, so the reviewed substitution was the pair of mouse
+buttons the system already reads as back and forward. Chrome and Brave honour
+them. Safari does not.
+
+Safari does honour Command+Left and Command+Right, so the plan now carries a
+keyboard alternative used only for applications that ignore the buttons. Arrow
+keys rather than Command+bracket, because a bracket's key code moves with the
+keyboard layout and an arrow's does not. **Untested on hardware.**
+
+**One discrepancy, unresolved.** The same preset labels a trigger "Desktop Left"
+whose action is `Move Right a Space`. Whether the thumb buttons are the way
+round the operator wants is therefore not established by the preset, and the
+2026-09-04 record already noted that which thumb is `0x08` and which is `0x10`
+was inferred from press order. Both thumbs switch Spaces; whether each switches
+the intended way is for the operator to say.

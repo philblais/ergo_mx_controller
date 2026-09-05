@@ -227,7 +227,12 @@ struct ObserverMenuView: View {
             if model.eventLayerEnabled {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
                     ForEach(model.eventLayerBindings, id: \.trigger) { binding in
-                        detailRow(binding.control, "\(binding.intent) · \(binding.replacement)")
+                        detailRow(
+                            binding.control,
+                            binding.keyboardAlternative.map {
+                                "\(binding.intent) · \(binding.replacement) / \($0)"
+                            } ?? "\(binding.intent) · \(binding.replacement)"
+                        )
                     }
                     detailRow(
                         "Events",
@@ -262,7 +267,7 @@ struct ObserverMenuView: View {
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("Ordinary left and right clicks are not observed by this tap at all, so this menu always stays reachable to switch it off. The MX Ergo itself is never written to.")
+                Text("Back and forward use the mouse buttons Chrome and Brave honour, and Command+Arrow in Safari and Finder, which ignore those buttons. BetterTouchTool used a three-finger swipe here; macOS exposes no way to synthesize one.\n\nOrdinary left and right clicks are not observed by this tap at all, so this menu always stays reachable to switch it off. The MX Ergo itself is never written to.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -29,7 +29,8 @@ package struct EventSynthesisPolicy: Sendable {
 
     package mutating func decide(
         _ kind: ObservedEventKind,
-        at timestamp: TimeInterval
+        at timestamp: TimeInterval,
+        frontmostBundleIdentifier: String? = nil
     ) -> EventSynthesisDecision {
         switch kind {
         case let .otherMouseDown(buttonNumber):
@@ -39,7 +40,10 @@ package struct EventSynthesisPolicy: Sendable {
                 return .passThrough
             }
             suppressedButtons.insert(buttonNumber)
-            return .suppressAndPost([binding.replacement])
+            return .suppressAndPost([plan.replacement(
+                for: binding,
+                frontmostBundleIdentifier: frontmostBundleIdentifier
+            )])
 
         case let .otherMouseUp(buttonNumber):
             guard suppressedButtons.remove(buttonNumber) != nil else {
@@ -73,7 +77,10 @@ package struct EventSynthesisPolicy: Sendable {
             ) else {
                 return .suppress
             }
-            return .suppressAndPost([binding.replacement])
+            return .suppressAndPost([plan.replacement(
+                for: binding,
+                frontmostBundleIdentifier: frontmostBundleIdentifier
+            )])
         }
     }
 

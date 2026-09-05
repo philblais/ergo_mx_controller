@@ -24,11 +24,12 @@ tests skip silently without `MX_ERGO_CRASH_HARNESS_PATH`. Use
 
 These are expanded in [SAFETY.md](SAFETY.md). The short form:
 
-1. **Productless targets stay productless.** Fourteen of twenty package targets
+1. **Productless targets stay productless.** Fifteen of twenty package targets
    deliberately have no library product and no app/helper dependency edge.
    Adding one is a review, not a commit.
 2. **One `IOHIDDeviceSetReport` call site** for the Precision runtime, in
-   `MXErgoPrecisionIOHIDOutput`. Never add a second.
+   `MXErgoPrecisionIOHIDOutput`. Never add a second. The event layer has the
+   matching rule outward: one `CGEvent.post`, in `MXErgoEventTap`.
 3. **A SET acknowledgement is never proof.** Only a separate `GetCidReporting`
    establishes device state.
 4. **Never write a retry, and never write an inverse command.** Once a SET may
@@ -37,6 +38,9 @@ These are expanded in [SAFETY.md](SAFETY.md). The short form:
    truth and its bytes are pinned by tests.
 6. **Review is not permission.** `notAuthorizedForExecution` means a review
    happened; execution needs a separate one-use authorization.
+7. **The event layer fails open.** Every error path passes the original event
+   through. Suppressing input on an error makes the pointing device feel broken
+   while offering no way to click out of it.
 
 If a change touches any of these, say so explicitly rather than burying it.
 

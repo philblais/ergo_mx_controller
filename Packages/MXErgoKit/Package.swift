@@ -26,6 +26,20 @@ let package = Package(
             dependencies: ["MXErgoCore", "MXErgoHIDPP"],
             linkerSettings: [.linkedFramework("IOKit")]
         ),
+        // Pure BetterTouchTool-replacement policy for the five ordinary-HID
+        // controls. It has no product, no app/helper edge, and imports no
+        // CoreGraphics: it decides, and cannot cause an event to exist.
+        .target(
+            name: "MXErgoEventSynthesis",
+            dependencies: ["MXErgoCore"]
+        ),
+        // Concrete CGEvent seam for the policy above. Productless: a
+        // suppressing global tap is a new capability class and promotion is a
+        // separate review. It holds the only CGEvent.post call site.
+        .target(
+            name: "MXErgoEventTap",
+            dependencies: ["MXErgoEventSynthesis", "MXErgoCore"]
+        ),
         // Deliberately has no product and no dependency edge from the app.
         // It is compiled only by its tests until the one-control hardware
         // trial receives a separate build-graph and byte review.
@@ -193,6 +207,18 @@ let package = Package(
         .testTarget(
             name: "MXErgoHIDTests",
             dependencies: ["MXErgoHID", "MXErgoCore", "MXErgoHIDPP"]
+        ),
+        .testTarget(
+            name: "MXErgoEventSynthesisTests",
+            dependencies: ["MXErgoEventSynthesis", "MXErgoCore"]
+        ),
+        .testTarget(
+            name: "MXErgoEventTapTests",
+            dependencies: [
+                "MXErgoEventTap",
+                "MXErgoEventSynthesis",
+                "MXErgoCore",
+            ]
         ),
         .testTarget(
             name: "MXErgoRestoreTrialIOHIDTests",

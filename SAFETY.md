@@ -17,10 +17,10 @@ A capability that can reach hardware is built as a SwiftPM target with **no
 library product** and **no dependency edge from any app or helper**. It is
 compiled and tested, but the linker cannot pull it into a signed binary.
 
-Fourteen of the twenty package targets are productless. Promotion out of that
+Fifteen of the twenty package targets are productless. Promotion out of that
 state is a separate, explicit review — never a side effect of adding a feature.
 
-Thirteen build-graph isolation tests enforce this by reading `Package.swift`,
+Fifteen build-graph isolation tests enforce this by reading `Package.swift`,
 `project.yml` and the generated `project.pbxproj` as evidence. They assert the
 target name is absent from the products half of the manifest, that its manifest
 occurrence count is exactly as expected, and that it appears in neither the
@@ -44,6 +44,13 @@ reachable across modules only through one narrow package factory.
 A test concatenates the Input, Output, Ownership and Assembly sources and
 asserts the symbol occurs exactly once across all four. Never add a second call
 site; route through the existing bridge.
+
+The event layer has the matching rule for the other direction. There is exactly
+**one** `CGEvent.post` call site, in `MXErgoEventTap`, so "what can this app
+inject into my session" is answerable by reading one function. A test asserts it
+occurs once across the whole `Sources` tree, and that only two suppressing
+`CGEvent.tapCreate` sites exist: the Precision scroll swallow and the synthesis
+tap.
 
 ## 3. An acknowledgement is evidence — a GET is proof
 
@@ -137,6 +144,35 @@ its baseline, deactivate it explicitly first. A physical disconnect while
 diverted is classified `recovery-required` and never triggers an automatic
 re-admit or re-SET on reconnect.
 
+## 11. The event layer fails open
+
+Suppressing input carries a hazard unlike a device write: it is fully
+reversible, but while it is wrong the pointing device feels broken, and the user
+may not be able to click their way to fixing it.
+
+So every uncertainty resolves toward *letting the event through*.
+
+* The tap's event mask admits exactly `otherMouseDown`, `otherMouseUp` and
+  `scrollWheel`. The primary and secondary buttons are not in it and have no
+  case in the observed-event type, so no state can swallow an ordinary click.
+* An unrecognised or undecodable event is passed through.
+* If injecting the replacement fails, the original is passed through rather
+  than swallowed — losing the input outright is the one outcome worse than not
+  remapping at all.
+* A release is suppressed only if *this policy suppressed its press*. Consulting
+  the plan instead would hand the frontmost app a mouse-up it never saw a
+  mouse-down for.
+* Continuous horizontal scroll is never suppressed. It is a trackpad gesture,
+  and swallowing it would break back and forward for every other pointing
+  device on the machine.
+* Mixed-axis scroll is passed through, so catching the horizontal half cannot
+  silently eat the vertical half.
+
+Re-enabling a tap that macOS disabled by timeout is **not** the retry rule 4
+forbids. That rule is about re-sending a command the device may already have
+acted on. Nothing here reaches the device, and re-arming is the documented
+contract of an event tap.
+
 ---
 
 ## Before changing anything
@@ -153,5 +189,7 @@ Ask, in order:
 4. Does this introduce a retry, an inverse command, or an automatic recovery?
 5. Does this let a durable ambiguity be resolved without a human?
 6. Does this rewrite journal bytes that something else is pinning?
+7. Does this add a second `CGEvent.post` call site, or a third suppressing tap?
+8. Does this make the event layer fail *closed* — swallowing input on an error?
 
 If the answer to any is yes, it needs an explicit review, not a commit.

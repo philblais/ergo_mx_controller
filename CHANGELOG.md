@@ -1052,3 +1052,97 @@ that the Audio test was never enabled.
 
 The app therefore has a hard dependency on Accessibility that was previously
 undocumented and, before the diagnostics existed, undiagnosable.
+
+The event layer exists. `MXErgoEventSynthesis` decides and `MXErgoEventTap`
+acts, and neither can reach a signed binary: both are productless, absent from
+`project.yml`, the generated project, and `App/`, and neither declares a single
+`public` symbol. A suppressing global event tap is a new capability class, so
+promotion is a separate review rather than a consequence of building it.
+
+Nothing about this touches the device. The five controls it replaces —
+wheel click, both thumbs, both wheel tilts — are already delivered to macOS as
+ordinary mouse buttons and scroll axes, which is what the 2026-09-04 session
+established and what cancelled the mapped-control SET path. Precision remains
+the sole control needing HID++, because it emits no ordinary report at all.
+
+The split is between a half that decides and a half that can act. The policy
+half imports no CoreGraphics whatsoever — an isolation test strips comments and
+asserts the token is absent from its code — so it is a pure value machine that
+structurally cannot cause an event to exist. Every question worth asking is
+answered there, by ordinary tests, rather than by installing a tap on a live
+session and finding out.
+
+The tap half holds the project's only `CGEvent.post` call site, for the same
+reason `MXErgoPrecisionIOHIDOutput` holds the only `IOHIDDeviceSetReport`:
+"what can this app inject into my session" should be answerable by reading one
+function. The isolation test asserts one such site across the whole `Sources`
+tree and exactly two suppressing `CGEvent.tapCreate` sites — the Precision
+scroll swallow and this one. Both halves of that were proved by breaking them:
+wiring `MXErgoEventTap` into `project.yml` fails the test, and adding a second
+post call fails it twice.
+
+Suppressing input is a different hazard from writing to the device. It is fully
+reversible, but while it is wrong the pointing device feels broken and the user
+may not be able to click their way out of it. So the layer fails open
+everywhere. The tap's mask admits exactly `otherMouseDown`, `otherMouseUp` and
+`scrollWheel`, and the primary and secondary buttons have no case in the
+observed-event type at all, so no reachable state can swallow an ordinary click.
+An undecodable event passes through. A failed injection passes the original
+through rather than swallowing it. Continuous horizontal scroll — a trackpad
+gesture — is never suppressed, and a mixed-axis scroll event is passed through
+so that catching the horizontal half cannot silently eat the vertical half that
+belongs to the Precision volume path.
+
+Two details are worth stating because they are the ones that bite. A release is
+suppressed only if this policy suppressed its press, never because the plan
+happens to bind that button; consulting the plan would hand the frontmost app a
+mouse-up it never saw a mouse-down for. And the tilt latch exists because one
+physical flick produces several AC Pan notches: firing per notch would send a
+browser several pages back from one gesture, so a fired direction is held off
+for 0.35 s, while a deliberate reversal fires immediately, since correcting an
+overshoot is the one case where the delay would be felt.
+
+`MappedControlActionPlan` binds wheel tilt to a three-finger swipe, and macOS
+exposes no public gesture-synthesis API. Rather than drop back and forward, the
+reviewed substitution is the pair of mouse buttons the system already reads as
+back and forward — which is exactly what this trackball's thumb buttons natively
+emit, and exactly what those thumbs are being rebound away from. The swap is
+deliberate. The plan is derived from `MappedControlActionPlan` rather than
+restated, so the two descriptions of what the buttons should do cannot drift.
+
+One thing is unverified and is marked as such in code. Which sign of
+`scrollWheelEventDeltaAxis2` corresponds to a *left* tilt has never been
+observed on this device; the 2026-09-04 session confirmed only that tilt moves a
+carousel, not in which direction the delta ran. Back and forward may therefore
+be reversed. `HorizontalScrollConvention` is the single place that decides, both
+values are tested, and one hardware session settles it.
+
+Re-enabling a tap that macOS disabled by timeout is not the retry the safety
+rules forbid. That rule is about re-sending a command the device may already
+have acted on; nothing here reaches the device, and re-arming is the documented
+contract of an event tap. The comment at that call site says so, because it is
+the kind of line a later reader would otherwise delete on principle.
+
+Twenty-five tests raise the package total to 383, all passing with none skipped.
+All four signed targets build and the menu app verifies on disk. No live HID
+operation was run, and no CGEvent has ever been posted: the one call site that
+could is unreachable from every runnable target.
+
+While counting the productless targets for this entry, three figures in
+`SAFETY.md`, `CLAUDE.md` and the `safety-gate` skill turned out to be wrong.
+They read "fourteen of twenty package targets" and "thirteen build-graph
+isolation tests"; the real figures before this milestone were thirteen of
+eighteen and fourteen. They are now fifteen of twenty and fifteen, counted from
+the manifest rather than from memory. In a project that treats counts as
+evidence, a wrong count is a defect, so it is recorded here rather than quietly
+fixed.
+
+One further finding, pre-existing and not from this milestone. Two tests fail
+intermittently under parallel load: `adapterDeadlineAfterApplyEntryIsPromptOutcomeUnknownAndStillDrains`
+and `concurrentDisconnectWakesABlockedReplyReadAndPoisonsTheAttempt`, both with
+`.timedOut` from the suites' one-second wall-clock `waitUntil` helper. Verified
+by running the suite six times with this milestone stashed: it reproduces at
+`HEAD` at a similar rate, so it is not a consequence of adding two test targets.
+It matters because `scripts/verify.sh` is the gate the whole hardware workflow
+rests on, and a gate that goes red at random teaches people to re-run it until
+it is green. Left as-is here rather than fixed inside an unrelated change.

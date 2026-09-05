@@ -1,6 +1,6 @@
 ---
 name: safety-gate
-description: Check a proposed change against the MX Ergo project's ten hardware-safety invariants before writing code. Use whenever a change touches HID output, the Precision or mapped-control runtime, the durable transaction journals, SwiftPM target wiring, package products, project.yml, or anything named Precision/Transport/IOHID/Admission/Journal. Also use when asked whether something is safe to run against the trackball.
+description: Check a proposed change against the MX Ergo project's eleven safety invariants before writing code. Use whenever a change touches HID output, event synthesis or CGEvent posting, the Precision or mapped-control runtime, the durable transaction journals, SwiftPM target wiring, package products, project.yml, or anything named Precision/Transport/IOHID/Admission/Journal/EventTap. Also use when asked whether something is safe to run against the trackball.
 ---
 
 # Hardware safety gate
@@ -11,13 +11,13 @@ before writing code, not after.
 
 Read [SAFETY.md](../../../SAFETY.md) for the full statement of each rule.
 
-## The six questions
+## The eight questions
 
 Answer each one explicitly. If any answer is yes, stop and tell the user the
 change needs an explicit review rather than a commit.
 
 1. **Does this add a dependency edge out of a productless target?**
-   Fourteen of twenty package targets deliberately have no library product and
+   Fifteen of twenty package targets deliberately have no library product and
    no app/helper edge, so the linker cannot pull them into a signed binary.
    Check `Packages/MXErgoKit/Package.swift` — a target is productless if its
    name appears only in the `targets:` half of the manifest.
@@ -45,6 +45,23 @@ change needs an explicit review rather than a commit.
    `device-state-journal.json` is the recovery ground truth and is never
    rewritten. Its SHA-256 and four sibling files are pinned by
    `PrecisionForensicEvidenceAudit`.
+
+7. **Does this add a second `CGEvent.post` call site, or a third suppressing
+   tap?**
+   There is exactly one post site, in `MXErgoEventTap`, and exactly two
+   `CGEvent.tapCreate` sites: the Precision scroll swallow in `MXErgoHID` and
+   the synthesis tap. `eventLayerIsProductlessUnwiredAndHoldsExactlyOneInjectionSite`
+   counts all three across the whole `Sources` tree.
+
+8. **Does this make the event layer fail closed?**
+   Every error path must pass the original event through. An unrecognised
+   event, a failed injection, a continuous (trackpad) horizontal scroll and a
+   mixed-axis scroll are all passed through. A release is suppressed only if
+   this policy suppressed its press. Suppressing input on an error makes the
+   pointing device feel broken while offering no way to click out of it.
+
+   Re-enabling a tap macOS disabled by timeout is not the question-4 retry.
+   That rule is about re-sending a command the device may have acted on.
 
 ## Currently protected hashes
 

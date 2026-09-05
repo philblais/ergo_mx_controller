@@ -43,15 +43,25 @@ runtime was worth building.
 
 Replacing BetterTouchTool for the other five is therefore an event-layer
 problem — observe, suppress, post replacements — with **no device write at
-all**. It needs an Accessibility permission gate and a horizontal scroll path,
-neither of which exists yet. See
-[Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md).
+all**. See [Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md).
+
+**Built, tested, and not shipped:** that event layer, as of 2026-09-04.
+`MXErgoEventSynthesis` decides — a pure value policy with no CoreGraphics import
+at all — and `MXErgoEventTap` acts, holding the project's only `CGEvent.post`
+call site. Both are productless and absent from `project.yml`, the generated
+project, and `App/`, so no signed binary can reach them. Promotion is a separate
+review: a suppressing global event tap is a new capability class.
+
+One thing in it is still unverified against hardware. Which sign of
+`scrollWheelEventDeltaAxis2` a *left* tilt produces has never been observed, so
+back and forward may be reversed. `HorizontalScrollConvention` is the single
+place that decides, and one hardware session settles it.
 
 **Reviewed but deliberately unauthorized:** the five BetterTouchTool-mapped CIDs
 (`0052`, `0053`, `0056`, `005B`, `005D`). Their diversion plan, readiness audit,
 action plan, event pump and live GET-only preflight all exist and all return
-`notAuthorizedForExecution`. No mapped SET is sent and no synthetic event is
-posted — there is no `CGEvent` posting anywhere in the project yet.
+`notAuthorizedForExecution`. No mapped SET is sent, and no synthetic event has
+ever been posted — the one call site that could is unreachable from any app.
 
 Audio execution is disabled after every launch and must be explicitly enabled.
 
@@ -59,7 +69,7 @@ Audio execution is disabled after every launch and must be explicitly enabled.
 
 | File | What it holds |
 |---|---|
-| [SAFETY.md](SAFETY.md) | The ten invariants, and the questions to ask before changing anything |
+| [SAFETY.md](SAFETY.md) | The eleven invariants, and the questions to ask before changing anything |
 | [RUNBOOK.md](RUNBOOK.md) | The ordered hardware-validation steps |
 | [CHANGELOG.md](CHANGELOG.md) | The full capability ledger and milestone history |
 | [Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md) | What the physical trackball actually did |
@@ -86,6 +96,8 @@ Audio execution is disabled after every launch and must be explicitly enabled.
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeAdmission/` — productless package-only explicit-authorization, observer-handoff, canonical-lease, state-policy, and shutdown supervisor
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeHostHandoff/` — productless, IOKit-free exact-run observer drain adapter with mandatory post-stop session and Root evidence reread
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeLifecycle/` — productless owner that binds one observer run into authorization and holds the restart fence through shutdown and rollover
+- `Packages/MXErgoKit/Sources/MXErgoEventSynthesis/` — productless, CoreGraphics-free BetterTouchTool-replacement policy; it decides what to suppress and what to inject, and structurally cannot cause an event to exist
+- `Packages/MXErgoKit/Sources/MXErgoEventTap/` — productless CGEvent seam holding the sole `CGEvent.post` call site; refuses to start without Accessibility and fails open on every error path
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeOwner/` — public executable façade for bind, quit, and session rollover; it does not expose admit or a SET sender
 - `Packages/MXErgoKit/Tests/` — unit and boundary tests, including observer handoff/drain races, admission authorization, composition validation, acquisition failure cleanup, source-assembly rollback, teardown, cancellation, abandonment, and build-graph isolation
 

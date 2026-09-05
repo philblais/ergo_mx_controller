@@ -28,10 +28,12 @@
 		D7D57A903E050B1DD5048F9D /* MXErgoPrecisionRuntimeOwner in Frameworks */ = {isa = PBXBuildFile; productRef = BE24317AD10B4703CB4C3D96 /* MXErgoPrecisionRuntimeOwner */; };
 		E1F9CFAEC6F1FFE54AD4C74C /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8594F8F14B3862793C321423 /* AppKit.framework */; };
 		E767DAB503857E354FC37B0C /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F96A2D4FFAF3203B1ED5557E /* IOKit.framework */; };
+		EA8E3E7DFF7B2786E9F55A9D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 00BA11000A7AF938BF353FE7 /* Assets.xcassets */; };
 		EBF277F53D0035FB8A14DDAD /* MXErgoHIDPP in Frameworks */ = {isa = PBXBuildFile; productRef = 773B67F0837B968E7E467491 /* MXErgoHIDPP */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		00BA11000A7AF938BF353FE7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0B9EC81B52D1AF7E7332EBB0 /* MXErgoController.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MXErgoController.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		729B08141702C731B22E9165 /* MXErgoPrecisionTrialReconciler.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MXErgoPrecisionTrialReconciler.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		822F1BAD0B238E12E62286BA /* MXErgoKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MXErgoKit; path = Packages/MXErgoKit; sourceTree = SOURCE_ROOT; };
@@ -126,6 +128,7 @@
 			isa = PBXGroup;
 			children = (
 				87F68AD7261860C6617DF429 /* AppModel.swift */,
+				00BA11000A7AF938BF353FE7 /* Assets.xcassets */,
 				D130BB3AD1AAE9AC86150C7D /* FrontmostApplicationTracker.swift */,
 				BE289F4BC281431C5B6857B1 /* LoginItemController.swift */,
 				E22D7BEB46F2A0DE6E3471D2 /* MXErgoControllerApp.swift */,
@@ -205,6 +208,7 @@
 			buildConfigurationList = 0345191D9083308B172FFA1D /* Build configuration list for PBXNativeTarget "MXErgoController" */;
 			buildPhases = (
 				31A1E6C369AECB94C6A0488E /* Sources */,
+				3C839F910D246040A3DE3A70 /* Resources */,
 				FA69895F439D6348E28439A2 /* Frameworks */,
 			);
 			buildRules = (
@@ -330,6 +334,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3C839F910D246040A3DE3A70 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EA8E3E7DFF7B2786E9F55A9D /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		31A1E6C369AECB94C6A0488E /* Sources */ = {

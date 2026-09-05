@@ -1639,3 +1639,32 @@ wants a stable location because registering from a temporary path reports
 `notFound`.
 
 Package total stays 404. No live HID operation was run.
+
+The app has an icon. It is drawn rather than traced: `Tools/MakeAppIcon.swift`
+renders all ten sizes with CoreGraphics, so 16 points is drawn at 16 points
+instead of being resampled from a large bitmap, and the detail that cannot
+survive — the wheel ridges, the thumb buttons, the specular highlight — is
+omitted below the size where it would turn to mush.
+
+It is an original mark, not the product photograph. The silhouette is what
+identifies the device: a tilted shell with the flank scooped out and the ball
+sitting proud of it. There is no vendor wordmark or logo, and none should be
+added — the app is not Logitech's and should not look as though it is.
+
+The one deliberate departure from the hardware is contrast. The real trackball
+is graphite on graphite, which at 32 points is a grey blob; the icon lightens
+the shell and darkens the ball so the two separate at every size. Legibility
+beat fidelity, on purpose.
+
+Wiring it took two attempts. `INFOPLIST_KEY_CFBundleIconFile` is not one of the
+keys Xcode's `GENERATE_INFOPLIST_FILE` accepts, so it silently produced a bundle
+with the icon file present and no plist entry pointing at it. An asset catalog
+with `ASSETCATALOG_COMPILER_APPICON_NAME` is the supported route and sets
+`CFBundleIconName` itself.
+
+This matters more than decoration. The app is `LSUIElement`, so it never appears
+in the Dock; the places it does appear are Finder, Login Items, and the
+Accessibility and Input Monitoring lists — which is exactly where a person needs
+to recognise it while granting something a suppressing event tap.
+
+Package total stays 404. No live HID operation was run.

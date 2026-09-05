@@ -1688,3 +1688,35 @@ unremarkable. It could not ship publicly with that on it, and this repository ha
 no remote, so nothing is published by committing it.
 
 Package total stays 404. No live HID operation was run.
+
+The daily-driver chain holds across a restart. A Release build installed at
+`/Applications`, signed and hardened, registered as a login item, and the
+machine restarted. Three minutes after boot, with nobody having opened the menu:
+the app was running from `/Applications` at a low process id, the remembered
+preference read `1`, and the `EventSynthesis` thread was present.
+
+That last one is the load-bearing check. The thread exists only after
+`CGEvent.tapCreate` has returned a tap, and that call fails without
+Accessibility, so its presence is evidence of both the grant surviving a reboot
+and the layer arming itself unattended. What it is not is evidence that events
+flow: a created tap is not a delivered event, and nothing in this check pressed
+a button. That distinction is worth keeping, because it is the same one that
+made "the app is running" look like "the remap works" earlier today.
+
+Nothing was added for this milestone. It is a validation of what already
+existed, and the only code change is to the `safety-gate` skill's authorization
+state, which had gone badly stale: it still said `CGEvent` posting "does not
+exist anywhere" and that replacing BetterTouchTool "needs an Accessibility gate
+and a horizontal scroll path", both of which have been false since this morning.
+It now records the single post call site, the two suppressing taps, the pinned
+facade surface, that the layer is on by default because the switch is
+remembered, and the three things learned the hard way — the arrow-key flags, the
+natural-scrolling sign, and Safari's indifference to the back/forward buttons.
+
+The next gates are unchanged and worth restating because the posture shifted so
+far today: no second `CGEvent.post` call site, no third suppressing tap, no
+mapped-control SET — that path is cancelled, not pending — and no gesture
+synthesis through private API. The event layer must keep failing open.
+
+Package total stays 404, all passing with none skipped. No live HID operation
+was run; the trackball was not written to at any point in this milestone.

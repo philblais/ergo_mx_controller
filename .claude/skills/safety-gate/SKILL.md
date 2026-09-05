@@ -100,18 +100,38 @@ Keep this accurate; it is the thing most likely to drift.
   or recovery-required evidence.
 - **No mapped control needs diversion.** Observed 2026-09-04: thumb buttons are
   ordinary HID buttons `0x08`/`0x10`, both wheel tilts are ordinary horizontal
-  scroll, wheel click is middle click. Only Precision (`00ED`) produces no
-  ordinary report. **Do not build a multi-CID SET path.** Replacing
-  BetterTouchTool for the other five is an event-layer problem with no device
-  write; it needs an Accessibility gate and a horizontal scroll path, not HID++.
-- **Mapped CIDs `0052`, `0053`, `0056`, `005B`, `005D`** — plan, readiness,
-  action plan, event pump and live GET-only preflight all exist and all return
-  `notAuthorizedForExecution`. No SET, no CGEvent posting. The project's own
-  gate is that these stay unauthorized until the Precision recover lock has been
-  exercised on hardware, then are admitted one CID at a time.
-- **`CGEvent` posting** — does not exist anywhere. The only `CGEvent` use is a
-  listen-only scroll tap in `MXErgoWheelObserver`. Adding posting also needs an
-  Accessibility (TCC) permission gate, which does not exist yet.
+  scroll. Wheel click was *inferred* to be middle click that day and only
+  **observed on 2026-09-05** as mask `0x04`. Only Precision (`00ED`) produces no
+  ordinary report. **Do not build a multi-CID SET path.** All five are handled
+  by the event layer with no device write at all.
+- **Mapped CIDs `0052`, `0053`, `0056`, `005B`, `005D`** — the HID++ diversion
+  plan, readiness, action plan, event pump and live GET-only preflight all still
+  exist and all still return `notAuthorizedForExecution`. **No mapped SET has
+  ever been sent and none should be.** That path is cancelled, not pending: the
+  hardware does not need it. These artefacts remain as reviewed evidence.
+- **`CGEvent` posting — exists, is live, and arms itself at login.** This
+  changed on 2026-09-05 and is the largest shift in the project's posture.
+  - Exactly **one** `CGEvent.post` call site, in `MXErgoEventTap`'s
+    `PreparedCoreGraphicsEvents`. A test counts it across the whole `Sources`
+    tree. Exactly **two** suppressing `CGEvent.tapCreate` sites: the Precision
+    scroll swallow in `MXErgoHID` and the synthesis tap.
+  - `MXErgoEventSynthesis` and `MXErgoEventTap` stay productless and
+    `package`-only. The app reaches them solely through the `MXErgoEventLayer`
+    facade, whose public surface is a pinned list — widening it fails a test.
+  - `verify.sh` refuses `.post(tap:` and `CGEvent.tapCreate` in `App/`.
+  - It is **on by default now**, because the switch is remembered and the app is
+    a login item. A remembered "on" still requires Accessibility and refuses
+    visibly without it.
+  - Three things learned the hard way, all in `Evidence/VALIDATION-RECORDS.md`:
+    a synthetic arrow key needs the numeric-pad and secondary-function flags or
+    the window server ignores it; the horizontal scroll sign inverts with the
+    "natural scrolling" preference and must be derived from it; and Safari
+    ignores the back/forward mouse buttons, so it gets Command+Arrow instead.
+- **What still must not happen.** No second post call site. No third suppressing
+  tap. No mapped-control SET. No gesture synthesis through private API — macOS
+  exposes none publicly, which is why the swipe became a substitution. And the
+  event layer must keep failing **open**: every error path passes the original
+  event through.
 
 ## After the change
 

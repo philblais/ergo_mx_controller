@@ -656,3 +656,34 @@ inconsistent with its own action. Nothing needs changing.
 That also settles, retroactively, which thumb is which: the button reporting
 `0x08` is the lower thumb and `0x10` the upper, since the bindings derived from
 that assumption behave as intended.
+
+### Live validation record — 2026-09-05, the daily-driver chain across a reboot
+
+**Conditions.** Release build installed at `/Applications/MX Ergo Controller.app`,
+signed, hardened runtime, designated requirement satisfied. Accessibility and
+Input Monitoring granted to that copy. Launch at login registered. The machine
+was then restarted.
+
+**Observed after the restart**, with the operator having opened nothing:
+
+| Check | Result |
+|---|---|
+| Uptime at time of check | 3 minutes — a real reboot |
+| App process | running from `/Applications`, PID 876, started at login |
+| Remembered preference | `com.phib.MXErgoController.eventLayerEnabled` = `1` |
+| `EventSynthesis` thread | **present** |
+
+**What this establishes.** The whole unattended chain: the login item launches
+the app, the remembered preference survives a reboot, the Accessibility grant
+survives a reboot for the `/Applications` copy, and the layer arms itself
+without anyone opening the menu. The `EventSynthesis` thread exists only after
+`CGEvent.tapCreate` has returned a tap, and that call fails without
+Accessibility, so its presence is evidence of the grant as well as the arming.
+
+**What it does not establish.** That events flow. A created tap is not a
+delivered event, and nothing here presses a button. The operator reported the
+app restarting with the machine; the arming was verified separately by sampling
+the process, not by pressing anything.
+
+**The low process id is incidental but consistent** with launching at login
+rather than being started by hand afterwards.

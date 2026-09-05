@@ -29,6 +29,8 @@ package struct EventSynthesisDiagnostics: Sendable, Equatable {
     package var postFailureCount = 0
     package var tapReenableCount = 0
     package var lastDecisionDescription: String?
+    /// The last event the tap decoded, whatever was done with it.
+    package var lastObservedDescription: String?
 
     package init() {}
 }
@@ -322,6 +324,7 @@ private final class Loop: @unchecked Sendable {
         // the callback returns, so nothing slow or re-entrant runs under it.
         stateLock.lock()
         diagnostics.observedCount += 1
+        diagnostics.lastObservedDescription = kind.description
         let decision = policy.decide(
             kind,
             at: timestamp,

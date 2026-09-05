@@ -69,7 +69,7 @@ import MXErgoEventTap
             observedCount: 10, passedThroughCount: 4, suppressedCount: 6,
             postedCount: 3, ownEventCount: 3,
             postFailureCount: postFailures, tapReenableCount: reenables,
-            lastDecisionDescription: nil
+            lastDecisionDescription: nil, lastObservedDescription: nil
         )
     }
     #expect(make().summary
@@ -128,6 +128,7 @@ import MXErgoEventTap
         "public let postFailureCount: Int",
         "public let tapReenableCount: Int",
         "public let lastDecisionDescription: String?",
+        "public let lastObservedDescription: String?",
         "public var summary: String {",
         "public var needsAttention: Bool {",
         "public final class EventLayer: @unchecked Sendable {",

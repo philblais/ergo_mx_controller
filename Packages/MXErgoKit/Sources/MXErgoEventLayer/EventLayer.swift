@@ -95,6 +95,9 @@ public struct EventLayerDiagnostics: Sendable, Equatable {
     public let postFailureCount: Int
     public let tapReenableCount: Int
     public let lastDecisionDescription: String?
+    /// The last event the tap decoded, whether or not it was rebound. This is
+    /// how an unbound button reveals itself.
+    public let lastObservedDescription: String?
 
     /// `own` is the load-bearing number on a first run. This layer both
     /// swallows mouse buttons 3 and 4 and injects them, so it has to recognise
@@ -229,7 +232,8 @@ public final class EventLayer: @unchecked Sendable {
                 ownEventCount: $0.ownEventCount,
                 postFailureCount: $0.postFailureCount,
                 tapReenableCount: $0.tapReenableCount,
-                lastDecisionDescription: $0.lastDecisionDescription
+                lastDecisionDescription: $0.lastDecisionDescription,
+                lastObservedDescription: $0.lastObservedDescription
             )
         }
     }

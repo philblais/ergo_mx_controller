@@ -70,6 +70,27 @@ package enum ObservedEventKind: Sendable, Equatable {
     case scroll(horizontalUnits: Int, verticalUnits: Int, isContinuous: Bool)
 }
 
+extension ObservedEventKind {
+    /// Names the event, button number included.
+    ///
+    /// Added 2026-09-05 to answer one question: does this trackball's Precision
+    /// button arrive as an ordinary mouse button? The BetterTouchTool preset in
+    /// this repository triggers it as "Button 12", which the 2026-09-04
+    /// observation could not have seen — that read the button mask from a
+    /// single byte, which carries only buttons 1 to 8.
+    package var description: String {
+        switch self {
+        case let .otherMouseDown(buttonNumber):
+            "button \(buttonNumber + 1) down"
+        case let .otherMouseUp(buttonNumber):
+            "button \(buttonNumber + 1) up"
+        case let .scroll(horizontal, vertical, isContinuous):
+            "scroll h \(horizontal) v \(vertical) "
+                + (isContinuous ? "continuous" : "discrete")
+        }
+    }
+}
+
 package enum EventSynthesisDecision: Sendable, Equatable {
     /// Hand the original event back to the system unchanged.
     case passThrough

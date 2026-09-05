@@ -1720,3 +1720,41 @@ synthesis through private API. The event layer must keep failing open.
 
 Package total stays 404, all passing with none skipped. No live HID operation
 was run; the trackball was not written to at any point in this milestone.
+
+Precision does not survive a reboot, and that is the design rather than a fault.
+The diversion is temporary by definition: it does not outlive the device
+disconnecting, a reboot does that, and nothing re-admits automatically — rule 10
+forbids it. The state after the restart is exactly right: schema-v2 baseline
+unchanged, runtime journal `completed` at revision 6 with CID `00ED` at
+`restoredVerified`. Getting Precision back means retiring the spent journal,
+binding, admitting, and enabling the Audio test, every boot.
+
+For a daily driver that is a poor answer, and reading the BetterTouchTool preset
+suggests a much better one may exist. Its Precision bindings — "Tap: Mute · Hold
++ Wheel: Volume", and the two Precision-plus-scroll volume triggers — are all
+`BTTTriggerTypeNormalMouse`, described as **Button 12**. If macOS delivers
+Precision as an ordinary mouse button, it needs no HID++ diversion either, the
+event layer can hold it permanently, and it survives reboots with no device
+write at all.
+
+That contradicts this project's central finding, so it is a hypothesis and
+nothing has been built on it. But the 2026-09-04 observation that recorded
+"no report at all" could not have seen a button 12: `standardMouseButtonMask`
+reads a single byte, `preview[1]`, which carries buttons 1 to 8. A twelfth
+button lives in the next byte and is invisible to that decoder — and the
+calibration panel only records a report when that byte changes, so such a press
+would leave no trace in the place it was looked for.
+
+So this milestone adds the measurement and nothing else. The tap now records
+which event it last decoded, named by button number, whether or not it is bound
+— an unbound button previously passed through leaving only a "passed through"
+in the decision row, which is exactly the shape of evidence that hid this. One
+test raises the package total to 405.
+
+Nothing was concluded and nothing was built on the hypothesis. If Precision does
+arrive as button 12, moving it to the event layer is a separate milestone with
+its own review, and the diversion runtime stays as validated work rather than
+being deleted — it is the only thing that has ever written to this device, and
+its evidence is the audit trail.
+
+No live HID operation was run.

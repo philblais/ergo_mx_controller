@@ -393,3 +393,19 @@ private func reviewedPolicy(
         frontmostBundleIdentifier: "com.apple.Safari"
     ) == .suppressAndPost([.keyChord(keyCode: 126, modifiers: .control)]))
 }
+
+@Test func anObservedEventNamesItsButtonSoAnUnboundOneRevealsItself() {
+    // The BetterTouchTool preset triggers Precision as "Button 12". If that is
+    // right, it arrives here as an unbound button and passes through unnoticed
+    // unless the tap says which button it saw. The 2026-09-04 observation could
+    // not have seen it: that read the mask from one byte, holding buttons 1-8.
+    #expect(ObservedEventKind.otherMouseDown(buttonNumber: 11).description
+        == "button 12 down")
+    #expect(ObservedEventKind.otherMouseUp(buttonNumber: 11).description
+        == "button 12 up")
+    #expect(ObservedEventKind.otherMouseDown(buttonNumber: 2).description
+        == "button 3 down")
+    #expect(ObservedEventKind.scroll(
+        horizontalUnits: -1, verticalUnits: 0, isContinuous: false
+    ).description == "scroll h -1 v 0 discrete")
+}

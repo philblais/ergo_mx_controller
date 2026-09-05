@@ -37,6 +37,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var eventLayerBindings: [EventLayerBinding] = []
     @Published private(set) var eventLayerDiagnosticsSummary: String?
     @Published private(set) var eventLayerLastDecision: String?
+    @Published private(set) var eventLayerLastObserved: String?
     @Published private(set) var eventLayerNeedsAttention = false
     /// What the layer should be on next launch. Kept separate from
     /// `eventLayerEnabled`, which is what it is doing right now: a remembered
@@ -379,6 +380,7 @@ final class AppModel: ObservableObject {
             eventLayerStatusText = "Off"
             eventLayerDiagnosticsSummary = nil
             eventLayerLastDecision = nil
+            eventLayerLastObserved = nil
             eventLayerNeedsAttention = false
             return
         }
@@ -443,6 +445,7 @@ final class AppModel: ObservableObject {
         guard eventLayerEnabled, let diagnostics = eventLayer.diagnostics else {
             eventLayerDiagnosticsSummary = nil
             eventLayerLastDecision = nil
+            eventLayerLastObserved = nil
             return
         }
         // Assigned only on change: this runs on a timer while the layer is
@@ -453,6 +456,9 @@ final class AppModel: ObservableObject {
         }
         if eventLayerLastDecision != diagnostics.lastDecisionDescription {
             eventLayerLastDecision = diagnostics.lastDecisionDescription
+        }
+        if eventLayerLastObserved != diagnostics.lastObservedDescription {
+            eventLayerLastObserved = diagnostics.lastObservedDescription
         }
         if diagnostics.needsAttention {
             eventLayerNeedsAttention = true

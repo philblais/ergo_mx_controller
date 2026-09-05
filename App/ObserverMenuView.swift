@@ -273,8 +273,12 @@ struct ObserverMenuView: View {
                         "Events",
                         model.eventLayerDiagnosticsSummary ?? "none yet"
                     )
+                    detailRow(
+                        "Last seen",
+                        model.eventLayerLastObserved ?? "nothing yet"
+                    )
                     if let last = model.eventLayerLastDecision {
-                        detailRow("Last", last)
+                        detailRow("Last action", last)
                     }
                 }
                 .font(.caption.monospacedDigit())

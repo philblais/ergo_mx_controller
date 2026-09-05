@@ -523,3 +523,39 @@ The modifier-transition change stays: a chord that never presses its modifier is
 wrong regardless, and A confirms the current form works. Whether it was ever
 necessary is not established, and is recorded here as unknown rather than
 claimed either way.
+
+### Correction — 2026-09-05, the A/B chord result did not reproduce
+
+The record above states that posting Control+Up "exactly as the tap builds it"
+opened Mission Control while the variant carrying a real arrow key's keypad
+flags did nothing. Repeating the same two buttons produced the **opposite**
+result: A did nothing, B opened Mission Control.
+
+The result is therefore not reproduced, and every conclusion drawn from it is
+withdrawn:
+
+* That the keypad-flag variant is broken. Not established.
+* That B "disproves" the flag hypothesis. It does not; nothing here decides it
+  either way.
+
+The likely confounder is that **Mission Control is a toggle**. If both chords
+work, the first press opens it and the second closes it, and "closed" reads as
+"nothing happened" depending on what the screen showed beforehand. That single
+explanation fits both runs with both chords working, which no other candidate
+does.
+
+The measurement was badly designed for this reason: its observable is a state
+that the act of measuring flips. A trial whose outcome depends on an unrecorded
+starting state should not have been reported as a finding after one run.
+
+**What survives.** That a real Control+Up opens Mission Control on this machine
+is unaffected. That the wheel click is observed, matched and suppressed, and a
+chord posted, is unaffected — it rests on the counters, not on A/B.
+
+**What does not.** The claim that posting from inside the tap callback is *the*
+cause. Deferring delivery until after the callback returns remains correct on
+its own grounds — posting into the tap point being serviced is a documented
+hazard, and the fail-open behaviour is unchanged by it — but it is no longer
+supported by this evidence, and it is not known whether it fixes the failure.
+That is settled by one thing only: whether wheel click now opens Mission
+Control.

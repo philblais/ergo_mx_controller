@@ -1339,6 +1339,11 @@ One test raises the package total to 398, all passing with none skipped. No live
 HID operation was run. The chord's fate is not yet established, and this entry
 is written before the session that settles it.
 
+**Superseded below: the A/B result did not reproduce and this entry's central
+claim is withdrawn.** It is left in place because retracting a milestone by
+overwriting it would hide exactly the kind of mistake this ledger exists to
+record.
+
 Settled: the window server drops an event posted from inside an event-tap
 callback. That alone is why every remapped control did nothing.
 
@@ -1375,3 +1380,34 @@ it was ever necessary is unknown, and is recorded as unknown.
 
 Package total stays 398, all passing with none skipped. No live HID operation
 was run.
+
+The A/B chord result did not reproduce. Pressing the same two diagnostic buttons
+again gave the opposite answer: A did nothing, B opened Mission Control. The
+previous entry's conclusion — that the keypad-flag variant is broken and that
+posting from inside the callback is *the* cause — is withdrawn.
+
+The measurement was badly designed, and in a way worth naming. Its observable is
+Mission Control, which is a **toggle**: the act of measuring flips the state the
+next measurement reads. If both chords work, the first press opens it and the
+second closes it, and whether that looks like success depends entirely on an
+unrecorded starting state. One explanation, both chords working, fits both runs.
+No other candidate does.
+
+Reporting a finding after a single run of a self-perturbing measurement is the
+same error as the two speculative fixes before it, wearing better clothes. The
+lesson is not "measure first" — that was already the lesson — but that a
+measurement needs an observable the measurement does not disturb, and needs to
+be repeated before it is written down.
+
+What survives is what rests on the counters rather than on A/B: the wheel click
+is observed, matched, suppressed, and a chord is posted, eleven times out of
+eleven. And a real Control+Up opens Mission Control on this machine.
+
+The deferred delivery stays. Posting into the tap point currently being serviced
+is a documented hazard, the fail-open guarantee is unchanged by the split, and
+the test pinning "build but do not deliver" is worth having regardless. But it
+is no longer claimed as the fix, because nothing now shows it is. One question
+settles that, and it was never the diagnostic buttons: whether wheel click
+itself opens Mission Control.
+
+Package total stays 398. No live HID operation was run.

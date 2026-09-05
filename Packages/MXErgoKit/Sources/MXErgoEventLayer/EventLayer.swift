@@ -86,9 +86,15 @@ public struct EventLayerDiagnostics: Sendable, Equatable {
     public let tapReenableCount: Int
     public let lastDecisionDescription: String?
 
+    /// `own` is the load-bearing number on a first run. This layer both
+    /// swallows mouse buttons 3 and 4 and injects them, so it has to recognise
+    /// its own events. If that marker ever failed, injected clicks would be
+    /// re-consumed and counted as observed instead — visible here rather than
+    /// only as strange behaviour.
     public var summary: String {
         "observed \(observedCount) · passed \(passedThroughCount) "
-            + "· suppressed \(suppressedCount) · posted \(postedCount)"
+            + "· suppressed \(suppressedCount) · posted \(postedCount) "
+            + "· own \(ownEventCount)"
     }
 
     /// Surfaced separately because these two are the ones that mean something

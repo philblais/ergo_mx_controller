@@ -72,7 +72,8 @@ import MXErgoEventTap
             lastDecisionDescription: nil
         )
     }
-    #expect(make().summary == "observed 10 · passed 4 · suppressed 6 · posted 3")
+    #expect(make().summary
+        == "observed 10 · passed 4 · suppressed 6 · posted 3 · own 3")
     #expect(!make().needsAttention)
     // A failed injection means input was passed through unremapped.
     #expect(make(postFailures: 1).needsAttention)

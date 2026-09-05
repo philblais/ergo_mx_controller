@@ -643,9 +643,16 @@ switch is exercised in both directions — the same physical tilt produces a mou
 button in one browser and a chord in another — and nothing regressed where the
 buttons already worked.
 
-**One discrepancy, unresolved.** The same preset labels a trigger "Desktop Left"
-whose action is `Move Right a Space`. Whether the thumb buttons are the way
-round the operator wants is therefore not established by the preset, and the
-2026-09-04 record already noted that which thumb is `0x08` and which is `0x10`
-was inferred from press order. Both thumbs switch Spaces; whether each switches
-the intended way is for the operator to say.
+**The thumb discrepancy is closed.** The same preset labels a trigger "Desktop
+Left" whose action is `Move Right a Space`, which left it unclear whether the
+buttons were the way round the operator wanted — and the 2026-09-04 record had
+already noted that which thumb reports `0x08` and which reports `0x10` was
+inferred from press order rather than observed.
+
+Confirmed on hardware 2026-09-05: **both thumbs switch the intended way.** The
+press-order inference was correct, and the preset's label is simply
+inconsistent with its own action. Nothing needs changing.
+
+That also settles, retroactively, which thumb is which: the button reporting
+`0x08` is the lower thumb and `0x10` the upper, since the bindings derived from
+that assumption behave as intended.

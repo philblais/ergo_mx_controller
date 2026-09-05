@@ -1564,3 +1564,19 @@ five did not.
 unshipped.
 
 Package total stays 401. No live HID operation was run.
+
+The thumb discrepancy is closed. Both thumbs switch the intended way, confirmed
+on hardware, so the press-order inference from 2026-09-04 was right and the
+preset's "Desktop Left" label is simply inconsistent with its own `Move Right a
+Space` action. That also settles which thumb is which — `0x08` is the lower and
+`0x10` the upper — since bindings derived from that assumption behave as
+intended.
+
+It is worth being precise about what that is and is not. It is a confirmation
+that the mapping is correct, not a measurement of which mask each thumb emits;
+nobody watched the report bytes while pressing a named button. The distinction
+is the same one that produced the withdrawn wheel-click claim earlier in this
+session, and the difference now is only that it is written down as what it is.
+
+With that, every open question on the event layer is closed and no control is
+left unverified. Package total stays 401. No live HID operation was run.

@@ -39,9 +39,17 @@ package struct EventSynthesisBinding: Sendable, Equatable {
 /// Precision is the sole exception and stays on the HID++ runtime, because it
 /// emits no ordinary report for a tap to see.
 package struct EventSynthesisPlan: Sendable, Equatable {
-    /// HID button masks observed on this MX Ergo on 2026-09-04: wheel click
-    /// `0x04`, lower thumb `0x08`, upper thumb `0x10`. A CGEvent button number
-    /// is the mask's bit position, so those are 2, 3 and 4.
+    /// A CGEvent button number is the HID button mask's bit position.
+    ///
+    /// The thumbs are observed: `0x08` and `0x10` on 2026-09-04, giving 3 and
+    /// 4. **The wheel click is not.** That session's record lists it under
+    /// "not observed", and `2` here is inferred from `StandardMouseButton.wheel`
+    /// being `0x04`, which is itself a specification assumption about this
+    /// device rather than a measurement of it.
+    ///
+    /// This comment previously claimed the wheel click had been observed. It
+    /// had not. Until a session prints the report bytes for a wheel click, a
+    /// binding keyed on button 2 may simply never match.
     package static let wheelClickButtonNumber = 2
     package static let lowerThumbButtonNumber = 3
     package static let upperThumbButtonNumber = 4

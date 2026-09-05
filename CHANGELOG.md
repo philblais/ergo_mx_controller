@@ -1060,9 +1060,10 @@ acts, and neither can reach a signed binary: both are productless, absent from
 promotion is a separate review rather than a consequence of building it.
 
 Nothing about this touches the device. The five controls it replaces —
-wheel click, both thumbs, both wheel tilts — are already delivered to macOS as
-ordinary mouse buttons and scroll axes, which is what the 2026-09-04 session
-established and what cancelled the mapped-control SET path. Precision remains
+wheel click, both thumbs, both wheel tilts — are believed to be delivered to
+macOS as ordinary mouse buttons and scroll axes. The thumbs and the tilts were
+observed on 2026-09-04; the wheel click was not, and saying otherwise here was
+an error corrected on 2026-09-05. Precision remains
 the sole control needing HID++, because it emits no ordinary report at all.
 
 The split is between a half that decides and a half that can act. The policy
@@ -1275,3 +1276,31 @@ Three tests raise the package total to 397, all passing with none skipped. No
 live HID operation was run. Whether the chord now reaches Mission Control is
 not yet established — that needs the next physical session, and this entry is
 written before it.
+
+An unsupported claim is withdrawn, and it is the likely cause of the live
+failure. `EventSynthesisPlan` stated that the wheel click's HID button mask
+`0x04` had been "observed on this MX Ergo on 2026-09-04". The thumb masks were
+observed that day. The wheel click was not — that session's own record lists it
+under *Not observed in this session*, alongside right click and both wheel
+tilts. The value came from `StandardMouseButton.wheel` in `MXErgoCore`, which is
+a specification assumption about how a three-button mouse reports rather than a
+measurement of this trackball.
+
+This is the second time the same author has written a plausible inference into
+this project's audit trail in the voice of an observation, after the
+calibration-panel claim withdrawn on 2026-09-04. Both carried a date that made
+them look sourced.
+
+It matters here because it has a consequence. Wheel click did not open Mission
+Control on either live run of the event layer, while the question of whether
+this device even emits button 2 had never been asked. A binding keyed on a
+button number the device never sends produces exactly the observed behaviour:
+the tap receives the event, finds no binding, and passes it through untouched.
+The constant stays at `2` and is now labelled inferred; one press with the
+calibration panel open settles it.
+
+Two rounds of speculative fixes preceded this, and neither was preceded by a
+measurement. The symbolic-hotkey work in the previous entry stands on its own —
+a chord that never presses its modifier is wrong regardless — but it was
+committed as a fix for a failure whose cause had not been established, which is
+the mistake this project's own runbook exists to prevent.

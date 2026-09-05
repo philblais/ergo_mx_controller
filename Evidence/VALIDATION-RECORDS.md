@@ -453,3 +453,27 @@ mouse's tilt wheel would produce the same discrete horizontal scroll and would
 be remapped identically. The AC Pan stream *is* attributed to this MX Ergo and
 is preference-invariant, so correlating the two streams is the eventual answer
 to that; it was not built here.
+
+### Correction — 2026-09-05, an unsupported claim about the wheel click
+
+`EventSynthesisPlan` carried the comment "HID button masks observed on this MX
+Ergo on 2026-09-04: wheel click `0x04`, lower thumb `0x08`, upper thumb `0x10`".
+
+The thumb masks were observed. **The wheel click was not.** The 2026-09-04
+record lists "right click, wheel click, wheel tilt left, and wheel tilt right"
+under *Not observed in this session*. The value `0x04` was inferred from
+`StandardMouseButton.wheel` in `MXErgoCore`, which is a specification assumption
+about how a three-button mouse reports, not a measurement of this trackball.
+
+The claim is withdrawn. The constant stays at `2`, now labelled as inferred.
+
+This is the second unsupported claim written into this project's audit trail by
+the same author, after the calibration-panel claim withdrawn on 2026-09-04. Both
+took the same shape: a plausible inference recorded in the voice of an
+observation, with a date attached that made it look sourced.
+
+It also has a concrete consequence, which is why it surfaced. Wheel click did
+not open Mission Control on the first two live runs of the event layer, and a
+binding keyed on a button number this device may never emit would produce
+exactly that: the tap sees the event, finds no binding for it, and passes it
+through untouched.

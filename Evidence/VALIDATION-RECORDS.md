@@ -402,3 +402,54 @@ unsound even though its conclusion happened to be right.
 
 The diagnostics did their job. They converted an unfalsifiable argument between
 two hypotheses into a frame of hex that settled it.
+
+### Read-only observation — 2026-09-05, the wheel-tilt sign
+
+**Question.** The event layer must decide which physical tilt a positive
+`scrollWheelEventDeltaAxis2` means. It could not be reasoned out: the device
+reports tilt as AC Pan on the Consumer page, macOS re-publishes it as a scroll
+event, and that translation is affected by the "natural scrolling" preference.
+
+**Conditions.** BetterTouchTool and Logi Options confirmed not running. Menu app
+launched with Input Monitoring and Accessibility granted. The Precision runtime
+was **not** bound; "Scroll axis diagnostics" reuses the same wheel observer in a
+non-suppressing mode. No device was opened, no lease taken, no SET sent, nothing
+suppressed, and no CGEvent posted. `com.apple.swipescrolldirection` read `0` at
+the start of the session.
+
+**Readings.**
+
+| natural scrolling | tilt | AC Pan (IOHID) | CGEvent axis2 |
+|---|---|---|---|
+| off | left | `-1` | `+1` |
+| off | right | `+1` | `-1` |
+| on | left | `-1` | `-1` |
+| on | right | `+1` | `+1` |
+
+All four samples read `discrete`, distinguishing them from a trackpad's
+continuous horizontal scroll.
+
+**What this establishes.**
+
+1. **The CGEvent sign is not a property of the trackball.** It inverts with the
+   preference. A compiled-in constant would be correct under one setting and
+   would silently reverse back and forward under the other. `HorizontalScrollConvention`
+   is now derived from `com.apple.swipescrolldirection` rather than fixed, and
+   `EventSynthesisTap.setConvention` exists so a change while the tap is running
+   can be applied without restarting it.
+
+2. **The AC Pan sign is invariant, and matches the HID specification.** Left is
+   `-1` and right is `+1` under both settings. The `MXErgoObservation.horizontalScroll`
+   comment claiming "positive to the right" was previously a spec claim; it is
+   now an observation.
+
+3. The value previously compiled in as `HorizontalScrollConvention.assumed`
+   — positive means left — was right, but only for natural scrolling off, and
+   only by luck. It was recorded as unverified, and that was the correct
+   description of it.
+
+**What this does not establish.** Nothing about device attribution. A second
+mouse's tilt wheel would produce the same discrete horizontal scroll and would
+be remapped identically. The AC Pan stream *is* attributed to this MX Ergo and
+is preference-invariant, so correlating the two streams is the eventual answer
+to that; it was not built here.

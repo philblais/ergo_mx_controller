@@ -1520,7 +1520,8 @@ struct ObserverMenuView: View {
     }
 
     /// Wheel tilt is an ordinary horizontal scroll axis on this device, not a
-    /// button. Positive is a right tilt.
+    /// button. Positive is a right tilt, confirmed on hardware 2026-09-05 and
+    /// unaffected by the "natural scrolling" preference.
     private func tiltDescription(_ notches: Int) -> String {
         let direction = notches > 0 ? "right" : "left"
         return "\(direction) (\(notches > 0 ? "+" : "")\(notches))"

@@ -5,17 +5,38 @@ import MXErgoEventSynthesis
 
 /// Which physical tilt a positive `scrollWheelEventDeltaAxis2` means.
 ///
-/// UNVERIFIED against this trackball. The device reports tilt as AC Pan on the
-/// Consumer page and macOS republishes it as horizontal scroll, but which sign
-/// corresponds to a left tilt has never been observed here — the 2026-09-04
-/// session confirmed only that tilt moves a carousel, not in which direction
-/// the delta ran. One hardware session settles it, and this is the single
-/// place that decides, so settling it is a one-line change.
+/// Settled on hardware on 2026-09-05, and the answer is that it is **not a
+/// property of the trackball**. The device's own AC Pan value is invariant —
+/// left is `-1` and right is `+1` under every setting — but macOS inverts the
+/// scroll event it publishes from it when "natural scrolling" is on:
+///
+/// | natural scrolling | tilt left | tilt right |
+/// |---|---|---|
+/// | off | axis2 `+1` | axis2 `-1` |
+/// | on  | axis2 `-1` | axis2 `+1` |
+///
+/// So a compiled-in constant would be right for one setting and silently
+/// reverse back and forward for the other. It is derived from the preference
+/// instead, and this is the only place that derives it.
 package enum HorizontalScrollConvention: Sendable, Equatable {
     case positiveIsLeft
     case positiveIsRight
 
-    package static let assumed = HorizontalScrollConvention.positiveIsLeft
+    /// The observed relationship. Natural scrolling on makes the scroll event
+    /// agree with the device's own AC Pan sign; off inverts it.
+    package static func forNaturalScrolling(
+        isEnabled: Bool
+    ) -> HorizontalScrollConvention {
+        isEnabled ? .positiveIsRight : .positiveIsLeft
+    }
+
+    package static func current(
+        in defaults: UserDefaults = .standard
+    ) -> HorizontalScrollConvention {
+        forNaturalScrolling(
+            isEnabled: NaturalScrollDirection.isEnabled(in: defaults)
+        )
+    }
 
     package func direction(
         forDeltaAxis2 delta: Int64
@@ -43,7 +64,7 @@ package enum ObservedEventDecoder {
         deltaAxis1: Int64,
         deltaAxis2: Int64,
         isContinuous: Int64,
-        convention: HorizontalScrollConvention = .assumed
+        convention: HorizontalScrollConvention = .current()
     ) -> ObservedEventKind? {
         switch type {
         case .otherMouseDown:

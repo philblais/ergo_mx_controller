@@ -52,10 +52,13 @@ call site. Both are productless and absent from `project.yml`, the generated
 project, and `App/`, so no signed binary can reach them. Promotion is a separate
 review: a suppressing global event tap is a new capability class.
 
-One thing in it is still unverified against hardware. Which sign of
-`scrollWheelEventDeltaAxis2` a *left* tilt produces has never been observed, so
-back and forward may be reversed. `HorizontalScrollConvention` is the single
-place that decides, and one hardware session settles it.
+**Settled on hardware 2026-09-05:** the wheel-tilt sign is not a property of
+the trackball. The device's own AC Pan value is invariant — left `-1`, right
+`+1` — but macOS inverts the scroll event it publishes from it when "natural
+scrolling" is on. `HorizontalScrollConvention` is therefore derived from
+`com.apple.swipescrolldirection` rather than compiled in, and can be replaced
+under a running tap. Device attribution remains open: a second mouse's tilt
+wheel would be remapped identically.
 
 **Reviewed but deliberately unauthorized:** the five BetterTouchTool-mapped CIDs
 (`0052`, `0053`, `0056`, `005B`, `005D`). Their diversion plan, readiness audit,

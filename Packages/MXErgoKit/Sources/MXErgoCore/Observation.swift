@@ -41,8 +41,13 @@ public enum MXErgoObservation: Sendable, Equatable {
     case outputReportCapabilities(deviceID: String, capabilities: [HIDOutputReportCapability])
     case report(HIDReportSnapshot)
     case verticalScroll(notches: Int)
-    /// Wheel tilt, positive to the right. Observation only: the app does
-    /// not suppress or replace the horizontal scroll macOS already
-    /// delivers.
+    /// Wheel tilt as the device itself reports it: the raw AC Pan value,
+    /// negative for a left tilt and positive for a right one. Confirmed on
+    /// hardware 2026-09-05, and confirmed invariant — unlike the scroll event
+    /// macOS publishes from it, this sign does not move with the "natural
+    /// scrolling" preference.
+    ///
+    /// Observation only: the app does not suppress or replace the horizontal
+    /// scroll macOS already delivers.
     case horizontalScroll(notches: Int)
 }

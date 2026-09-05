@@ -1146,3 +1146,40 @@ by running the suite six times with this milestone stashed: it reproduces at
 It matters because `scripts/verify.sh` is the gate the whole hardware workflow
 rests on, and a gate that goes red at random teaches people to re-run it until
 it is green. Left as-is here rather than fixed inside an unrelated change.
+
+The wheel-tilt sign is settled, and the answer is that there was no sign to
+compile in. Four readings on 2026-09-05, tilting left and right under each
+setting of "natural scrolling", show the device's own AC Pan value invariant at
+`-1` left and `+1` right, while the scroll event macOS publishes from it inverts
+with the preference: axis2 `+1` for a left tilt with natural scrolling off,
+`-1` for the same tilt with it on.
+
+So `HorizontalScrollConvention` was the wrong shape, not merely the wrong value.
+It is now derived from `com.apple.swipescrolldirection` instead of fixed, and
+`EventSynthesisTap.setConvention` exists because that preference can change at
+any moment from System Settings — without it, flipping natural scrolling would
+silently swap back and forward until the tap was restarted. A promotion of this
+layer has to call it from the same refresh path that already re-reads the
+permission statuses.
+
+The constant that was there — positive means left — turns out to have been
+correct, but only for natural scrolling off and only by luck. It was recorded as
+unverified, which was the right description of it; had it shipped, half the
+machines it ran on would have navigated backwards.
+
+Two smaller things follow. The `MXErgoObservation.horizontalScroll` comment
+claiming "positive to the right" was a specification claim repeated from the HID
+usage tables; it is now an observation, and so is the same claim in the tilt row
+of the menu. And the invariance is itself useful: the AC Pan stream is both
+attributed to this MX Ergo and unaffected by the preference, which makes
+correlating it with the CGEvent stream the eventual answer to device
+attribution — a second mouse's tilt wheel is currently indistinguishable and
+would be remapped identically. That was not built here.
+
+The diagnostics that produced the readings reuse the existing wheel tap in a
+non-suppressing mode rather than adding a second one, and are off after every
+launch. Two tests raise the package total to 389, all passing with none
+skipped, including one that runs all four recorded hardware readings back
+through the decoder and asserts a left tilt decodes as a left tilt under both
+settings. No live HID operation was run: no device was opened, no lease taken,
+no SET sent, nothing suppressed, and no CGEvent posted.

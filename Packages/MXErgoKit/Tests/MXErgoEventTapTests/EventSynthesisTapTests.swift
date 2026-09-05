@@ -68,11 +68,27 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
     ) == .scroll(horizontalUnits: -2, verticalUnits: 0, isContinuous: true))
 }
 
-@Test func decoderConventionIsTheOnePlaceThatDecidesWhichSignIsALeftTilt() {
-    // Which sign a left tilt produces has never been observed on this
-    // trackball. It is a single switch so one hardware session settles it.
-    #expect(HorizontalScrollConvention.assumed == .positiveIsLeft)
+@Test func conventionIsDerivedFromNaturalScrollingBecauseTheSignIsNotTheDevices() {
+    // Settled on hardware 2026-09-05. The trackball's own AC Pan value is
+    // invariant — left -1, right +1 — but macOS inverts the scroll event it
+    // publishes from it when natural scrolling is on. A compiled-in constant
+    // would therefore be right for one setting and reverse back and forward
+    // for the other.
+    #expect(HorizontalScrollConvention.forNaturalScrolling(isEnabled: false)
+        == .positiveIsLeft)
+    #expect(HorizontalScrollConvention.forNaturalScrolling(isEnabled: true)
+        == .positiveIsRight)
 
+    let suiteName = "com.phib.MXErgoControllerTests.\(UUID().uuidString)"
+    let defaults = try! #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set(false, forKey: NaturalScrollDirection.preferenceKey)
+    #expect(HorizontalScrollConvention.current(in: defaults) == .positiveIsLeft)
+    defaults.set(true, forKey: NaturalScrollDirection.preferenceKey)
+    #expect(HorizontalScrollConvention.current(in: defaults) == .positiveIsRight)
+}
+
+@Test func conventionDecidesWhichSignIsALeftTiltInBothDirections() {
     #expect(HorizontalScrollConvention.positiveIsLeft.direction(forDeltaAxis2: 1) == .left)
     #expect(HorizontalScrollConvention.positiveIsLeft.direction(forDeltaAxis2: -1) == .right)
     #expect(HorizontalScrollConvention.positiveIsRight.direction(forDeltaAxis2: 1) == .right)
@@ -91,6 +107,32 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
         deltaAxis1: 0, deltaAxis2: 5, isContinuous: 0,
         convention: .positiveIsRight
     ) == .scroll(horizontalUnits: 5, verticalUnits: 0, isContinuous: false))
+}
+
+@Test func bothRecordedHardwarePassesDecodeToTheSamePhysicalDirection() {
+    // The four readings from the 2026-09-05 session, run through the decoder
+    // under the convention each was taken with. A left tilt must decode as a
+    // left tilt in both, which is the whole point of deriving the convention.
+    let recorded: [(naturalScrolling: Bool, deltaAxis2: Int64, tilt: MappedControlHorizontalSwipe)] = [
+        (false, +1, .left),
+        (false, -1, .right),
+        (true, -1, .left),
+        (true, +1, .right),
+    ]
+    for reading in recorded {
+        let convention = HorizontalScrollConvention.forNaturalScrolling(
+            isEnabled: reading.naturalScrolling
+        )
+        // The policy's own convention is that negative units mean a left tilt.
+        let expected = reading.tilt == .left ? -1 : 1
+        #expect(ObservedEventDecoder.decode(
+            type: .scrollWheel, buttonNumber: 0,
+            deltaAxis1: 0, deltaAxis2: reading.deltaAxis2, isContinuous: 0,
+            convention: convention
+        ) == .scroll(
+            horizontalUnits: expected, verticalUnits: 0, isContinuous: false
+        ))
+    }
 }
 
 @Test func decoderRefusesEventTypesOutsideTheMaskSoTheyArePassedThrough() {
@@ -166,7 +208,8 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
     ) -> SuppressionOutcome {
         guard let kind = ObservedEventDecoder.decode(
             type: type, buttonNumber: buttonNumber,
-            deltaAxis1: 0, deltaAxis2: deltaAxis2, isContinuous: 0
+            deltaAxis1: 0, deltaAxis2: deltaAxis2, isContinuous: 0,
+            convention: .forNaturalScrolling(isEnabled: false)
         ) else {
             return .passThrough
         }
@@ -181,8 +224,8 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
     #expect(feed(type: .otherMouseDown, buttonNumber: 4, at: 1) == .suppress)
     #expect(feed(type: .otherMouseUp, buttonNumber: 4, at: 1.05) == .suppress)
     #expect(feed(type: .leftMouseDown, at: 1.1) == .passThrough)
-    // A three-notch flick under the assumed convention: positive is a left
-    // tilt, which the plan binds to back.
+    // A three-notch flick with natural scrolling off, where positive axis2 is
+    // a left tilt, which the plan binds to back.
     #expect(feed(type: .scrollWheel, deltaAxis2: 1, at: 2) == .suppress)
     #expect(feed(type: .scrollWheel, deltaAxis2: 1, at: 2.03) == .suppress)
     #expect(feed(type: .scrollWheel, deltaAxis2: 1, at: 2.06) == .suppress)

@@ -76,7 +76,7 @@ package final class EventSynthesisTap: @unchecked Sendable {
     package func start(
         plan: EventSynthesisPlan,
         latch: HorizontalTiltLatch = HorizontalTiltLatch(),
-        convention: HorizontalScrollConvention = .assumed,
+        convention: HorizontalScrollConvention = .current(),
         poster: SyntheticEventPosting? = nil
     ) throws {
         guard AXIsProcessTrusted() else {
@@ -116,6 +116,19 @@ package final class EventSynthesisTap: @unchecked Sendable {
         }
     }
 
+    /// Applies a new convention to a running tap.
+    ///
+    /// "Natural scrolling" can be changed at any moment from System Settings,
+    /// and it inverts the horizontal delta. Without this, flipping it would
+    /// silently swap back and forward until the tap was restarted. A host must
+    /// call this whenever it refreshes the preference.
+    package func setConvention(_ convention: HorizontalScrollConvention) {
+        lock.lock()
+        let running = loop
+        lock.unlock()
+        running?.setConvention(convention)
+    }
+
     package func stop() {
         lock.lock()
         let running = loop
@@ -128,8 +141,8 @@ package final class EventSynthesisTap: @unchecked Sendable {
 /// The tap's own thread, run loop, and mutable decision state.
 private final class Loop: @unchecked Sendable {
     private let stateLock = NSLock()
-    private let convention: HorizontalScrollConvention
     private let poster: SyntheticEventPosting
+    private var convention: HorizontalScrollConvention
     private var policy: EventSynthesisPolicy
     private var diagnostics = EventSynthesisDiagnostics()
     private var thread: Thread?
@@ -173,6 +186,12 @@ private final class Loop: @unchecked Sendable {
             CFRunLoopStop(loop)
         }
         CFRunLoopWakeUp(loop)
+    }
+
+    func setConvention(_ convention: HorizontalScrollConvention) {
+        stateLock.lock()
+        self.convention = convention
+        stateLock.unlock()
     }
 
     func snapshot() -> EventSynthesisDiagnostics {
@@ -270,6 +289,9 @@ private final class Loop: @unchecked Sendable {
             return passThrough
         }
 
+        stateLock.lock()
+        let convention = self.convention
+        stateLock.unlock()
         guard let kind = ObservedEventDecoder.decode(
             type: type,
             buttonNumber: event.getIntegerValueField(.mouseEventButtonNumber),

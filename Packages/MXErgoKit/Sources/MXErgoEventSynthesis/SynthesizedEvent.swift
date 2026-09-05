@@ -17,6 +17,19 @@ package struct SynthesizedModifiers: OptionSet, Sendable, Equatable {
     package static let option = SynthesizedModifiers(rawValue: 1 << 1)
     package static let command = SynthesizedModifiers(rawValue: 1 << 2)
     package static let shift = SynthesizedModifiers(rawValue: 1 << 3)
+
+    /// Not modifiers a person presses. macOS sets both on a real arrow key,
+    /// which is a keypad-group key reached through Fn. A synthetic arrow that
+    /// omits them is not the same event as the one a keyboard produces, and a
+    /// system hotkey matcher may or may not care — which is the open question
+    /// these exist to answer.
+    package static let numericPad = SynthesizedModifiers(rawValue: 1 << 4)
+    package static let secondaryFunction = SynthesizedModifiers(rawValue: 1 << 5)
+
+    /// The four a key transition can be built from. The other two ride along
+    /// on the key's own flags and never get a press of their own.
+    package static let pressable: SynthesizedModifiers =
+        [.control, .option, .command, .shift]
 }
 
 /// What the layer may inject. Two shapes only, both public CoreGraphics

@@ -125,6 +125,21 @@ package final class CoreGraphicsSyntheticEventPoster: SyntheticEventPosting, @un
         if modifiers.contains(.option) { flags.insert(.maskAlternate) }
         if modifiers.contains(.command) { flags.insert(.maskCommand) }
         if modifiers.contains(.shift) { flags.insert(.maskShift) }
+        if modifiers.contains(.numericPad) { flags.insert(.maskNumericPad) }
+        if modifiers.contains(.secondaryFunction) { flags.insert(.maskSecondaryFn) }
         return flags
+    }
+}
+
+
+/// Posts one reviewed event directly, outside any tap callback.
+///
+/// It exists to separate two failures that look identical from the outside: a
+/// chord the system will not act on at all, and a chord the system will not act
+/// on *when it is posted from inside an event-tap callback*. Those have
+/// different fixes, and no amount of reading the code distinguishes them.
+package enum SyntheticEventDiagnosticPost {
+    package static func post(_ event: SyntheticEvent) throws -> Bool {
+        try CoreGraphicsSyntheticEventPoster().post([event])
     }
 }

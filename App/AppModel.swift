@@ -336,6 +336,29 @@ final class AppModel: ObservableObject {
         return nil
     }
 
+    /// Posts the wheel click's chord directly, outside the tap callback.
+    ///
+    /// A real Control+Up opens Mission Control and the tap's synthetic one does
+    /// not. Either the chord is not something the system will act on, or a
+    /// chord posted from inside an event-tap callback is dropped. These two
+    /// buttons separate those, which reading the code cannot.
+    func postDiagnosticChord(_ chord: EventLayer.DiagnosticChord) {
+        do {
+            let posted = try eventLayer.postDiagnosticChord(chord)
+            eventLayerStatusText = posted
+                ? "Posted Control+Up \(chord.label). Did Mission Control open?"
+                : "The system refused the chord posted \(chord.label)."
+            eventLayerNeedsAttention = !posted
+        } catch let error as EventLayerError {
+            eventLayerStatusText = "Diagnostic post failed: \(error.message)"
+            eventLayerNeedsAttention = true
+        } catch {
+            eventLayerStatusText =
+                "Diagnostic post failed: \(error.localizedDescription)"
+            eventLayerNeedsAttention = true
+        }
+    }
+
     func refreshEventLayerDiagnostics() {
         guard eventLayerEnabled, let diagnostics = eventLayer.diagnostics else {
             eventLayerDiagnosticsSummary = nil

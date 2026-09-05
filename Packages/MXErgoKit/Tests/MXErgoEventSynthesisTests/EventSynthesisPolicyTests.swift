@@ -289,3 +289,27 @@ private func reviewedPolicy(
         SynthesizedKeyStroke(virtualKey: 49, isKeyDown: false, modifiers: []),
     ])
 }
+
+@Test func keypadFlagsRideOnTheKeyAndAreNeverPressedAsModifiers() {
+    // A real arrow key carries the numeric-pad and secondary-function flags,
+    // but nobody presses them: they are a property of the key, not a chord
+    // member, so they must not produce transitions of their own.
+    let strokes = SyntheticKeyChordPlanner.strokes(
+        keyCode: 126,
+        modifiers: [.control, .numericPad, .secondaryFunction]
+    )
+    #expect(strokes == [
+        SynthesizedKeyStroke(virtualKey: 0x3B, isKeyDown: true, modifiers: .control),
+        SynthesizedKeyStroke(
+            virtualKey: 126, isKeyDown: true,
+            modifiers: [.control, .numericPad, .secondaryFunction]
+        ),
+        SynthesizedKeyStroke(
+            virtualKey: 126, isKeyDown: false,
+            modifiers: [.control, .numericPad, .secondaryFunction]
+        ),
+        SynthesizedKeyStroke(virtualKey: 0x3B, isKeyDown: false, modifiers: []),
+    ])
+    #expect(SynthesizedModifiers.pressable == [.control, .option, .command, .shift])
+    #expect(!SynthesizedModifiers.pressable.contains(.numericPad))
+}

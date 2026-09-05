@@ -49,6 +49,8 @@ package enum SyntheticKeyChordPlanner {
         modifiers: SynthesizedModifiers
     ) -> [SynthesizedKeyStroke] {
         let active = modifierOrder.filter { modifiers.contains($0.0) }
+        // Flags that ride on the key without ever being pressed.
+        let passive = modifiers.subtracting(.pressable)
         var strokes: [SynthesizedKeyStroke] = []
         var state: SynthesizedModifiers = []
 
@@ -66,14 +68,14 @@ package enum SyntheticKeyChordPlanner {
             SynthesizedKeyStroke(
                 virtualKey: keyCode,
                 isKeyDown: true,
-                modifiers: state
+                modifiers: state.union(passive)
             )
         )
         strokes.append(
             SynthesizedKeyStroke(
                 virtualKey: keyCode,
                 isKeyDown: false,
-                modifiers: state
+                modifiers: state.union(passive)
             )
         )
         for (modifier, virtualKey) in active.reversed() {

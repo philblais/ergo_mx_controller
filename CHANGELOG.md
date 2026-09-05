@@ -1304,3 +1304,37 @@ measurement. The symbolic-hotkey work in the previous entry stands on its own �
 a chord that never presses its modifier is wrong regardless — but it was
 committed as a fix for a failure whose cause had not been established, which is
 the mistake this project's own runbook exists to prevent.
+
+A real Control+Up opens Mission Control on this machine; the tap's synthetic one
+does not. The counters settle everything upstream of that: `observed 2498 ·
+passed 2476 · suppressed 22 · posted 11 · own 0`, where `suppressed` is exactly
+twice `posted` — one down, one up, one chord per press. The wheel click is seen,
+matched, suppressed, and a chord is posted. The failure is entirely downstream.
+
+The calibration panel also settled the withdrawn claim: `Wheel click down (mask
+0x04)`. The inferred constant was right. It was still an inference when it was
+written down as an observation.
+
+A confound turned up while looking for a second chord to compare against. This
+machine has exactly one Space, so Control+Left and Control+Right cannot switch
+desktops whatever the code does, and the thumb buttons are not evidence of
+anything. All three chords were unverifiable, each for a different reason.
+
+That leaves two candidates and no way to choose between them by reading code:
+the chord is not something the system will act on, or a chord posted from
+*inside an event-tap callback* is dropped. They have different fixes and look
+identical from outside. So this milestone adds the measurement rather than a
+third speculative fix: two buttons post the wheel click's chord from the main
+thread, one byte-for-byte as the tap posts it and one carrying the numeric-pad
+and secondary-function flags that macOS sets on a real arrow key.
+
+If A works and the tap does not, posting from within a callback is the problem.
+If A fails and B works, the flags are. If both fail, neither candidate survives.
+
+`SynthesizedModifiers` grows those two flags, and the planner keeps them off the
+modifier transitions, because nobody presses Fn to type an arrow — they are a
+property of the key. A test pins that.
+
+One test raises the package total to 398, all passing with none skipped. No live
+HID operation was run. The chord's fate is not yet established, and this entry
+is written before the session that settles it.

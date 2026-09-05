@@ -228,10 +228,23 @@ struct ObserverMenuView: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
 
-                Button("Refresh event counts") {
-                    model.refreshEventLayerDiagnostics()
+                HStack {
+                    Button("Refresh event counts") {
+                        model.refreshEventLayerDiagnostics()
+                    }
+                    Button("Post chord A") {
+                        model.postDiagnosticChord(.asTheTapPostsIt)
+                    }
+                    Button("Post chord B") {
+                        model.postDiagnosticChord(.withKeypadFlags)
+                    }
                 }
                 .controlSize(.small)
+
+                Text("A posts Control+Up exactly as the tap does, but from this button instead of from inside the tap callback. B adds the keypad flags a real arrow key carries. Watch whether Mission Control opens.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text("Ordinary left and right clicks are not observed by this tap at all, so this menu always stays reachable to switch it off. The MX Ergo itself is never written to.")
                     .font(.caption2)

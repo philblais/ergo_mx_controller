@@ -45,27 +45,35 @@ Replacing BetterTouchTool for the other five is therefore an event-layer
 problem — observe, suppress, post replacements — with **no device write at
 all**. See [Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md).
 
-**Shipped 2026-09-05, off by default:** that event layer. `MXErgoEventSynthesis`
-decides — a pure value policy with no CoreGraphics import at all — and
-`MXErgoEventTap` acts, holding the project's only `CGEvent.post` call site. Both
-remain productless and `package`-only; the app reaches them through the
-`MXErgoEventLayer` facade, whose public surface is a pinned list.
+**Working, proved on hardware 2026-09-05:** the event layer, which replaces
+BetterTouchTool for all five remaining controls with **no device write at all**.
+Wheel click opens Mission Control, both thumbs switch Spaces, and both wheel
+tilts navigate back and forward.
 
-A toggle in the menu turns it on. It is off after every launch, requires
-Accessibility, and takes over wheel click, both thumbs and both wheel tilts
-globally while it runs — quit BetterTouchTool first or both will act. The
-escape hatch is structural rather than promised: the tap's event mask excludes
-the primary and secondary buttons, so an ordinary click can never be swallowed
-and the menu always stays reachable. Nothing here writes to the trackball, and
-stopping the layer restores everything at once.
+`MXErgoEventSynthesis` decides — a pure value policy with no CoreGraphics import
+at all — and `MXErgoEventTap` acts, holding the project's only `CGEvent.post`
+call site. Both remain productless and `package`-only; the app reaches them
+through the `MXErgoEventLayer` facade, whose public surface is a pinned list.
 
-**Settled on hardware 2026-09-05:** the wheel-tilt sign is not a property of
-the trackball. The device's own AC Pan value is invariant — left `-1`, right
-`+1` — but macOS inverts the scroll event it publishes from it when "natural
-scrolling" is on. `HorizontalScrollConvention` is therefore derived from
-`com.apple.swipescrolldirection` rather than compiled in, and can be replaced
-under a running tap. Device attribution remains open: a second mouse's tilt
-wheel would be remapped identically.
+A toggle in the menu turns it on, off after every launch, requiring
+Accessibility. The escape hatch is structural rather than promised: the tap's
+event mask excludes the primary and secondary buttons, so an ordinary click can
+never be swallowed and the menu always stays reachable. Stopping the layer
+restores everything at once — there is no inverse command to send.
+
+Three findings from making it work, each recorded in
+[Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md):
+
+- A synthetic arrow key must carry the numeric-pad and secondary-function flags
+  a real one does, or the window server's hotkey matcher ignores it. This broke
+  all three chords at once.
+- The horizontal scroll sign is not a property of the trackball. It inverts with
+  the "natural scrolling" preference, so it is derived from that rather than
+  compiled in.
+- BetterTouchTool's back and forward were a three-finger swipe, which every
+  application honours and macOS cannot synthesize. The substitution is the
+  back/forward mouse buttons, plus Command+Arrow for Safari and Finder, which
+  ignore them.
 
 **Reviewed but deliberately unauthorized:** the five BetterTouchTool-mapped CIDs
 (`0052`, `0053`, `0056`, `005B`, `005D`). Their diversion plan, readiness audit,

@@ -635,7 +635,13 @@ them. Safari does not.
 Safari does honour Command+Left and Command+Right, so the plan now carries a
 keyboard alternative used only for applications that ignore the buttons. Arrow
 keys rather than Command+bracket, because a bracket's key code moves with the
-keyboard layout and an arrow's does not. **Untested on hardware.**
+keyboard layout and an arrow's does not.
+
+**Verified on hardware the same day: tilt navigates in Safari.** All five
+controls now work across Chrome, Brave and Safari. The frontmost-application
+switch is exercised in both directions — the same physical tilt produces a mouse
+button in one browser and a chord in another — and nothing regressed where the
+buttons already worked.
 
 **One discrepancy, unresolved.** The same preset labels a trigger "Desktop Left"
 whose action is `Move Right a Space`. Whether the thumb buttons are the way

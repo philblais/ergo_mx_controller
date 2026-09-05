@@ -1548,3 +1548,19 @@ operator wants is for the operator to say.
 
 Two tests raise the package total to 401, all passing with none skipped. No live
 HID operation was run. The Safari alternative is untested on hardware.
+
+Safari navigates. The frontmost-application switch is verified in both
+directions on hardware: the same physical tilt produces a mouse button in Chrome
+and a chord in Safari, and nothing regressed where the buttons already worked.
+
+That completes the event layer. All five controls BetterTouchTool was holding —
+wheel click, both thumbs, both wheel tilts — now work across Chrome, Brave and
+Safari, with no device write at all. Precision, the sixth, has been on the HID++
+runtime since 2026-09-04; it is the only control on this device with no ordinary
+representation, which is why it needed the diversion machinery and why the other
+five did not.
+
+`README.md` is updated to say the layer works rather than that it is built and
+unshipped.
+
+Package total stays 401. No live HID operation was run.

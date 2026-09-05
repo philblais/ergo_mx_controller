@@ -134,21 +134,3 @@ package struct EventSynthesisPlan: Sendable, Equatable {
         }
     }
 }
-
-/// Immutable proof that a review happened and nothing more, in the same shape
-/// as every other plan in this package. It carries no tap, no poster, and no
-/// method that could cause an event to exist.
-package struct EventSynthesisReviewSnapshot: Sendable, Equatable {
-    package let triggers: [String]
-    package let replacements: [String]
-    package let authorization: MappedControlActionSynthesisAuthorization
-
-    package static func makeUnauthorized() throws -> EventSynthesisReviewSnapshot {
-        let plan = try EventSynthesisPlan.reviewed()
-        return EventSynthesisReviewSnapshot(
-            triggers: plan.bindings.map(\.trigger.description),
-            replacements: plan.bindings.map(\.replacement.description),
-            authorization: .notAuthorizedForExecution
-        )
-    }
-}

@@ -6,7 +6,7 @@ changing anything that could reach the trackball.
 ## What this is
 
 A macOS menu-bar app that speaks HID++ 2.0 to one Logitech MX Ergo over BLE.
-Swift 6, SwiftPM package (`Packages/MXErgoKit`, 20 targets) plus an XcodeGen
+Swift 6, SwiftPM package (`Packages/MXErgoKit`, 21 targets) plus an XcodeGen
 project (`project.yml`, 4 app targets). Tests are `swift-testing`, not XCTest.
 
 ## Verify
@@ -24,9 +24,11 @@ tests skip silently without `MX_ERGO_CRASH_HARNESS_PATH`. Use
 
 These are expanded in [SAFETY.md](SAFETY.md). The short form:
 
-1. **Productless targets stay productless.** Fifteen of twenty package targets
-   deliberately have no library product and no app/helper dependency edge.
-   Adding one is a review, not a commit.
+1. **Productless targets stay productless.** Fifteen of twenty-one package
+   targets deliberately have no library product and no app/helper dependency
+   edge. Adding one is a review, not a commit. When a capability does get
+   promoted, it goes behind a facade with a pinned public API list — as the
+   event layer did on 2026-09-05 — not by giving the working target a product.
 2. **One `IOHIDDeviceSetReport` call site** for the Precision runtime, in
    `MXErgoPrecisionIOHIDOutput`. Never add a second. The event layer has the
    matching rule outward: one `CGEvent.post`, in `MXErgoEventTap`.

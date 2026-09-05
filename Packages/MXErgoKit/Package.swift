@@ -13,6 +13,10 @@ let package = Package(
             name: "MXErgoPrecisionRuntimeOwner",
             targets: ["MXErgoPrecisionRuntimeOwner"]
         ),
+        .library(
+            name: "MXErgoEventLayer",
+            targets: ["MXErgoEventLayer"]
+        ),
         .executable(
             name: "MXErgoTransactionCrashHarness",
             targets: ["MXErgoTransactionCrashHarness"]
@@ -39,6 +43,17 @@ let package = Package(
         .target(
             name: "MXErgoEventTap",
             dependencies: ["MXErgoEventSynthesis", "MXErgoCore"]
+        ),
+        // Public executable facade for the event layer. Start, stop, the
+        // reviewed plan, and read-only counters. It exposes no poster, no tap,
+        // no policy, and no way to supply different bindings.
+        .target(
+            name: "MXErgoEventLayer",
+            dependencies: [
+                "MXErgoEventTap",
+                "MXErgoEventSynthesis",
+                "MXErgoCore",
+            ]
         ),
         // Deliberately has no product and no dependency edge from the app.
         // It is compiled only by its tests until the one-control hardware
@@ -207,6 +222,15 @@ let package = Package(
         .testTarget(
             name: "MXErgoHIDTests",
             dependencies: ["MXErgoHID", "MXErgoCore", "MXErgoHIDPP"]
+        ),
+        .testTarget(
+            name: "MXErgoEventLayerTests",
+            dependencies: [
+                "MXErgoEventLayer",
+                "MXErgoEventTap",
+                "MXErgoEventSynthesis",
+                "MXErgoCore",
+            ]
         ),
         .testTarget(
             name: "MXErgoEventSynthesisTests",

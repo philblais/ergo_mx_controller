@@ -45,12 +45,19 @@ Replacing BetterTouchTool for the other five is therefore an event-layer
 problem — observe, suppress, post replacements — with **no device write at
 all**. See [Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md).
 
-**Built, tested, and not shipped:** that event layer, as of 2026-09-04.
-`MXErgoEventSynthesis` decides — a pure value policy with no CoreGraphics import
-at all — and `MXErgoEventTap` acts, holding the project's only `CGEvent.post`
-call site. Both are productless and absent from `project.yml`, the generated
-project, and `App/`, so no signed binary can reach them. Promotion is a separate
-review: a suppressing global event tap is a new capability class.
+**Shipped 2026-09-05, off by default:** that event layer. `MXErgoEventSynthesis`
+decides — a pure value policy with no CoreGraphics import at all — and
+`MXErgoEventTap` acts, holding the project's only `CGEvent.post` call site. Both
+remain productless and `package`-only; the app reaches them through the
+`MXErgoEventLayer` facade, whose public surface is a pinned list.
+
+A toggle in the menu turns it on. It is off after every launch, requires
+Accessibility, and takes over wheel click, both thumbs and both wheel tilts
+globally while it runs — quit BetterTouchTool first or both will act. The
+escape hatch is structural rather than promised: the tap's event mask excludes
+the primary and secondary buttons, so an ordinary click can never be swallowed
+and the menu always stays reachable. Nothing here writes to the trackball, and
+stopping the layer restores everything at once.
 
 **Settled on hardware 2026-09-05:** the wheel-tilt sign is not a property of
 the trackball. The device's own AC Pan value is invariant — left `-1`, right
@@ -99,6 +106,7 @@ Audio execution is disabled after every launch and must be explicitly enabled.
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeAdmission/` — productless package-only explicit-authorization, observer-handoff, canonical-lease, state-policy, and shutdown supervisor
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeHostHandoff/` — productless, IOKit-free exact-run observer drain adapter with mandatory post-stop session and Root evidence reread
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeLifecycle/` — productless owner that binds one observer run into authorization and holds the restart fence through shutdown and rollover
+- `Packages/MXErgoKit/Sources/MXErgoEventLayer/` — public executable façade for the event layer: start, stop, the reviewed bindings, and read-only counters; it exposes no tap, poster, or policy, and its public API list is pinned by a test
 - `Packages/MXErgoKit/Sources/MXErgoEventSynthesis/` — productless, CoreGraphics-free BetterTouchTool-replacement policy; it decides what to suppress and what to inject, and structurally cannot cause an event to exist
 - `Packages/MXErgoKit/Sources/MXErgoEventTap/` — productless CGEvent seam holding the sole `CGEvent.post` call site; refuses to start without Accessibility and fails open on every error path
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeOwner/` — public executable façade for bind, quit, and session rollover; it does not expose admit or a SET sender

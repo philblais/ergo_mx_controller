@@ -17,10 +17,17 @@ Answer each one explicitly. If any answer is yes, stop and tell the user the
 change needs an explicit review rather than a commit.
 
 1. **Does this add a dependency edge out of a productless target?**
-   Fifteen of twenty package targets deliberately have no library product and
-   no app/helper edge, so the linker cannot pull them into a signed binary.
-   Check `Packages/MXErgoKit/Package.swift` — a target is productless if its
-   name appears only in the `targets:` half of the manifest.
+   Fifteen of twenty-one package targets deliberately have no library product,
+   so nothing can link against them directly. Check
+   `Packages/MXErgoKit/Package.swift` — a target is productless if its name
+   appears only in the `targets:` half of the manifest, split on a
+   line-anchored `"\n    targets: ["`.
+
+   Productless does not always mean unreachable: several are reached through
+   `MXErgoPrecisionRuntimeOwner`, and the event layer through
+   `MXErgoEventLayer`. What must stay true is that no app or helper names them
+   directly. Promoting a capability means adding a facade with a pinned public
+   API list, never giving the working target a product.
 
 2. **Does this add a second `IOHIDDeviceSetReport` call site?**
    The Precision runtime has exactly one, in `MXErgoPrecisionIOHIDOutput`.

@@ -3,6 +3,7 @@ import ApplicationServices
 import CoreGraphics
 import Foundation
 import MXErgoCore
+import MXErgoEventLayer
 import MXErgoHID
 import MXErgoHIDPP
 import MXErgoPrecisionRuntimeOwner
@@ -27,6 +28,16 @@ final class AppModel: ObservableObject {
     /// Input Monitoring. Nothing in this build posts events yet; the gate
     /// exists so the requirement is visible before anything depends on it.
     @Published private(set) var accessibilityGranted = AXIsProcessTrusted()
+    /// The BetterTouchTool replacement for the five ordinary-HID controls.
+    /// Promoted 2026-09-05. Off after every launch: enabling it takes over
+    /// wheel click, both thumbs and both wheel tilts globally. It never
+    /// touches the MX Ergo, and stopping it restores everything at once.
+    @Published private(set) var eventLayerEnabled = false
+    @Published private(set) var eventLayerStatusText = "Off"
+    @Published private(set) var eventLayerBindings: [EventLayerBinding] = []
+    @Published private(set) var eventLayerDiagnosticsSummary: String?
+    @Published private(set) var eventLayerLastDecision: String?
+    @Published private(set) var eventLayerNeedsAttention = false
     /// Scroll-axis diagnostics. They exist to settle one question the code
     /// cannot answer by reasoning: which sign of the horizontal CGEvent delta
     /// a *left* wheel tilt produces on this machine. Off after every launch,
@@ -146,6 +157,7 @@ final class AppModel: ObservableObject {
 
     private let observer = MXErgoObserver()
     private let wheelObserver = MXErgoWheelObserver()
+    private let eventLayer = EventLayer()
     private let launchID = UUID()
     private var runtimeOwner: PrecisionRuntimeOwner?
     private var runtimeOwnerSession: DeviceTransactionSession?
@@ -254,6 +266,10 @@ final class AppModel: ObservableObject {
         inputMonitoringGranted = CGPreflightListenEventAccess()
         accessibilityGranted = AXIsProcessTrusted()
         naturalScrollingEnabled = NaturalScrollDirection.isEnabled()
+        // The horizontal scroll sign inverts with this preference, so a
+        // running layer would otherwise navigate backwards until restarted.
+        eventLayer.setNaturalScrolling(enabled: naturalScrollingEnabled)
+        refreshEventLayerDiagnostics()
         refreshRecoveryJournalStatus()
         revalidatePrecisionReadinessEvidence()
         revalidateMappedControlDiversionEvidence()
@@ -270,6 +286,71 @@ final class AppModel: ObservableObject {
         inputMonitoringGranted = CGRequestListenEventAccess()
         guard inputMonitoringGranted else { return }
         restartObserverAfterPermissionGrant()
+    }
+
+    /// Turns the BetterTouchTool replacement on or off.
+    ///
+    /// The escape hatch is structural rather than promised: the tap's event
+    /// mask excludes the primary and secondary buttons, so an ordinary click
+    /// can never be swallowed and this menu stays reachable to switch it off.
+    func setEventLayerEnabled(_ isEnabled: Bool) {
+        guard isEnabled else {
+            eventLayer.stop()
+            eventLayerEnabled = false
+            eventLayerStatusText = "Off"
+            eventLayerDiagnosticsSummary = nil
+            eventLayerLastDecision = nil
+            eventLayerNeedsAttention = false
+            return
+        }
+        guard eventLayerGateFailureText == nil else { return }
+        do {
+            eventLayerBindings = try EventLayerReview.reviewed().bindings
+            naturalScrollingEnabled = NaturalScrollDirection.isEnabled()
+            try eventLayer.start(naturalScrollingEnabled: naturalScrollingEnabled)
+            eventLayerEnabled = true
+            eventLayerNeedsAttention = false
+            eventLayerStatusText =
+                "Active. Wheel click, both thumbs and both tilts are remapped. Quit BetterTouchTool or it will act on them too."
+        } catch let error as EventLayerError {
+            eventLayer.stop()
+            eventLayerEnabled = false
+            eventLayerNeedsAttention = true
+            eventLayerStatusText = "Failed to start: \(error.message)"
+        } catch {
+            eventLayer.stop()
+            eventLayerEnabled = false
+            eventLayerNeedsAttention = true
+            eventLayerStatusText = "Failed to start: \(error.localizedDescription)"
+        }
+    }
+
+    /// Nil when the toggle may be turned on.
+    var eventLayerGateFailureText: String? {
+        if !accessibilityGranted {
+            return "Grant Accessibility first; suppressing events requires it"
+        }
+        if scrollDiagnosticsEnabled {
+            return "Turn off Scroll axis diagnostics first"
+        }
+        return nil
+    }
+
+    func refreshEventLayerDiagnostics() {
+        guard eventLayerEnabled, let diagnostics = eventLayer.diagnostics else {
+            eventLayerDiagnosticsSummary = nil
+            eventLayerLastDecision = nil
+            return
+        }
+        eventLayerDiagnosticsSummary = diagnostics.summary
+        eventLayerLastDecision = diagnostics.lastDecisionDescription
+        if diagnostics.needsAttention {
+            eventLayerNeedsAttention = true
+            eventLayerStatusText = "Active, with "
+                + "\(diagnostics.postFailureCount) failed injections and "
+                + "\(diagnostics.tapReenableCount) tap re-arms. A failed "
+                + "injection passes the original event through unremapped."
+        }
     }
 
     /// Runs the existing wheel tap in a non-suppressing mode so the raw scroll
@@ -304,6 +385,12 @@ final class AppModel: ObservableObject {
     var scrollDiagnosticsGateFailureText: String? {
         if !accessibilityGranted {
             return "Grant Accessibility first; a scroll tap needs it"
+        }
+        // Both would claim the scroll stream, and which one saw an event first
+        // would depend on tap insertion order. Measuring and remapping are
+        // kept exclusive rather than reasoned about.
+        if eventLayerEnabled {
+            return "Turn off the BetterTouchTool replacement first"
         }
         if runtimeOwnerIsBound {
             return "Release the Precision runtime first; it owns the same tap"
@@ -1234,6 +1321,9 @@ final class AppModel: ObservableObject {
                 await refreshRuntimeOwnerFlags()
             }
             stopWheelObserver()
+            // Unlike a diverted control, this needs no inverse anything: the
+            // remapping exists only while the tap does.
+            setEventLayerEnabled(false)
             stop()
             NSApplication.shared.terminate(nil)
         }
@@ -1241,8 +1331,9 @@ final class AppModel: ObservableObject {
 
     /// Opens the Accessibility pane. Deliberately does not use
     /// `AXIsProcessTrustedWithOptions` with the prompt option: a permission
-    /// dialog the user did not ask for is the wrong shape for this app, and the
-    /// grant is only needed once event posting exists.
+    /// dialog the user did not ask for is the wrong shape for this app. The
+    /// grant now gates two real things: the Precision scroll swallow and the
+    /// BetterTouchTool replacement.
     func openAccessibilitySettings() {
         guard let url = URL(
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"

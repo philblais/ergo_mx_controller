@@ -239,7 +239,7 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
     #expect(diagnostics.postFailureCount == 0)
 }
 
-@Test func eventLayerIsProductlessUnwiredAndHoldsExactlyOneInjectionSite() throws {
+@Test func eventLayerReachesTheAppOnlyThroughItsFacadeAndOneInjectionSite() throws {
     let packageRoot = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
@@ -252,22 +252,30 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
         contentsOf: packageRoot.appendingPathComponent("Package.swift"),
         encoding: .utf8
     )
+    // The boundary is line-anchored. Splitting on a bare "targets: ["
+    // truncates at the first *product's* targets list, which left this
+    // check scanning two lines of the manifest.
     let products = try #require(
-        manifest.split(separator: "targets: [", maxSplits: 1).first
+        manifest.split(separator: "\n    targets: [", maxSplits: 1).first
     )
+    // Promoted 2026-09-05: the layer now reaches the app, but only through
+    // MXErgoEventLayer. The two halves that do the work still have no product
+    // of their own, so nothing can link against them directly.
     #expect(!products.contains("MXErgoEventSynthesis"))
     #expect(!products.contains("MXErgoEventTap"))
-    // Declaration, the tap's dependency, and one edge from each test target.
+    #expect(products.contains("MXErgoEventLayer"))
+    // Declaration, the tap's dependency, the facade's dependency, and one edge
+    // from each of three test targets.
     #expect(manifest.components(
         separatedBy: "\"MXErgoEventSynthesis\""
-    ).count - 1 == 4)
-    // Declaration and one edge from its own test target.
+    ).count - 1 == 6)
+    // Declaration, the facade's dependency, and one edge from two test targets.
     #expect(manifest.components(
         separatedBy: "\"MXErgoEventTap\""
-    ).count - 1 == 2)
+    ).count - 1 == 4)
 
-    // Neither module may reach a signed binary. A suppressing global tap is a
-    // new capability class, and promotion is a separate review.
+    // Neither half may be named by the app or the project. Reaching them means
+    // going through the facade, whose surface is fixed and small.
     let projectYAML = try String(
         contentsOf: projectRoot.appendingPathComponent("project.yml"),
         encoding: .utf8
@@ -295,6 +303,14 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
     let tapCode = try codeText(
         under: packageRoot.appendingPathComponent("Sources/MXErgoEventTap")
     )
+    let facadeCode = try codeText(
+        under: packageRoot.appendingPathComponent("Sources/MXErgoEventLayer")
+    )
+    // The facade is the only public surface, and it must stay a facade: no tap
+    // creation, no posting, and no policy of its own.
+    for forbidden in ["CGEvent", "tap" + "Create", ".post" + "(tap:", "NSLock"] {
+        #expect(!facadeCode.contains(forbidden))
+    }
 
     // The policy half decides and cannot cause an event to exist. Keeping
     // CoreGraphics out of it is what makes that checkable rather than claimed.

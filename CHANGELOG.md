@@ -1183,3 +1183,64 @@ skipped, including one that runs all four recorded hardware readings back
 through the decoder and asserts a left tilt decodes as a left tilt under both
 settings. No live HID operation was run: no device was opened, no lease taken,
 no SET sent, nothing suppressed, and no CGEvent posted.
+
+The event layer is promoted. This is the review rule 1 requires, and it takes
+the shape a promotion should: `MXErgoEventSynthesis` and `MXErgoEventTap` keep
+no product and no `public` symbol, and a new `MXErgoEventLayer` facade becomes
+the only thing the app may name. The facade exposes start, stop, the reviewed
+bindings, and read-only counters — no tap, no poster, no policy, and no way for
+a caller to supply different bindings, since the plan is derived from
+`MappedControlActionPlan`. A test pins its public declaration list, so widening
+the surface of the one type that can take over the pointing device means
+editing that list on purpose.
+
+The build-graph diff is what makes the change checkable: `project.pbxproj` gains
+exactly one product dependency and nothing else. That is the whole reason the
+generated file is tracked.
+
+It ships **off after every launch**. Turning it on requires Accessibility and
+takes over wheel click, both thumbs and both wheel tilts globally, which the
+status line says in those words along with the instruction to quit
+BetterTouchTool first. The escape hatch is structural rather than promised: the
+tap's mask excludes the primary and secondary buttons, so an ordinary click
+cannot be swallowed and the menu stays reachable to switch it off. Quitting
+stops the layer, and unlike a diverted control that needs no inverse of any
+kind — the remapping exists only while the tap does.
+
+Two interactions had to be settled rather than reasoned about. The scroll-axis
+diagnostics and the layer both claim the scroll stream, and which one saw an
+event first would depend on tap insertion order, so they are mutually exclusive
+toggles. And the natural-scrolling preference is now pushed into the running tap
+from the same refresh that re-reads the permission statuses; without that,
+flipping it in System Settings would silently swap back and forward until the
+next launch.
+
+`EventLayerReview` deliberately carries no `notAuthorizedForExecution` marker,
+and `EventSynthesisReviewSnapshot`, which did, is deleted. That marker means "a
+review happened and nothing more", and repeating it about a layer that can now
+execute would have been false. The HID++ diversion plans still carry it, because
+for them it is still true.
+
+Promotion also exposed a defect in the mechanism the promotion relies on. The
+isolation tests extract the manifest's products half by splitting on
+`"targets: ["`, which first matches inside the *first product's own* targets
+list — so twelve of those checks were scanning two lines of `Package.swift` and
+asserting absence from almost nothing. The pinned occurrence counts were doing
+the real work, alone. The split is now line-anchored, and the fix was proved by
+adding a product for `MXErgoPrecisionWriteLifecycle` at the end of the list,
+where the truncation used to hide it, and watching the products assertion fail
+at the exact line that could not fail before.
+
+The same look found that `MXErgoPrecisionTransport` had no build-graph isolation
+test at all — the only productless target with none, and an omission rather than
+a deliberate exception like `MXErgoRestoreTrialIOHID`. It has one now: no
+product, absent from `project.yml`, the generated project and `App/`, and a
+pinned count of nineteen manifest occurrences.
+
+`scripts/verify.sh` now also refuses `.post(tap:` and `CGEvent.tapCreate` in
+`App/`. The app goes through the facade; the injection door stays in one place.
+
+Sixteen tests raise the package total to 394, all passing with none skipped, and
+all four signed targets build. No live HID operation was run. Synthetic events
+can now be posted for the first time in this project's history, but only while
+the toggle is on, and none was posted by the test suite.

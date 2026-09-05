@@ -327,8 +327,11 @@ import Testing
         contentsOf: packageRoot.appendingPathComponent("Package.swift"),
         encoding: .utf8
     )
+    // The boundary is line-anchored. Splitting on a bare "targets: ["
+    // truncates at the first *product's* targets list, which left this
+    // check scanning two lines of the manifest.
     let products = try #require(
-        manifest.split(separator: "targets: [", maxSplits: 1).first
+        manifest.split(separator: "\n    targets: [", maxSplits: 1).first
     )
     #expect(!products.contains("MXErgoPrecisionRuntimeComposition"))
     #expect(manifest.components(

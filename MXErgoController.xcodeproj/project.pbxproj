@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		00EDD116090D6243CF9D1A61 /* MXErgoPrecisionRestoreTrialMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16336507DE31113F277B2F6 /* MXErgoPrecisionRestoreTrialMain.swift */; };
 		1A3FB0EA6D7A5822E6F5042D /* MXErgoPrecisionTrialReconcilerMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17AC497E0D5D1B4DE5930E4 /* MXErgoPrecisionTrialReconcilerMain.swift */; };
+		1E2B84D381911174D3606832 /* MXErgoEventLayer in Frameworks */ = {isa = PBXBuildFile; productRef = 01BF93C13AD00BE08F6D4BB1 /* MXErgoEventLayer */; };
 		1FF8E46B8385F0C286E2F3C4 /* MXErgoHID in Frameworks */ = {isa = PBXBuildFile; productRef = FAD352C55ADA1384D1E019F3 /* MXErgoHID */; };
 		2512CA0EC9E6FFA49D811B26 /* MXErgoRestoreTrialProbeMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2DE9A1C82554584878C502 /* MXErgoRestoreTrialProbeMain.swift */; };
 		330D1B1086829E699E9A6D62 /* MXErgoRestoreTrialProbeMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2DE9A1C82554584878C502 /* MXErgoRestoreTrialProbeMain.swift */; };
@@ -82,6 +83,7 @@
 				EBF277F53D0035FB8A14DDAD /* MXErgoHIDPP in Frameworks */,
 				1FF8E46B8385F0C286E2F3C4 /* MXErgoHID in Frameworks */,
 				D7D57A903E050B1DD5048F9D /* MXErgoPrecisionRuntimeOwner in Frameworks */,
+				1E2B84D381911174D3606832 /* MXErgoEventLayer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -209,6 +211,7 @@
 				773B67F0837B968E7E467491 /* MXErgoHIDPP */,
 				FAD352C55ADA1384D1E019F3 /* MXErgoHID */,
 				BE24317AD10B4703CB4C3D96 /* MXErgoPrecisionRuntimeOwner */,
+				01BF93C13AD00BE08F6D4BB1 /* MXErgoEventLayer */,
 			);
 			productName = MXErgoController;
 			productReference = 0B9EC81B52D1AF7E7332EBB0 /* MXErgoController.app */;
@@ -740,6 +743,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		01BF93C13AD00BE08F6D4BB1 /* MXErgoEventLayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MXErgoEventLayer;
+		};
 		24D83B2D8F0F1469A1935BA6 /* MXErgoCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MXErgoCore;

@@ -17,10 +17,14 @@ A capability that can reach hardware is built as a SwiftPM target with **no
 library product** and **no dependency edge from any app or helper**. It is
 compiled and tested, but the linker cannot pull it into a signed binary.
 
-Fifteen of the twenty package targets are productless. Promotion out of that
-state is a separate, explicit review — never a side effect of adding a feature.
+Fifteen of the twenty-one package targets are productless. Promotion out of
+that state is a separate, explicit review — never a side effect of adding a
+feature. It has happened once, to the event layer on 2026-09-05, and it took
+the shape a promotion should: the two targets that do the work stayed
+productless and `package`-only, and a new `MXErgoEventLayer` facade with a
+pinned public API list became the single thing the app may name.
 
-Fifteen build-graph isolation tests enforce this by reading `Package.swift`,
+Sixteen build-graph isolation tests enforce this by reading `Package.swift`,
 `project.yml` and the generated `project.pbxproj` as evidence. They assert the
 target name is absent from the products half of the manifest, that its manifest
 occurrence count is exactly as expected, and that it appears in neither the
@@ -29,6 +33,11 @@ XcodeGen input nor the generated project.
 > The occurrence counts are pinned integers. Adding a legitimate dependency edge
 > will fail them until the number is updated by hand. That is intentional
 > friction: it forces a human to notice the graph changed.
+
+> The products half must be split on a **line-anchored** `"\n    targets: ["`.
+> Splitting on a bare `"targets: ["` truncates at the first *product's* own
+> targets list, which left twelve of these checks scanning two lines of the
+> manifest and passing vacuously until 2026-09-05.
 
 `MXErgoRestoreTrialIOHID` is the one deliberate exception — `project.yml`
 compiles its single source file directly into the trial helper. Its isolation

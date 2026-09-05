@@ -237,22 +237,3 @@ private func reviewedPolicy(
         at: 1.01
     ) == .suppressAndPost([.otherMouseClick(buttonNumber: 4)]))
 }
-
-@Test func reviewSnapshotIsProofOfReviewAndNothingMore() throws {
-    let snapshot = try EventSynthesisReviewSnapshot.makeUnauthorized()
-    #expect(snapshot.authorization == .notAuthorizedForExecution)
-    #expect(snapshot.triggers == [
-        "mouse button 3",
-        "mouse button 4",
-        "mouse button 5",
-        "wheel tilt left",
-        "wheel tilt right",
-    ])
-    #expect(snapshot.replacements == [
-        "Control+key 126",
-        "Control+key 124",
-        "Control+key 123",
-        "mouse button 4",
-        "mouse button 5",
-    ])
-}

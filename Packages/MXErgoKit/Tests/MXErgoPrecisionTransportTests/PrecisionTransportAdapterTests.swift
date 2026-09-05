@@ -1728,3 +1728,61 @@ private func waitUntil(
         try await Task.sleep(nanoseconds: 1_000_000)
     }
 }
+
+@Test func transportTargetHasNoProductAndIsNamedByNoRunnableTarget() throws {
+    // Added 2026-09-05. This was the one productless target with no
+    // build-graph isolation test at all, which went unnoticed because the
+    // shared products-section check was truncating to two lines of manifest.
+    //
+    // Like the Precision runtime's other layers, it is productless but
+    // reachable through the MXErgoPrecisionRuntimeOwner product. What must
+    // stay true is that nothing links against it directly.
+    let packageRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let projectRoot = packageRoot
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+
+    let manifest = try String(
+        contentsOf: packageRoot.appendingPathComponent("Package.swift"),
+        encoding: .utf8
+    )
+    // The boundary is line-anchored. Splitting on a bare "targets: ["
+    // truncates at the first *product's* targets list, which left this
+    // check scanning two lines of the manifest.
+    let products = try #require(
+        manifest.split(separator: "\n    targets: [", maxSplits: 1).first
+    )
+    #expect(!products.contains("MXErgoPrecisionTransport"))
+    // Its own declaration, ten dependency edges from source targets, and
+    // eight from test targets. A pinned integer so a new edge has to be
+    // noticed by a person rather than absorbed silently.
+    #expect(manifest.components(
+        separatedBy: "\"MXErgoPrecisionTransport\""
+    ).count - 1 == 19)
+
+    let projectYAML = try String(
+        contentsOf: projectRoot.appendingPathComponent("project.yml"),
+        encoding: .utf8
+    )
+    let projectFile = try String(
+        contentsOf: projectRoot
+            .appendingPathComponent("MXErgoController.xcodeproj")
+            .appendingPathComponent("project.pbxproj"),
+        encoding: .utf8
+    )
+    #expect(!projectYAML.contains("MXErgoPrecisionTransport"))
+    #expect(!projectFile.contains("MXErgoPrecisionTransport"))
+
+    let appRoot = projectRoot.appendingPathComponent("App")
+    let appText = try FileManager.default.contentsOfDirectory(
+        at: appRoot,
+        includingPropertiesForKeys: nil
+    )
+    .filter { $0.pathExtension == "swift" }
+    .map { try String(contentsOf: $0, encoding: .utf8) }
+    .joined(separator: "\n")
+    #expect(!appText.contains("MXErgoPrecisionTransport"))
+}

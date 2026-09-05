@@ -34,6 +34,7 @@ struct ObserverMenuView: View {
             connectionSection
             protocolSafetySection
             reportSection
+            eventLayerSection
             scrollAxisSection
             calibrationSection
             intentPreviewSection
@@ -87,7 +88,7 @@ struct ObserverMenuView: View {
                     .background(.blue.opacity(0.14), in: Capsule())
             }
 
-            Text("This build does not replace BetterTouchTool for thumb, tilt, or wheel-click actions. Those stay with BTT or native macOS. After Input Monitoring is granted, this window should show reports when you press buttons. Precision mute/volume only work after Bind → Admit, with Audio test on.")
+            Text("Thumb, tilt and wheel-click actions are replaced only while the BetterTouchTool replacement below is switched on; quit BTT first or both will act. After Input Monitoring is granted, this window should show reports when you press buttons. Precision mute/volume only work after Bind → Admit, with Audio test on.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -130,7 +131,7 @@ struct ObserverMenuView: View {
                     model.openAccessibilitySettings()
                 }
                 .controlSize(.small)
-                Text("Required only to post synthetic events, which this build never does. Replacing BetterTouchTool for the thumb buttons, wheel tilt and wheel click will need it; the MX Ergo itself is not affected either way.")
+                Text("Required to suppress and post events: the BetterTouchTool replacement and the Precision scroll swallow both need it. The MX Ergo itself is not affected either way.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -181,6 +182,61 @@ struct ObserverMenuView: View {
                 Text(reportPlaceholder)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// The BetterTouchTool replacement. Off after every launch, because
+    /// enabling it takes over five controls globally.
+    private var eventLayerSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(
+                get: { model.eventLayerEnabled },
+                set: { model.setEventLayerEnabled($0) }
+            )) {
+                Text("Replace BetterTouchTool for thumb, tilt and wheel click")
+                    .font(.subheadline.weight(.medium))
+            }
+            .toggleStyle(.switch)
+            .disabled(model.eventLayerGateFailureText != nil
+                && !model.eventLayerEnabled)
+
+            if let blocked = model.eventLayerGateFailureText,
+               !model.eventLayerEnabled {
+                Text(blocked)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            } else {
+                Text(model.eventLayerStatusText)
+                    .font(.caption)
+                    .foregroundStyle(model.eventLayerNeedsAttention ? .orange : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if model.eventLayerEnabled {
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
+                    ForEach(model.eventLayerBindings, id: \.trigger) { binding in
+                        detailRow(binding.control, "\(binding.intent) · \(binding.replacement)")
+                    }
+                    if let summary = model.eventLayerDiagnosticsSummary {
+                        detailRow("Events", summary)
+                    }
+                    if let last = model.eventLayerLastDecision {
+                        detailRow("Last", last)
+                    }
+                }
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+
+                Button("Refresh event counts") {
+                    model.refreshEventLayerDiagnostics()
+                }
+                .controlSize(.small)
+
+                Text("Ordinary left and right clicks are not observed by this tap at all, so this menu always stays reachable to switch it off. The MX Ergo itself is never written to.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

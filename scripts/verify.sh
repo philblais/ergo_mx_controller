@@ -130,8 +130,11 @@ step "Auditing the shipped binary for dormant-runtime symbols"
 # The owner product legitimately pulls IOHIDDeviceSetReport into the linked
 # image; no menu-app code path invokes it. What must never appear is a direct
 # admission or acquisition entry point in App/ itself.
+# The event layer is promoted, so MXErgoEventLayer legitimately links in. What
+# must never appear in App/ is a direct injection or tap call: the app goes
+# through the facade, which holds the only CGEvent.post site in the package.
 APP_SOURCES="$(cat "$ROOT"/App/*.swift)"
-for forbidden in "PrecisionRuntimeAdmissionFactory" "IOHIDDeviceSetReport" "recoverExplicitly()"; do
+for forbidden in "PrecisionRuntimeAdmissionFactory" "IOHIDDeviceSetReport" "recoverExplicitly()" ".post(tap:" "CGEvent.tapCreate"; do
     if printf '%s' "$APP_SOURCES" | grep -q -- "$forbidden"; then
         fail "App/ sources contain forbidden symbol: $forbidden"
     fi

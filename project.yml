@@ -30,6 +30,8 @@ targets:
         product: MXErgoHID
       - package: MXErgoKit
         product: MXErgoPrecisionRuntimeOwner
+      - package: MXErgoKit
+        product: MXErgoEventLayer
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.phib.MXErgoController

@@ -14,6 +14,7 @@
 		1FF8E46B8385F0C286E2F3C4 /* MXErgoHID in Frameworks */ = {isa = PBXBuildFile; productRef = FAD352C55ADA1384D1E019F3 /* MXErgoHID */; };
 		2512CA0EC9E6FFA49D811B26 /* MXErgoRestoreTrialProbeMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2DE9A1C82554584878C502 /* MXErgoRestoreTrialProbeMain.swift */; };
 		330D1B1086829E699E9A6D62 /* MXErgoRestoreTrialProbeMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2DE9A1C82554584878C502 /* MXErgoRestoreTrialProbeMain.swift */; };
+		34F446B155AD03D7A5240923 /* DiagnosticsLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9175B8C2EC0DE64EEAF9F58F /* DiagnosticsLog.swift */; };
 		3B2AF5C1C9C58EABE8D6ACB9 /* SystemAudioController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD28653404612B540652D52E /* SystemAudioController.swift */; };
 		4E2942025AC908EEE5BAD64A /* ObserverMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FEE79EFE5F56DE29757335A /* ObserverMenuView.swift */; };
 		4FB6F95669FB93C097D5B3BD /* DormantPrecisionTrialIOHIDAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBDB53288DAE70670DFE03D4 /* DormantPrecisionTrialIOHIDAdapter.swift */; };
@@ -40,6 +41,7 @@
 		8594F8F14B3862793C321423 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		87F68AD7261860C6617DF429 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		8FEE79EFE5F56DE29757335A /* ObserverMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObserverMenuView.swift; sourceTree = "<group>"; };
+		9175B8C2EC0DE64EEAF9F58F /* DiagnosticsLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsLog.swift; sourceTree = "<group>"; };
 		BE289F4BC281431C5B6857B1 /* LoginItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginItemController.swift; sourceTree = "<group>"; };
 		C16336507DE31113F277B2F6 /* MXErgoPrecisionRestoreTrialMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MXErgoPrecisionRestoreTrialMain.swift; sourceTree = "<group>"; };
 		CC7C593CB498BC8C443241DA /* MXErgoPrecisionRestoreTrial.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MXErgoPrecisionRestoreTrial.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -129,6 +131,7 @@
 			children = (
 				87F68AD7261860C6617DF429 /* AppModel.swift */,
 				00BA11000A7AF938BF353FE7 /* Assets.xcassets */,
+				9175B8C2EC0DE64EEAF9F58F /* DiagnosticsLog.swift */,
 				D130BB3AD1AAE9AC86150C7D /* FrontmostApplicationTracker.swift */,
 				BE289F4BC281431C5B6857B1 /* LoginItemController.swift */,
 				E22D7BEB46F2A0DE6E3471D2 /* MXErgoControllerApp.swift */,
@@ -352,6 +355,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9FDAE12A29269D9E1AD8DF66 /* AppModel.swift in Sources */,
+				34F446B155AD03D7A5240923 /* DiagnosticsLog.swift in Sources */,
 				64AF9F568D610E354EC96C4D /* FrontmostApplicationTracker.swift in Sources */,
 				1EFDDE037285759C043F0112 /* LoginItemController.swift in Sources */,
 				61D415B9DBFF16DA8FF01C00 /* MXErgoControllerApp.swift in Sources */,

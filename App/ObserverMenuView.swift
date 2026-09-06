@@ -36,6 +36,7 @@ struct ObserverMenuView: View {
             protocolSafetySection
             reportSection
             eventLayerSection
+            diagnosticsLogSection
             loginItemSection
             scrollAxisSection
             calibrationSection
@@ -185,6 +186,27 @@ struct ObserverMenuView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var diagnosticsLogSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(
+                get: { model.diagnosticsLogEnabled },
+                set: { model.setDiagnosticsLogEnabled($0) }
+            )) {
+                Text("Write diagnostics log")
+                    .font(.subheadline.weight(.medium))
+            }
+            .toggleStyle(.switch)
+
+            Text(model.diagnosticsLogEnabled
+                ? "Recording to \(model.diagnosticsLogPath)"
+                : "Off. Records button reports and the layer's counters to a file, so a session can be read back exactly instead of transcribed. Pointer movement is never recorded.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
         }
     }
 

@@ -39,6 +39,13 @@ final class AppModel: ObservableObject {
     @Published private(set) var eventLayerLastDecision: String?
     @Published private(set) var eventLayerLastObserved: String?
     @Published private(set) var eventLayerObservedButtons = "none yet"
+    /// Off by default. Writes observed reports and layer counters to a file so
+    /// a session can be read back exactly instead of transcribed.
+    ///
+    /// Persisted, so it can be turned on without the menu — which is the point
+    /// when the person reading the log is not the person pressing the button.
+    @Published private(set) var diagnosticsLogEnabled =
+        UserDefaults.standard.bool(forKey: AppModel.diagnosticsLogPreferenceKey)
     @Published private(set) var eventLayerNeedsAttention = false
     /// What the layer should be on next launch. Kept separate from
     /// `eventLayerEnabled`, which is what it is doing right now: a remembered
@@ -169,9 +176,15 @@ final class AppModel: ObservableObject {
     private let eventLayer = EventLayer()
     private let frontmostApplication = FrontmostApplicationTracker()
     private let loginItem = LoginItemController()
+    private lazy var diagnosticsLog = DiagnosticsLog(
+        url: Self.journalFileURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("diagnostics.log")
+    )
     /// Set once when an autostart fails for a reason granting a permission
     /// will not fix, so a foreground refresh does not retry it forever.
     private var eventLayerAutostartAbandoned = false
+    private var loggedLastObserved: String?
     private let launchID = UUID()
     private var runtimeOwner: PrecisionRuntimeOwner?
     private var runtimeOwnerSession: DeviceTransactionSession?
@@ -201,6 +214,9 @@ final class AppModel: ObservableObject {
     init() {
         refreshRecoveryJournalStatus()
         refreshLoginItemStatus()
+        if diagnosticsLogEnabled {
+            diagnosticsLog.start()
+        }
         // A remembered "on" arms here, not on first menu open: the point of
         // remembering is that the trackball works before anyone looks at it.
         autostartEventLayerIfRemembered()
@@ -313,6 +329,29 @@ final class AppModel: ObservableObject {
     /// The escape hatch is structural rather than promised: the tap's event
     /// mask excludes the primary and secondary buttons, so an ordinary click
     /// can never be swallowed and this menu stays reachable to switch it off.
+    static let diagnosticsLogPreferenceKey =
+        "com.phib.MXErgoController.diagnosticsLog"
+
+    var diagnosticsLogPath: String { diagnosticsLog.path }
+
+    func setDiagnosticsLogEnabled(_ isEnabled: Bool) {
+        diagnosticsLogEnabled = isEnabled
+        UserDefaults.standard.set(
+            isEnabled,
+            forKey: Self.diagnosticsLogPreferenceKey
+        )
+        if isEnabled {
+            diagnosticsLog.start()
+            diagnosticsLog.append(
+                "layer enabled=\(eventLayerEnabled) "
+                    + "accessibility=\(accessibilityGranted) "
+                    + "inputMonitoring=\(inputMonitoringGranted)"
+            )
+        } else {
+            diagnosticsLog.stop()
+        }
+    }
+
     func refreshLoginItemStatus() {
         loginItemStatus = loginItem.status
         loginItemStatusText = loginItemStatus.message
@@ -463,6 +502,16 @@ final class AppModel: ObservableObject {
         }
         if eventLayerObservedButtons != diagnostics.observedButtonsDescription {
             eventLayerObservedButtons = diagnostics.observedButtonsDescription
+            if diagnosticsLogEnabled {
+                diagnosticsLog.append(
+                    "tap buttons seen: \(diagnostics.observedButtonsDescription)"
+                )
+            }
+        }
+        if diagnosticsLogEnabled, let observed = diagnostics.lastObservedDescription,
+           observed != loggedLastObserved {
+            loggedLastObserved = observed
+            diagnosticsLog.append("tap saw \(observed) · \(diagnostics.summary)")
         }
         if diagnostics.needsAttention {
             eventLayerNeedsAttention = true
@@ -2327,6 +2376,15 @@ final class AppModel: ObservableObject {
             if shouldRecordForCalibration {
                 calibrationReportBuffer.append(report)
                 calibrationReports = calibrationReportBuffer.elements
+                if diagnosticsLogEnabled {
+                    diagnosticsLog.append(
+                        "hid report id=\(report.reportID) "
+                            + "len=\(report.length) bytes="
+                            + report.preview
+                                .map { String(format: "%02X", $0) }
+                                .joined(separator: " ")
+                    )
+                }
             }
         case let .verticalScroll(notches):
             wheelEventCount += 1

@@ -1786,3 +1786,36 @@ something not being started.
 
 Package total stays 405, all passing with none skipped. No live HID operation
 was run.
+
+The "Button 12" hypothesis is disproven and the original finding stands.
+Precision emits **no HID report at all**: with unfiltered logging and the ball
+held still, the observer's own counter began at `#1` during the ball movement
+that followed, so nothing arrived during a 44-second window of five or six
+presses — and that movement then produced 651 reports, proving the observer and
+the logger were working. Byte 2, where buttons 9 to 16 live, is `00` in every
+sampled report, and the tap never saw a fourth button.
+
+The control is the point. The previous two attempts at this measurement failed
+for the same reason in different clothes: the first used a latest-value row that
+the act of checking overwrote, and the second filtered reports through the very
+single-byte button mask whose blind spot it had been added to look past. This
+one logs everything and ends with an action known to produce reports, so silence
+during the press window means something.
+
+That was three instruments in a row built with a defect the previous round had
+already named. The habit worth keeping is not "measure first" — that was learned
+this morning — but "say what result would prove the instrument works, and
+produce that result in the same run".
+
+So Precision is confirmed as the one control on this device with no
+representation outside HID++, the diversion runtime was necessary, and it stays
+the only thing that has ever written to this trackball. What that costs is real
+and is now the honest position: Precision does not survive a reboot and cannot
+be made to without a device write at login, which nothing in this project's
+design permits doing unattended.
+
+The unfiltered logging is kept. The filtered version was actively misleading and
+the volume is bounded by the existing 512 KB wrap.
+
+Package total stays 405, all passing with none skipped. No live HID operation
+was run; the trackball was not written to at any point in this investigation.

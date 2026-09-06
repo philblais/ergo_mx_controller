@@ -687,3 +687,56 @@ the process, not by pressing anything.
 
 **The low process id is incidental but consistent** with launching at login
 rather than being started by hand afterwards.
+
+### Read-only observation — 2026-09-06, Precision emits nothing over ordinary HID
+
+**Question.** The 2026-08-25 BetterTouchTool preset triggers all three Precision
+bindings as `BTTTriggerTypeNormalMouse`, described as **Button 12**. If macOS
+delivers Precision as an ordinary mouse button it needs no HID++ diversion, the
+event layer could hold it permanently, and it would survive a reboot.
+
+**Conditions.** `/Applications` Release build, relaunched and verified by start
+time against the binary's build time. Both loops confirmed running by sampling
+threads: `InputLoop` for raw HID, `EventSynthesis` for the tap. Unfiltered
+logging: **every** report written, not only those whose button mask changed.
+No device write, no lease, no SET.
+
+**Readings.**
+
+| | |
+|---|---|
+| Log opened | 12:00:56 |
+| Precision pressed 5–6 times, ball still | 12:00:56 → 12:01:40 |
+| **First report the observer ever received** | **`#1` at 12:01:40** — the first ball movement |
+| Ball moved | 12:01:40 → 12:02:21, reaching report `#651` |
+| Byte 1 (buttons 1–8) values seen | `00`, `01` |
+| **Byte 2 (buttons 9–16) values seen** | **`00` only** |
+| Tap `buttons seen` | `3, 4, 5` — never grew |
+
+**What this establishes.** Precision produces **no HID report at all**. The
+observer's own counter began at `#1` during the ball movement, so nothing
+arrived during the press window; and the movement that followed produced 651
+reports, which proves the observer and the logger were working. That is the
+control the previous two attempts lacked.
+
+Buttons 9 to 16 live in byte 2, which is `00` in all 97 sampled reports. A
+button 12 would have set it. The tap, whose mask admits `otherMouseDown` for
+every button number, never saw a fourth button either.
+
+**So the "Button 12" hypothesis is disproven**, and the 2026-09-04 finding
+stands after all: Precision is the one control on this device with no
+representation outside HID++. The diversion runtime was necessary, and remains
+the only thing that has ever written to this trackball.
+
+**Residual uncertainty, stated rather than hidden.** A BLE device can sleep, and
+a wake latency could swallow a first press. That would not account for five or
+six presses across a 44-second window, and it does not explain byte 2 never
+being set — but it is why this is recorded as strong evidence rather than proof.
+
+**What it does not explain.** How BetterTouchTool drove Precision without
+diverting. The same preset carries an "MX Ergo device access" entry
+(`BTTTriggerType` 1324), which suggests BTT opened the device directly rather
+than relying on ordinary HID. The 2026-08-27 baseline recorded all nine controls
+at `flags 0000` while BTT was in daily use, so either BTT diverts and restores
+around each use, or it reads the vendor interface by some other means. Not
+investigated, and not needed: this app already has a working path.

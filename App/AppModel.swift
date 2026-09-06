@@ -2346,6 +2346,19 @@ final class AppModel: ObservableObject {
             inspectedOutputCapabilityDeviceIDs.insert(deviceID)
         case let .report(report):
             lastReport = report
+            // Every report, unfiltered. An earlier version of this logged only
+            // reports whose `standardMouseButtonMask` changed — the same
+            // single-byte check that can only see buttons 1 to 8, so it would
+            // have discarded the very report it was added to look for.
+            if diagnosticsLogEnabled {
+                diagnosticsLog.append(
+                    "hid report #\(report.count) id=\(report.reportID) "
+                        + "len=\(report.length) bytes="
+                        + report.preview
+                            .map { String(format: "%02X", $0) }
+                            .joined(separator: " ")
+                )
+            }
             var shouldRecordForCalibration = report.isLogitechVendorReport
             let now = ProcessInfo.processInfo.systemUptime
 
@@ -2376,15 +2389,6 @@ final class AppModel: ObservableObject {
             if shouldRecordForCalibration {
                 calibrationReportBuffer.append(report)
                 calibrationReports = calibrationReportBuffer.elements
-                if diagnosticsLogEnabled {
-                    diagnosticsLog.append(
-                        "hid report id=\(report.reportID) "
-                            + "len=\(report.length) bytes="
-                            + report.preview
-                                .map { String(format: "%02X", $0) }
-                                .joined(separator: " ")
-                    )
-                }
             }
         case let .verticalScroll(notches):
             wheelEventCount += 1

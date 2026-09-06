@@ -338,13 +338,11 @@ private final class Loop: @unchecked Sendable {
         case .scroll:
             break
         }
-        let decision = policy.decide(
+        let applied = EventSynthesisDecisionApplier.apply(
             kind,
             at: timestamp,
-            frontmostBundleIdentifier: frontmost
-        )
-        let applied = EventSynthesisDecisionApplier.apply(
-            decision,
+            frontmostBundleIdentifier: frontmost,
+            policy: &policy,
             poster: poster,
             diagnostics: &diagnostics
         )

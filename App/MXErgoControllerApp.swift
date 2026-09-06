@@ -79,7 +79,9 @@ private struct ControllerStatusMenu: View {
         if let intent = model.lastIntent {
             Text("Last preview: \(intent.name)")
         }
-        Text("Buttons are not remapped. Keep BetterTouchTool for thumb, tilt, and wheel-click.")
+        Text(model.eventLayerEnabled
+            ? "Button remapping active. Keep BetterTouchTool quit to avoid duplicate actions."
+            : "Button remapping inactive. Open the controller to enable it.")
 
         if model.status == .stopped {
             Button("Start observer") {

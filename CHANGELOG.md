@@ -1819,3 +1819,39 @@ the volume is bounded by the existing 512 KB wrap.
 
 Package total stays 405, all passing with none skipped. No live HID operation
 was run; the trackball was not written to at any point in this investigation.
+
+
+The first daily-use hardening milestone repairs paired input on replacement
+failure. Previously the policy marked a button as suppressed before the event
+poster could build its replacement. When construction failed, the down passed
+through but its up was swallowed. The event applier now evaluates a policy copy,
+prepares the replacement, and commits the candidate state only when preparation
+succeeds. On failure it preserves the prior tilt state and records a button
+press as passed through until its release.
+
+A held button retains that first disposition. Repeated downs for a suppressed
+press are suppressed without another replacement; repeated downs for a
+passed-through press remain passed through without another preparation attempt.
+Both dispositions are cleared on release or stop. A failed tilt replacement no
+longer consumes the repeat interval: the next actual notch may be processed
+normally. No failed event is replayed.
+
+The menu now reports whether ordinary remapping is active, the Accessibility
+label describes its current requirement, and Precision guidance identifies the
+separate ordinary-remapping switch. The diagnostics description also states
+that raw reports can contain pointer movement; the logger's behavior was not
+changed.
+
+Five regression tests raise the package total from 405 to 410. Four of the new
+tests reproduced the input defects before the fix; the reset test already
+passed. That pre-fix run also encountered two existing asynchronous timeout
+failures. The unchanged baseline suite had passed, and the complete post-fix
+run passed all 410 tests with none skipped, without changing those timeout
+paths. The main app and all three helpers built successfully, and the supported
+verification script passed its signing and isolation checks.
+
+No package product, dependency edge, event-posting site, suppressing tap,
+Precision operation, or journal behavior was added or changed. Normal macOS
+termination and genuinely fresh session evidence remain the next milestone and
+require their own lifecycle review. This build was not installed or launched
+for a physical validation session. No live HID operation was run.

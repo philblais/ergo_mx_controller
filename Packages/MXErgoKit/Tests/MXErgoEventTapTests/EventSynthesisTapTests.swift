@@ -253,7 +253,9 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
         }
         diagnostics.observedCount += 1
         switch EventSynthesisDecisionApplier.apply(
-            policy.decide(kind, at: timestamp),
+            kind,
+            at: timestamp,
+            policy: &policy,
             poster: poster,
             diagnostics: &diagnostics
         ) {
@@ -282,6 +284,132 @@ private final class RecordingPoster: SyntheticEventPosting, @unchecked Sendable 
     #expect(diagnostics.observedCount == 5)
     #expect(diagnostics.suppressedCount == 5)
     #expect(diagnostics.postFailureCount == 0)
+}
+
+/// Exercises the same decision/preparation sequence as the tap without opening
+/// a tap or posting system events. Delivery only updates the fake's record.
+private func applyObservedEvent(
+    _ event: ObservedEventKind,
+    at timestamp: TimeInterval,
+    policy: inout EventSynthesisPolicy,
+    poster: RecordingPoster,
+    diagnostics: inout EventSynthesisDiagnostics
+) -> SuppressionOutcome {
+    switch EventSynthesisDecisionApplier.apply(
+        event,
+        at: timestamp,
+        policy: &policy,
+        poster: poster,
+        diagnostics: &diagnostics
+    ) {
+    case .passThrough:
+        return .passThrough
+    case let .suppress(delivery):
+        delivery?.deliver()
+        return .suppress
+    }
+}
+
+@Test func failedReplacementPassesBothPressAndReleaseForEveryBoundButton() throws {
+    for button in [2, 3, 4] {
+        var policy = EventSynthesisPolicy(plan: try EventSynthesisPlan.reviewed())
+        var diagnostics = EventSynthesisDiagnostics()
+        let failed = RecordingPoster(canBuild: false)
+        let working = RecordingPoster()
+
+        #expect(applyObservedEvent(.otherMouseDown(buttonNumber: button), at: 1,
+            policy: &policy, poster: failed, diagnostics: &diagnostics) == .passThrough)
+        #expect(applyObservedEvent(.otherMouseUp(buttonNumber: button), at: 1.1,
+            policy: &policy, poster: failed, diagnostics: &diagnostics) == .passThrough)
+        #expect(failed.delivered.isEmpty)
+        #expect(diagnostics.postFailureCount == 1)
+
+        // A new physical press may remap normally after the failed pair ends.
+        #expect(applyObservedEvent(.otherMouseDown(buttonNumber: button), at: 2,
+            policy: &policy, poster: working, diagnostics: &diagnostics) == .suppress)
+        #expect(applyObservedEvent(.otherMouseUp(buttonNumber: button), at: 2.1,
+            policy: &policy, poster: working, diagnostics: &diagnostics) == .suppress)
+        #expect(working.delivered.count == 1)
+        #expect(policy.heldSuppressedButtons.isEmpty)
+    }
+}
+
+@Test func repeatedDownAfterFailedPreparationPassesUntilTheRelease() throws {
+    var policy = EventSynthesisPolicy(plan: try EventSynthesisPlan.reviewed())
+    var diagnostics = EventSynthesisDiagnostics()
+    let failed = RecordingPoster(canBuild: false)
+    let working = RecordingPoster()
+
+    #expect(applyObservedEvent(.otherMouseDown(buttonNumber: 3), at: 1,
+        policy: &policy, poster: failed, diagnostics: &diagnostics) == .passThrough)
+    #expect(applyObservedEvent(.otherMouseDown(buttonNumber: 3), at: 1.1,
+        policy: &policy, poster: working, diagnostics: &diagnostics) == .passThrough)
+    #expect(applyObservedEvent(.otherMouseUp(buttonNumber: 3), at: 1.2,
+        policy: &policy, poster: working, diagnostics: &diagnostics) == .passThrough)
+    #expect(working.prepared.isEmpty)
+    #expect(policy.heldSuppressedButtons.isEmpty)
+}
+
+@Test func repeatedSuppressedDownDoesNotPrepareAnotherReplacement() throws {
+    var policy = EventSynthesisPolicy(plan: try EventSynthesisPlan.reviewed())
+    var diagnostics = EventSynthesisDiagnostics()
+    let working = RecordingPoster()
+    let failed = RecordingPoster(canBuild: false)
+
+    #expect(applyObservedEvent(.otherMouseDown(buttonNumber: 4), at: 1,
+        policy: &policy, poster: working, diagnostics: &diagnostics) == .suppress)
+    #expect(applyObservedEvent(.otherMouseDown(buttonNumber: 4), at: 1.1,
+        policy: &policy, poster: working, diagnostics: &diagnostics) == .suppress)
+    #expect(applyObservedEvent(.otherMouseDown(buttonNumber: 4), at: 1.2,
+        policy: &policy, poster: failed, diagnostics: &diagnostics) == .suppress)
+    // Waiting does not change the held button's disposition.
+    #expect(applyObservedEvent(.otherMouseUp(buttonNumber: 4), at: 20,
+        policy: &policy, poster: failed, diagnostics: &diagnostics) == .suppress)
+    #expect(working.delivered.count == 1)
+    #expect(diagnostics.postFailureCount == 0)
+}
+
+@Test func failedTiltPreparationDoesNotConsumeTheNextNotch() throws {
+    var policy = EventSynthesisPolicy(plan: try EventSynthesisPlan.reviewed())
+    var diagnostics = EventSynthesisDiagnostics()
+    let failed = RecordingPoster(canBuild: false)
+    let working = RecordingPoster()
+    let tilt = ObservedEventKind.scroll(
+        horizontalUnits: -1, verticalUnits: 0, isContinuous: false
+    )
+
+    #expect(applyObservedEvent(tilt, at: 1,
+        policy: &policy, poster: failed, diagnostics: &diagnostics) == .passThrough)
+    #expect(applyObservedEvent(tilt, at: 1.01,
+        policy: &policy, poster: failed, diagnostics: &diagnostics) == .passThrough)
+    #expect(applyObservedEvent(tilt, at: 1.02,
+        policy: &policy, poster: working, diagnostics: &diagnostics) == .suppress)
+    #expect(applyObservedEvent(tilt, at: 1.03,
+        policy: &policy, poster: working, diagnostics: &diagnostics) == .suppress)
+    #expect(diagnostics.postFailureCount == 2)
+    #expect(working.delivered == [.otherMouseClick(buttonNumber: 3)])
+}
+
+@Test func resetClearsBothSuppressedAndPassedThroughHeldButtons() throws {
+    var policy = EventSynthesisPolicy(plan: try EventSynthesisPlan.reviewed())
+    var diagnostics = EventSynthesisDiagnostics()
+    let failed = RecordingPoster(canBuild: false)
+    let working = RecordingPoster()
+
+    _ = applyObservedEvent(.otherMouseDown(buttonNumber: 3), at: 1,
+        policy: &policy, poster: failed, diagnostics: &diagnostics)
+    _ = applyObservedEvent(.otherMouseDown(buttonNumber: 4), at: 1.1,
+        policy: &policy, poster: working, diagnostics: &diagnostics)
+    policy.reset()
+    for button in [3, 4] {
+        #expect(applyObservedEvent(.otherMouseUp(buttonNumber: button), at: 2,
+            policy: &policy, poster: working, diagnostics: &diagnostics) == .passThrough)
+        #expect(applyObservedEvent(.otherMouseDown(buttonNumber: button), at: 3,
+            policy: &policy, poster: working, diagnostics: &diagnostics) == .suppress)
+        #expect(applyObservedEvent(.otherMouseUp(buttonNumber: button), at: 3.1,
+            policy: &policy, poster: working, diagnostics: &diagnostics) == .suppress)
+    }
+    #expect(working.delivered.count == 3)
 }
 
 @Test func eventLayerReachesTheAppOnlyThroughItsFacadeAndOneInjectionSite() throws {

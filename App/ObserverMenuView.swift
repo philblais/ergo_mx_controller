@@ -118,7 +118,7 @@ struct ObserverMenuView: View {
                 Text(
                     model.accessibilityGranted
                         ? "Accessibility granted"
-                        : "Accessibility not granted (not needed yet)"
+                        : "Accessibility needed for button remapping and Precision volume"
                 )
             } icon: {
                 Image(
@@ -202,7 +202,7 @@ struct ObserverMenuView: View {
 
             Text(model.diagnosticsLogEnabled
                 ? "Recording to \(model.diagnosticsLogPath)"
-                : "Off. Records button reports and the layer's counters to a file, so a session can be read back exactly instead of transcribed. Pointer movement is never recorded.")
+                : "Off. Records raw HID reports and the layer's counters to a file, including reports containing pointer movement, so a session can be read back exactly instead of transcribed.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1113,7 +1113,7 @@ struct ObserverMenuView: View {
                     Task { await model.confirmRuntimeOwnerAdmission() }
                 }
             } message: {
-                Text("BetterTouchTool and Logi Options must be fully quit. This stops the current observer, opens the Precision runtime, and can change CID 00ED. After admit, Precision tap mutes and hold+scroll changes volume only when Audio test is on. Other buttons stay with the OS or BetterTouchTool. Deactivate before quit if you need Precision restored; quit does not send an inverse SET.")
+                Text("BetterTouchTool and Logi Options must be fully quit. This stops the current observer, opens the Precision runtime, and can change CID 00ED. After admit, Precision tap mutes and hold+scroll changes volume only when Audio test is on. Thumb buttons, wheel tilt and wheel click use the separate button-remapping switch. Deactivate before quit if you need Precision restored; quit does not send an inverse SET.")
             }
 
             Button("Recover Precision…") {
@@ -1254,7 +1254,7 @@ struct ObserverMenuView: View {
 
             Divider()
 
-            Text("While admitted, Precision tap mutes and hold+scroll changes volume when Audio test is on. If the trackball disconnects, this app shuts down without a restore SET and shows recovery-required. After rollover, start the observer on the new connection, review readiness, bind, then confirm Recover Precision to send one restore SET. Reconnect never auto-retries. Other buttons stay with the OS/BetterTouchTool.")
+            Text("While admitted, Precision tap mutes and hold+scroll changes volume when Audio test is on. If the trackball disconnects, this app shuts down without a restore SET and shows recovery-required. After rollover, start the observer on the new connection, review readiness, bind, then confirm Recover Precision to send one restore SET. Reconnect never auto-retries. Thumb buttons, wheel tilt and wheel click use the separate button-remapping switch.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

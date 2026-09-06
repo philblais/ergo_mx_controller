@@ -23,7 +23,33 @@ package enum AppliedDecision {
 /// an event swallowed" — is exercised by ordinary tests with a fake poster,
 /// rather than only by installing a real tap on a real session.
 package enum EventSynthesisDecisionApplier {
+    /// Commit gesture state only once we know what the callback will return.
+    /// Otherwise a failed build passes the down but swallows its up, or consumes
+    /// a tilt's repeat interval without ever delivering its replacement.
     package static func apply(
+        _ event: ObservedEventKind,
+        at timestamp: TimeInterval,
+        frontmostBundleIdentifier: String? = nil,
+        policy: inout EventSynthesisPolicy,
+        poster: SyntheticEventPosting,
+        diagnostics: inout EventSynthesisDiagnostics
+    ) -> AppliedDecision {
+        var candidate = policy
+        let decision = candidate.decide(
+            event, at: timestamp,
+            frontmostBundleIdentifier: frontmostBundleIdentifier
+        )
+        let applied = apply(decision, poster: poster, diagnostics: &diagnostics)
+        if case .suppressAndPost = decision, case .passThrough = applied {
+            policy.recordReplacementFailure(for: event)
+        } else {
+            policy = candidate
+        }
+        return applied
+    }
+
+    // Only the transactional entry point above is exposed across the package.
+    static func apply(
         _ decision: EventSynthesisDecision,
         poster: SyntheticEventPosting,
         diagnostics: inout EventSynthesisDiagnostics

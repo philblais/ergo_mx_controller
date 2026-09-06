@@ -31,6 +31,13 @@ package struct EventSynthesisDiagnostics: Sendable, Equatable {
     package var lastDecisionDescription: String?
     /// The last event the tap decoded, whatever was done with it.
     package var lastObservedDescription: String?
+    /// Every distinct mouse button this tap has ever decoded.
+    ///
+    /// A single "last seen" row is overwritten by whatever is touched next,
+    /// which makes it useless for the question "does this button exist at
+    /// all". A set answers that whenever the button is pressed, in any order,
+    /// and nothing can erase it.
+    package var observedButtonNumbers: Set<Int> = []
 
     package init() {}
 }
@@ -325,6 +332,12 @@ private final class Loop: @unchecked Sendable {
         stateLock.lock()
         diagnostics.observedCount += 1
         diagnostics.lastObservedDescription = kind.description
+        switch kind {
+        case let .otherMouseDown(buttonNumber), let .otherMouseUp(buttonNumber):
+            diagnostics.observedButtonNumbers.insert(buttonNumber)
+        case .scroll:
+            break
+        }
         let decision = policy.decide(
             kind,
             at: timestamp,

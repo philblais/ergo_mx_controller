@@ -1758,3 +1758,31 @@ being deleted — it is the only thing that has ever written to this device, and
 its evidence is the audit trail.
 
 No live HID operation was run.
+
+A single "last seen" row was the wrong instrument. Asked to press wheel click
+and then Precision, the reported reading was a horizontal scroll — a tilt, not a
+click — which means either the click never reached the row or something touched
+afterwards overwrote it. Whichever it was, the control failed, so the Precision
+reading it was meant to validate establishes nothing.
+
+The instrument is the defect, not the reading. A row that shows only the most
+recent event answers "what happened just now" and cannot answer "does this
+button exist at all", because the act of checking generates events that erase
+the evidence. `observedButtonNumbers` is a set: any button that ever arrives
+joins it, in any order, and nothing removes it. The menu shows it as **Buttons
+seen**.
+
+This is the same lesson as the A/B chord measurement earlier today — an
+observable the measurement itself disturbs — and it is the second time it has
+cost a round trip. The pattern worth remembering: prefer an accumulating record
+over a latest-value one whenever the question is existential rather than
+temporal.
+
+Both loops were confirmed running in the copy under test by sampling its
+threads: `InputLoop` for raw HID observation and `EventSynthesis` for the tap.
+So both the raw-report panel and the tap diagnostics are live, and a Precision
+press that produces nothing in either is meaningful rather than an artefact of
+something not being started.
+
+Package total stays 405, all passing with none skipped. No live HID operation
+was run.

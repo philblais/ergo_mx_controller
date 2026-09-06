@@ -38,6 +38,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var eventLayerDiagnosticsSummary: String?
     @Published private(set) var eventLayerLastDecision: String?
     @Published private(set) var eventLayerLastObserved: String?
+    @Published private(set) var eventLayerObservedButtons = "none yet"
     @Published private(set) var eventLayerNeedsAttention = false
     /// What the layer should be on next launch. Kept separate from
     /// `eventLayerEnabled`, which is what it is doing right now: a remembered
@@ -459,6 +460,9 @@ final class AppModel: ObservableObject {
         }
         if eventLayerLastObserved != diagnostics.lastObservedDescription {
             eventLayerLastObserved = diagnostics.lastObservedDescription
+        }
+        if eventLayerObservedButtons != diagnostics.observedButtonsDescription {
+            eventLayerObservedButtons = diagnostics.observedButtonsDescription
         }
         if diagnostics.needsAttention {
             eventLayerNeedsAttention = true

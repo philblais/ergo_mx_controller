@@ -273,6 +273,7 @@ struct ObserverMenuView: View {
                         "Events",
                         model.eventLayerDiagnosticsSummary ?? "none yet"
                     )
+                    detailRow("Buttons seen", model.eventLayerObservedButtons)
                     detailRow(
                         "Last seen",
                         model.eventLayerLastObserved ?? "nothing yet"

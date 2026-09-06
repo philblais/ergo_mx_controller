@@ -98,6 +98,8 @@ public struct EventLayerDiagnostics: Sendable, Equatable {
     /// The last event the tap decoded, whether or not it was rebound. This is
     /// how an unbound button reveals itself.
     public let lastObservedDescription: String?
+    /// Every distinct mouse button seen, one-based as a person counts them.
+    public let observedButtons: [Int]
 
     /// `own` is the load-bearing number on a first run. This layer both
     /// swallows mouse buttons 3 and 4 and injects them, so it has to recognise
@@ -112,6 +114,12 @@ public struct EventLayerDiagnostics: Sendable, Equatable {
 
     /// Surfaced separately because these two are the ones that mean something
     /// is wrong rather than merely busy.
+    public var observedButtonsDescription: String {
+        observedButtons.isEmpty
+            ? "none yet"
+            : observedButtons.map(String.init).joined(separator: ", ")
+    }
+
     public var needsAttention: Bool {
         postFailureCount > 0 || tapReenableCount > 0
     }
@@ -233,7 +241,8 @@ public final class EventLayer: @unchecked Sendable {
                 postFailureCount: $0.postFailureCount,
                 tapReenableCount: $0.tapReenableCount,
                 lastDecisionDescription: $0.lastDecisionDescription,
-                lastObservedDescription: $0.lastObservedDescription
+                lastObservedDescription: $0.lastObservedDescription,
+                observedButtons: $0.observedButtonNumbers.sorted().map { $0 + 1 }
             )
         }
     }

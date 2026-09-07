@@ -28,6 +28,9 @@ struct ObserverMenuView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
+            if let message = model.terminationStatusText {
+                Text(message).font(.caption).foregroundStyle(.secondary)
+            }
 
             Divider()
 
@@ -72,6 +75,7 @@ struct ObserverMenuView: View {
             }
         }
         .padding(16)
+        .disabled(model.isTerminating)
         .frame(width: 370)
         .onAppear { model.refreshPermissionStatus() }
     }

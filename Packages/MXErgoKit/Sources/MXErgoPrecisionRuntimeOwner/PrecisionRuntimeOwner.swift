@@ -67,6 +67,7 @@ public actor PrecisionRuntimeOwner {
     private var diversionStatusHandler:
         (@Sendable (PrecisionRuntimeOwnerDiversionStatus) -> Void)?
     private var deviceDisconnected = false
+    private var quitRequested = false
     private var recoverLockedAfterAmbiguousSET = false
     public nonisolated let precisionHeld = PrecisionHeldFlag()
 
@@ -146,12 +147,14 @@ public actor PrecisionRuntimeOwner {
     public func setControlEventHandler(
         _ handler: (@Sendable (ControllerIntent) -> Void)?
     ) {
+        guard !quitRequested else { return }
         controlEventHandler = handler
     }
 
     public func setDiversionStatusHandler(
         _ handler: (@Sendable (PrecisionRuntimeOwnerDiversionStatus) -> Void)?
     ) {
+        guard !quitRequested else { return }
         diversionStatusHandler = handler
     }
 
@@ -292,6 +295,7 @@ public actor PrecisionRuntimeOwner {
         rootGenerationProvider: @escaping @Sendable () async throws -> UInt64,
         nowUptimeNanoseconds: UInt64
     ) async throws {
+        guard !quitRequested else { throw PrecisionRuntimeOwnerError.notBound }
         guard explicitlyConfirmed else {
             throw PrecisionRuntimeOwnerError.explicitConfirmationRequired
         }
@@ -329,6 +333,7 @@ public actor PrecisionRuntimeOwner {
                     Task { await self?.handleDeviceDisconnected() }
                 }
             )
+            guard !quitRequested else { throw PrecisionRuntimeOwnerError.notBound }
             if deviceDisconnected {
                 await handleDeviceDisconnected()
             }
@@ -362,6 +367,7 @@ public actor PrecisionRuntimeOwner {
     public func confirmDeactivation(
         explicitlyConfirmed: Bool
     ) async throws {
+        guard !quitRequested else { throw PrecisionRuntimeOwnerError.notBound }
         guard explicitlyConfirmed else {
             throw PrecisionRuntimeOwnerError.explicitConfirmationRequired
         }
@@ -404,13 +410,16 @@ public actor PrecisionRuntimeOwner {
     /// Quit path. Shuts down an admitted runtime if one exists and never
     /// releases the observer restart fence. It does not send an inverse SET.
     public func prepareForQuit() async {
+        quitRequested = true
+        controlEventHandler = nil
+        diversionStatusHandler = nil
         precisionHeld.set(false)
         _ = await lifecycle.shutdown()
         await publishDiversionStatus()
     }
 
     public func noteVerticalScroll(notches: Int, at timestamp: TimeInterval) {
-        guard !deviceDisconnected else { return }
+        guard !deviceDisconnected, !quitRequested else { return }
         let intents = eventPump.processVerticalScroll(
             notches: notches,
             at: timestamp
@@ -420,7 +429,7 @@ public actor PrecisionRuntimeOwner {
     }
 
     func deliverUnsolicitedHIDPP(_ bytes: [UInt8]) {
-        guard !deviceDisconnected else { return }
+        guard !deviceDisconnected, !quitRequested else { return }
         let intents = eventPump.processHIDPPNotification(
             bytes,
             at: ProcessInfo.processInfo.systemUptime
@@ -493,6 +502,7 @@ public actor PrecisionRuntimeOwner {
 
     private func publishDiversionStatus() async {
         let status = await currentDiversionStatus()
+        guard !quitRequested else { return }
         diversionStatusHandler?(status)
     }
 }
@@ -517,6 +527,8 @@ private func mapped(
     case .alreadyAdmitted:
         return .alreadyAdmitted
     case .notAdmitted:
+        return .notAdmitted
+    case .shuttingDown:
         return .notAdmitted
     case .invalidAuthorizationBinding:
         return .invalidIntent

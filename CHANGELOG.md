@@ -1855,3 +1855,35 @@ Precision operation, or journal behavior was added or changed. Normal macOS
 termination and genuinely fresh session evidence remain the next milestone and
 require their own lifecycle review. This build was not installed or launched
 for a physical validation session. No live HID operation was run.
+
+
+The termination-hardening portion of the second daily-use milestone routes
+normal AppKit termination and the menu's Quit action through one main-actor
+coordinator. It closes admission and input execution synchronously, then waits
+for runtime shutdown, any already-started firmware migration, and observer
+teardown. A ten-second reply deadline cancels the quit request without
+cancelling or duplicating physical cleanup. Controls stay disabled; a later
+Quit joins the same cleanup or exits once it has completed. Uncertain observer
+release cancels termination.
+
+Runtime shutdown now also joins admission that was already pending. Even if
+that admission ignores cancellation and returns a session late, the lifecycle
+drains the session exactly once before completing shutdown. Bound shutdown is
+terminal, and the observer restart fence remains held. The owner drops late
+input/status callbacks and refuses new admission after quit begins. App-level
+callbacks cannot restart observation or persist a late discovery baseline
+during termination.
+
+Nine regression tests raise the package total from 410 to 419, all passing
+without skips. Coverage includes duplicate quit requests, deadline expiry with
+cleanup still running, late successful cleanup, uncertain release, pending
+admission success and failure, retained restart fences, and suppressed late
+owner callbacks. The full verification script passed the main-app and three
+helper builds, signing checks, and isolation audits. Normal quit, logout, and
+shutdown still require user-attended validation with the actual device.
+
+This is milestone 2A only. Replacing captured session evidence with current,
+provenance-bound observations remains milestone 2B and requires its own review.
+No package product, dependency edge, SET site, retry, automatic restore, or new
+journal write was added. The build was not installed or launched. No live HID
+operation was run.

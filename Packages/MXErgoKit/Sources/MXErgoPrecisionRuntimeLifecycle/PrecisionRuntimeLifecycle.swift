@@ -12,6 +12,7 @@ package enum PrecisionRuntimeLifecycleError: Error, Sendable, Equatable {
     case restartFenceUnavailable
     case alreadyAdmitted
     case notAdmitted
+    case shuttingDown
     case stillOwningRuntime
     case alreadyReleased
     case invalidAuthorizationBinding
@@ -64,6 +65,9 @@ package actor PrecisionRuntimeLifecycle {
     private let hostHandoff: any PrecisionRuntimeHostHandoff
     private let releaseFence: FenceReleaser
     private var session: (any PrecisionRuntimeLifecycleSession)?
+    private var admissionTask: Task<any PrecisionRuntimeLifecycleSession, Error>?
+    private var shutdownTask: Task<PrecisionRuntimeShutdownReport?, Never>?
+    private var shutdownRequested = false
 
     /// Read-only. Available whenever a session exists, regardless of phase.
     package func inputDiagnostics() async -> PrecisionInputDiagnostics? {
@@ -209,9 +213,30 @@ package actor PrecisionRuntimeLifecycle {
             deviceDisconnectHandler: deviceDisconnectHandler,
             nowProvider: nowProvider
         )
-        let session = try await admit(configuration)
-        self.session = session
-        phaseStorage = .admitted
+        // Reserve admission before suspension so shutdown can join a late result.
+        let pending = Task { try await admit(configuration) }
+        admissionTask = pending
+        do {
+            let acquired = try await withTaskCancellationHandler {
+                try await pending.value
+            } onCancel: {
+                pending.cancel()
+            }
+            guard !shutdownRequested else {
+                _ = await shutdown()
+                throw PrecisionRuntimeLifecycleError.shuttingDown
+            }
+            session = acquired
+            admissionTask = nil
+            if Task.isCancelled {
+                _ = await shutdown()
+                throw CancellationError()
+            }
+            phaseStorage = .admitted
+        } catch {
+            if !shutdownRequested { admissionTask = nil }
+            throw error
+        }
     }
 
     package func reviewIntent(
@@ -249,27 +274,42 @@ package actor PrecisionRuntimeLifecycle {
     }
 
     package func shutdown() async -> PrecisionRuntimeShutdownReport? {
-        switch phaseStorage {
-        case .admitted:
-            break
-        case .shutDown, .released, .bound:
-            return nil
+        if let shutdownTask { return await shutdownTask.value }
+        if phaseStorage == .released { return lastShutdownReportStorage }
+        shutdownRequested = true
+        let pending = admissionTask
+        let active = session
+        pending?.cancel()
+        let task = Task<PrecisionRuntimeShutdownReport?, Never> {
+            // Cancellation is logical only. Even an admission that ignores it
+            // must finish, and its late session must drain before quit can finish.
+            let acquired: (any PrecisionRuntimeLifecycleSession)?
+            if let active {
+                acquired = active
+            } else if let pending {
+                acquired = try? await pending.value
+            } else {
+                acquired = nil
+            }
+            let report = await acquired?.shutdown()
+            self.session = nil
+            self.admissionTask = nil
+            self.lastShutdownReportStorage = report
+            self.phaseStorage = .shutDown
+            return report
         }
-        guard let session else {
-            phaseStorage = .shutDown
-            return nil
-        }
-        let report = await session.shutdown()
-        self.session = nil
-        lastShutdownReportStorage = report
-        phaseStorage = .shutDown
-        return report
+        shutdownTask = task
+        return await task.value
     }
 
     /// Releases the observer restart fence only after the runtime is gone or
     /// when admission never began. Quit and abandonment keep the fence.
     @discardableResult
     package func releaseObserverRestartFence() throws -> Bool {
+        guard admissionTask == nil,
+              !shutdownRequested || phaseStorage == .shutDown || phaseStorage == .released else {
+            throw PrecisionRuntimeLifecycleError.stillOwningRuntime
+        }
         switch phaseStorage {
         case .admitted:
             throw PrecisionRuntimeLifecycleError.stillOwningRuntime
@@ -284,6 +324,12 @@ package actor PrecisionRuntimeLifecycle {
     }
 
     private func requireBound() throws {
+        guard !shutdownRequested else {
+            throw PrecisionRuntimeLifecycleError.shuttingDown
+        }
+        guard admissionTask == nil else {
+            throw PrecisionRuntimeLifecycleError.alreadyAdmitted
+        }
         switch phaseStorage {
         case .bound:
             return
@@ -297,6 +343,9 @@ package actor PrecisionRuntimeLifecycle {
     }
 
     private func requireAdmitted() throws {
+        guard !shutdownRequested else {
+            throw PrecisionRuntimeLifecycleError.shuttingDown
+        }
         guard phaseStorage == .admitted, session != nil else {
             throw PrecisionRuntimeLifecycleError.notAdmitted
         }

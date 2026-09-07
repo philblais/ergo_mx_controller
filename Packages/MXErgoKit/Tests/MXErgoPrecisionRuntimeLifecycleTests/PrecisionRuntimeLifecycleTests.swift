@@ -96,7 +96,7 @@ import Testing
     )
 
     #expect(await owner.shutdown() == nil)
-    #expect(await owner.phase == .bound)
+    #expect(await owner.phase == .shutDown)
     #expect(try await owner.releaseObserverRestartFence())
     #expect(await owner.phase == .released)
     #expect(events.values == ["release"])
@@ -465,8 +465,16 @@ private struct LifecycleStubHandoff: PrecisionRuntimeHostHandoff {
 private actor LifecycleFakeSession: PrecisionRuntimeLifecycleSession {
     private let events: LockedLifecycleEvents
     private let boundIntent: PrecisionRuntimeAdmissionIntent
+    private let shutdownStarted: LifecycleTestGate?
+    private let shutdownRelease: LifecycleTestGate?
 
-    init(events: LockedLifecycleEvents, observerRunID: UUID = UUID()) {
+    init(
+        events: LockedLifecycleEvents, observerRunID: UUID = UUID(),
+        shutdownStarted: LifecycleTestGate? = nil,
+        shutdownRelease: LifecycleTestGate? = nil
+    ) {
+        self.shutdownStarted = shutdownStarted
+        self.shutdownRelease = shutdownRelease
         self.events = events
         boundIntent = lifecycleIntent(observerRunID: observerRunID)
     }
@@ -507,6 +515,8 @@ private actor LifecycleFakeSession: PrecisionRuntimeLifecycleSession {
 
     func shutdown() async -> PrecisionRuntimeShutdownReport {
         events.append("shutdown")
+        shutdownStarted?.open()
+        await shutdownRelease?.wait()
         return PrecisionRuntimeShutdownReport(
             disposition: .stateUnavailable("test"),
             deviceCloseReturn: 0
@@ -532,4 +542,148 @@ private final class LockedLifecycleEvents: @unchecked Sendable {
     func append(_ value: String) {
         lock.withLock { storage.append(value) }
     }
+}
+
+
+private final class LifecycleTestGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var opened = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let immediate = lock.withLock {
+                if opened { return true }
+                waiters.append(continuation)
+                return false
+            }
+            if immediate { continuation.resume() }
+        }
+    }
+
+    func open() {
+        let pending = lock.withLock {
+            opened = true
+            let pending = waiters
+            waiters.removeAll()
+            return pending
+        }
+        pending.forEach { $0.resume() }
+    }
+}
+
+private func makeTerminationRaceLifecycle(events: LockedLifecycleEvents) -> PrecisionRuntimeLifecycle {
+    let runID = UUID()
+    return PrecisionRuntimeLifecycle(
+        intent: lifecycleIntent(observerRunID: runID),
+        fence: MXErgoObserverRestartFence(
+            fenceID: UUID(), capturedRunID: runID, observerID: UUID()
+        ),
+        hostHandoff: LifecycleStubHandoff(observerRunID: runID, events: events),
+        releaseFence: { _ in events.append("release"); return true }
+    )
+}
+
+@Test func shutdownDrainsLateAdmissionOnceBeforeAnyCallerCanFinish() async throws {
+    let events = LockedLifecycleEvents()
+    let owner = makeTerminationRaceLifecycle(events: events)
+    let started = LifecycleTestGate()
+    let cancelled = LifecycleTestGate()
+    let admissionRelease = LifecycleTestGate()
+    let shutdownStarted = LifecycleTestGate()
+    let shutdownRelease = LifecycleTestGate()
+    let admitting = Task {
+        try await owner.admit(
+            authorization: lifecycleAuthorization(), competitorProbe: { [] },
+            sessionProvider: { lifecycleSession() }, rootGenerationProvider: { 1 },
+            admit: { _ in
+                await withTaskCancellationHandler {
+                    started.open()
+                    await admissionRelease.wait()
+                    return LifecycleFakeSession(
+                        events: events, shutdownStarted: shutdownStarted,
+                        shutdownRelease: shutdownRelease
+                    )
+                } onCancel: { cancelled.open() }
+            }
+        )
+    }
+    await started.wait()
+    await #expect(throws: PrecisionRuntimeLifecycleError.alreadyAdmitted) {
+        try await owner.admit(
+            authorization: lifecycleAuthorization(), competitorProbe: { [] },
+            sessionProvider: { lifecycleSession() }, rootGenerationProvider: { 1 },
+            admit: { _ in Issue.record("second admission must not run"); return LifecycleFakeSession(events: events) }
+        )
+    }
+    let firstShutdown = Task { await owner.shutdown() }
+    await cancelled.wait()
+    let secondShutdown = Task { await owner.shutdown() }
+    await #expect(throws: PrecisionRuntimeLifecycleError.stillOwningRuntime) {
+        _ = try await owner.releaseObserverRestartFence()
+    }
+    admissionRelease.open()
+    await shutdownStarted.wait()
+    #expect(await owner.phase != .admitted)
+    #expect(events.values == ["shutdown"])
+    await #expect(throws: PrecisionRuntimeLifecycleError.stillOwningRuntime) {
+        _ = try await owner.releaseObserverRestartFence()
+    }
+    shutdownRelease.open()
+    let firstReport = await firstShutdown.value
+    let secondReport = await secondShutdown.value
+    #expect(firstReport == secondReport)
+    #expect(firstReport?.disposition == .stateUnavailable("test"))
+    await #expect(throws: PrecisionRuntimeLifecycleError.shuttingDown) {
+        try await admitting.value
+    }
+    #expect(await owner.phase == .shutDown)
+    #expect(events.values == ["shutdown"])
+    #expect(try await owner.releaseObserverRestartFence())
+    #expect(events.values == ["shutdown", "release"])
+}
+
+@Test func shutdownBeforeAdmissionIsTerminalAndKeepsTheFence() async throws {
+    let events = LockedLifecycleEvents()
+    let owner = makeTerminationRaceLifecycle(events: events)
+    #expect(await owner.shutdown() == nil)
+    #expect(await owner.shutdown() == nil)
+    #expect(await owner.phase == .shutDown)
+    await #expect(throws: PrecisionRuntimeLifecycleError.shuttingDown) {
+        try await owner.admit(
+            authorization: lifecycleAuthorization(), competitorProbe: { [] },
+            sessionProvider: { lifecycleSession() }, rootGenerationProvider: { 1 },
+            admit: { _ in Issue.record("shutdown must close admission"); return LifecycleFakeSession(events: events) }
+        )
+    }
+    #expect(events.values.isEmpty)
+}
+
+@Test func failedPendingAdmissionStillCompletesSharedShutdown() async throws {
+    let events = LockedLifecycleEvents()
+    let owner = makeTerminationRaceLifecycle(events: events)
+    let started = LifecycleTestGate()
+    let cancelled = LifecycleTestGate()
+    let release = LifecycleTestGate()
+    let admitting = Task {
+        try await owner.admit(
+            authorization: lifecycleAuthorization(), competitorProbe: { [] },
+            sessionProvider: { lifecycleSession() }, rootGenerationProvider: { 1 },
+            admit: { _ in
+                try await withTaskCancellationHandler {
+                    started.open()
+                    await release.wait()
+                    throw LifecycleTestError.admit
+                } onCancel: { cancelled.open() }
+            }
+        )
+    }
+    await started.wait()
+    let shutdown = Task { await owner.shutdown() }
+    await cancelled.wait()
+    release.open()
+    #expect(await shutdown.value == nil)
+    await #expect(throws: LifecycleTestError.admit) { try await admitting.value }
+    #expect(await owner.phase == .shutDown)
+    #expect(events.values.isEmpty)
 }

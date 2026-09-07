@@ -10,6 +10,46 @@ import MXErgoPrecisionRuntimeOwner
 
 @MainActor
 final class AppModel: ObservableObject {
+    @Published private(set) var isTerminating = false
+    @Published private(set) var terminationStatusText: String?
+    private var firmwareMigrationTask: Task<Void, Never>?
+    private var termination: ApplicationTerminationCoordinator?
+
+    private func makeTerminationCoordinator() -> ApplicationTerminationCoordinator {
+        ApplicationTerminationCoordinator(
+            closeAdmission: { [weak self] in
+                guard let self else { return }
+                isTerminating = true
+                pendingObserverRestart = false
+                disableAudioForTermination()
+                setEventLayerEnabled(false, remembering: false)
+                stopWheelObserver()
+            },
+            cleanup: { [weak self] in
+                guard let self else { return false }
+                if let owner = runtimeOwner { await owner.prepareForQuit() }
+                await firmwareMigrationTask?.value
+                let closed = await observer.stopAndWaitForTermination()
+                stop()
+                diagnosticsLog.stop()
+                return closed
+            },
+            reply: { NSApplication.shared.reply(toApplicationShouldTerminate: $0) },
+            stateChanged: { [weak self] state in
+                switch state {
+                case .idle: self?.terminationStatusText = nil
+                case .draining: self?.terminationStatusText = "Finishing device cleanup…"
+                case .waitingAfterDeadline:
+                    self?.terminationStatusText = "Quit was cancelled while device cleanup continues. Controls remain off; try Quit again from the menu bar after cleanup finishes."
+                case .ready:
+                    self?.terminationStatusText = "Device cleanup finished. Choose Quit from the menu bar to exit."
+                case .blocked:
+                    self?.terminationStatusText = "Device release could not be verified. Quit was cancelled and controls remain off."
+                }
+            },
+            waitForDeadline: { try await Task.sleep(for: .seconds(10)) }
+        )
+    }
     @Published private(set) var status: ObserverStatus = .stopped
     @Published private(set) var devices: [HIDDeviceProperties] = []
     @Published private(set) var outputReportCapabilitiesByDevice: [String: [HIDOutputReportCapability]] = [:]
@@ -242,6 +282,7 @@ final class AppModel: ObservableObject {
     }
 
     func bootstrapOnLaunch() {
+        guard !isTerminating else { return }
         guard !didBootstrap else { return }
         didBootstrap = true
         requestInputMonitoringIfNeeded()
@@ -250,6 +291,7 @@ final class AppModel: ObservableObject {
     }
 
     func start() {
+        guard !isTerminating else { return }
         guard status == .stopped else { return }
         guard !runtimeOwnerBlocksRestart else {
             runtimeOwnerStatusText =
@@ -315,6 +357,7 @@ final class AppModel: ObservableObject {
     }
 
     func requestInputMonitoringIfNeeded() {
+        guard !isTerminating else { return }
         if CGPreflightListenEventAccess() {
             inputMonitoringGranted = true
             return
@@ -335,6 +378,7 @@ final class AppModel: ObservableObject {
     var diagnosticsLogPath: String { diagnosticsLog.path }
 
     func setDiagnosticsLogEnabled(_ isEnabled: Bool) {
+        guard !isTerminating || !isEnabled else { return }
         diagnosticsLogEnabled = isEnabled
         UserDefaults.standard.set(
             isEnabled,
@@ -358,6 +402,7 @@ final class AppModel: ObservableObject {
     }
 
     func setLoginItemRegistered(_ isRegistered: Bool) {
+        guard !isTerminating else { return }
         do {
             try loginItem.setRegistered(isRegistered)
         } catch {
@@ -379,6 +424,7 @@ final class AppModel: ObservableObject {
     /// than fail quietly. Losing Accessibility between launches is ordinary: a
     /// macOS update or a rebuild to a different path is enough.
     func autostartEventLayerIfRemembered() {
+        guard !isTerminating else { return }
         guard !eventLayerAutostartAbandoned else { return }
         switch EventLayerAutostart.decide(
             rememberedPreference: eventLayerRemembered,
@@ -406,6 +452,7 @@ final class AppModel: ObservableObject {
     /// have survived a launch. Making each caller say which it means is the
     /// only version of this that cannot silently do the wrong thing.
     func setEventLayerEnabled(_ isEnabled: Bool, remembering: Bool) {
+        guard !isTerminating || !isEnabled else { return }
         if remembering {
             eventLayerRemembered = isEnabled
             UserDefaults.standard.set(
@@ -467,6 +514,7 @@ final class AppModel: ObservableObject {
     /// tilt uses it. Posting it from a button separates "the click is not what
     /// the system acts on" from "the tilt was never seen in the first place".
     func postDiagnosticInjection(_ injection: EventLayer.DiagnosticInjection) {
+        guard !isTerminating else { return }
         do {
             let sent = try eventLayer.postDiagnosticInjection(injection)
             eventLayerStatusText = "Posted \(injection.label): \(sent)"
@@ -530,6 +578,7 @@ final class AppModel: ObservableObject {
     /// Precision runtime owns the same observer while admitted, so the two are
     /// kept mutually exclusive rather than allowed to race for it.
     func setScrollDiagnosticsEnabled(_ isEnabled: Bool) {
+        guard !isTerminating || !isEnabled else { return }
         guard scrollDiagnosticsGateFailureText == nil || !isEnabled else { return }
         scrollDiagnosticsEnabled = isEnabled
         guard isEnabled else {
@@ -568,6 +617,7 @@ final class AppModel: ObservableObject {
     }
 
     private func record(scrollTapSample sample: ScrollTapSample) {
+        guard !isTerminating else { return }
         guard scrollDiagnosticsEnabled else { return }
         scrollTapEventCount += 1
         lastScrollTapSample = sample
@@ -576,7 +626,14 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private func disableAudioForTermination() {
+        audioExecutionEnabled = false
+        audioController.cancelPendingVolumeChanges()
+        audioStatus = .disabled
+    }
+
     func setAudioExecutionEnabled(_ isEnabled: Bool) {
+        guard !isTerminating || !isEnabled else { return }
         guard !rootQueryInProgress,
               !firmwareFingerprintInProgress,
               !controlEnumerationInProgress,
@@ -597,6 +654,7 @@ final class AppModel: ObservableObject {
     }
 
     func performOneShotRootQuery() {
+        guard !isTerminating else { return }
         guard rootQueryGateFailureText == nil else { return }
 
         reprogFeatureDescriptor = nil
@@ -616,6 +674,7 @@ final class AppModel: ObservableObject {
     }
 
     func performReadOnlyFirmwareFingerprint() {
+        guard !isTerminating else { return }
         guard firmwareFingerprintGateFailureText == nil else { return }
 
         invalidateRestorePacketPreview(reason: "Rebuild after fresh firmware discovery")
@@ -632,6 +691,7 @@ final class AppModel: ObservableObject {
     }
 
     func performFirmwareIdentityMigrationDryRun() {
+        guard !isTerminating else { return }
         guard firmwareMigrationDryRunGateFailureText == nil,
               let firmwareFingerprint else { return }
 
@@ -675,6 +735,7 @@ final class AppModel: ObservableObject {
     }
 
     func performRestoreOnlyPacketPreview() {
+        guard !isTerminating else { return }
         guard restorePacketPreviewGateFailureText == nil,
               let currentFeature = reprogFeatureDescriptor,
               let firmwareFingerprint else { return }
@@ -720,6 +781,7 @@ final class AppModel: ObservableObject {
     }
 
     func commitFirmwareIdentityMigration() {
+        guard !isTerminating else { return }
         guard firmwareMigrationCommitGateFailureText == nil,
               let plan = firmwareMigrationPlan,
               let fingerprint = firmwareFingerprint else { return }
@@ -729,9 +791,12 @@ final class AppModel: ObservableObject {
         firmwareMigrationCommitReceipt = nil
         firmwareMigrationCommitStatusText = "Publishing durable backup and bound journal…"
 
-        Task { @MainActor [weak self] in
+        firmwareMigrationTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            defer { firmwareMigrationCommitInProgress = false }
+            defer {
+                firmwareMigrationCommitInProgress = false
+                firmwareMigrationTask = nil
+            }
 
             do {
                 let validatedGeneration = connectionGeneration
@@ -771,6 +836,7 @@ final class AppModel: ObservableObject {
     }
 
     func performReadOnlyControlEnumeration() {
+        guard !isTerminating else { return }
         guard controlEnumerationGateFailureText == nil else { return }
 
         controlEnumerationAttempted = true
@@ -786,6 +852,7 @@ final class AppModel: ObservableObject {
     }
 
     func performReadOnlyReportingSnapshot() {
+        guard !isTerminating else { return }
         guard reportingSnapshotGateFailureText == nil else { return }
 
         reportingSnapshotAttempted = true
@@ -801,6 +868,7 @@ final class AppModel: ObservableObject {
     }
 
     func performRecoveryRehearsal() {
+        guard !isTerminating else { return }
         guard recoveryRehearsalGateFailureText == nil else { return }
 
         recoveryRehearsalAttempted = true
@@ -832,6 +900,7 @@ final class AppModel: ObservableObject {
     }
 
     func performTransactionSimulation() {
+        guard !isTerminating else { return }
         guard transactionSimulationGateFailureText == nil else { return }
 
         transactionSimulationAttempted = true
@@ -870,6 +939,7 @@ final class AppModel: ObservableObject {
     }
 
     func performRestoreOnlyHardwareTrialSimulation() {
+        guard !isTerminating else { return }
         guard restoreTrialSimulationGateFailureText == nil,
               let currentFeature = reprogFeatureDescriptor else { return }
 
@@ -920,6 +990,7 @@ final class AppModel: ObservableObject {
     }
 
     func performReadOnlyPrecisionPreflight() {
+        guard !isTerminating else { return }
         guard precisionPreflightGateFailureText == nil,
               let currentFeature = reprogFeatureDescriptor else { return }
 
@@ -986,6 +1057,7 @@ final class AppModel: ObservableObject {
     }
 
     func performPrecisionLifecycleReadinessReview() {
+        guard !isTerminating else { return }
         guard precisionReadinessGateFailureText == nil,
               let currentFeature = reprogFeatureDescriptor,
               let preflight = precisionPreflightSnapshot,
@@ -1072,6 +1144,7 @@ final class AppModel: ObservableObject {
     }
 
     func performMappedControlDiversionReview() {
+        guard !isTerminating else { return }
         guard mappedDiversionGateFailureText == nil,
               let currentFeature = reprogFeatureDescriptor,
               let rootEvidenceGeneration,
@@ -1146,6 +1219,7 @@ final class AppModel: ObservableObject {
     }
 
     func performReadOnlyMappedControlPreflight() {
+        guard !isTerminating else { return }
         guard mappedLivePreflightGateFailureText == nil,
               let currentFeature = reprogFeatureDescriptor,
               let plan = mappedPreflightPlan else { return }
@@ -1187,6 +1261,7 @@ final class AppModel: ObservableObject {
     }
 
     func bindDormantRuntimeOwner() async {
+        guard !isTerminating else { return }
         guard !runtimeOwnerBindInProgress,
               runtimeOwner == nil,
               status == .observing,
@@ -1321,6 +1396,7 @@ final class AppModel: ObservableObject {
     }
 
     func confirmJournalRotation() {
+        guard !isTerminating else { return }
         guard journalRotationGateFailureText == nil else { return }
         journalRotationInProgress = true
         defer { journalRotationInProgress = false }
@@ -1365,6 +1441,7 @@ final class AppModel: ObservableObject {
     }
 
     func confirmRuntimeOwnerAdmission() async {
+        guard !isTerminating else { return }
         guard runtimeOwnerCanAdmit,
               !runtimeOwnerOperationInProgress,
               let owner = runtimeOwner,
@@ -1388,6 +1465,7 @@ final class AppModel: ObservableObject {
                 rootGenerationProvider: { rootGeneration }
             )
             await refreshRuntimeOwnerFlags()
+            guard !isTerminating else { return }
             startWheelObserver(owner: owner)
             runtimeOwnerStatusText =
                 "Precision diverted (active). Precision tap mutes; hold Precision and scroll for volume when Audio test is on. Deactivate before quit if you need the button restored. Disconnect classifies recovery-required and does not send a restore SET."
@@ -1403,6 +1481,7 @@ final class AppModel: ObservableObject {
     }
 
     func confirmRuntimeOwnerRecovery() async {
+        guard !isTerminating else { return }
         guard runtimeOwnerCanRecover,
               !runtimeOwnerOperationInProgress,
               let owner = runtimeOwner,
@@ -1444,6 +1523,7 @@ final class AppModel: ObservableObject {
     }
 
     func confirmRuntimeOwnerDeactivation() async {
+        guard !isTerminating else { return }
         guard runtimeOwnerCanDeactivate,
               !runtimeOwnerOperationInProgress,
               let owner = runtimeOwner else {
@@ -1467,6 +1547,7 @@ final class AppModel: ObservableObject {
     }
 
     func completeRuntimeOwnerSessionRollover() async {
+        guard !isTerminating else { return }
         guard runtimeOwnerCanRollover, let owner = runtimeOwner else { return }
         do {
             try await owner.completeSessionRollover()
@@ -1483,20 +1564,15 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func requestTermination() -> ApplicationTerminationDecision {
+        let coordinator = termination ?? makeTerminationCoordinator()
+        termination = coordinator
+        return coordinator.requestTermination()
+    }
+
     func quit() {
-        Task { @MainActor in
-            if let owner = runtimeOwner {
-                await owner.prepareForQuit()
-                await refreshRuntimeOwnerFlags()
-            }
-            stopWheelObserver()
-            // Unlike a diverted control, this needs no inverse anything: the
-            // remapping exists only while the tap does. It must not be
-            // *forgotten*, though — quitting is not the user turning it off.
-            setEventLayerEnabled(false, remembering: false)
-            stop()
-            NSApplication.shared.terminate(nil)
-        }
+        // All ordinary quit sources enter the same AppKit delegate path.
+        NSApplication.shared.terminate(nil)
     }
 
     /// Opens the Accessibility pane. Deliberately does not use
@@ -2137,6 +2213,7 @@ final class AppModel: ObservableObject {
     }
 
     private func startWheelObserver(owner: PrecisionRuntimeOwner) {
+        guard !isTerminating else { return }
         let held = owner.precisionHeld
         // The diagnostic mode holds the same observer. Clearing the flag here
         // keeps the UI honest about which mode the single tap is in.
@@ -2301,6 +2378,7 @@ final class AppModel: ObservableObject {
     }
 
     private func restartObserverAfterPermissionGrant() {
+        guard !isTerminating else { return }
         guard !runtimeOwnerBlocksRestart else { return }
         switch status {
         case .stopped:
@@ -2314,6 +2392,7 @@ final class AppModel: ObservableObject {
     }
 
     private func receive(_ observation: MXErgoObservation) {
+        guard !isTerminating else { return }
         switch observation {
         case let .status(newStatus):
             status = newStatus
@@ -2406,6 +2485,7 @@ final class AppModel: ObservableObject {
     }
 
     private func receive(rootQueryResult result: MXErgoOneShotRootQueryResult) {
+        guard !isTerminating else { return }
         rootQueryInProgress = false
         reprogFeatureDescriptor = nil
         rootEvidenceGeneration = nil
@@ -2455,6 +2535,7 @@ final class AppModel: ObservableObject {
     private func receive(
         firmwareFingerprintResult result: MXErgoFirmwareFingerprintResult
     ) {
+        guard !isTerminating else { return }
         firmwareFingerprintInProgress = false
 
         switch result {
@@ -2508,6 +2589,7 @@ final class AppModel: ObservableObject {
     private func receive(
         controlEnumerationResult result: MXErgoReadOnlyControlEnumerationResult
     ) {
+        guard !isTerminating else { return }
         controlEnumerationInProgress = false
 
         switch result {
@@ -2554,6 +2636,7 @@ final class AppModel: ObservableObject {
     private func receive(
         reportingSnapshotResult result: MXErgoReadOnlyReportingSnapshotResult
     ) {
+        guard !isTerminating else { return }
         reportingSnapshotInProgress = false
 
         switch result {
@@ -2628,6 +2711,7 @@ final class AppModel: ObservableObject {
         expectedJournal: DeviceStateJournal,
         expectedConnectionGeneration: UInt64
     ) {
+        guard !isTerminating else { return }
         precisionPreflightInProgress = false
 
         switch result {
@@ -2724,6 +2808,7 @@ final class AppModel: ObservableObject {
         expectedJournal: DeviceStateJournal,
         expectedConnectionGeneration: UInt64
     ) {
+        guard !isTerminating else { return }
         mappedLivePreflightInProgress = false
 
         switch result {
@@ -3485,6 +3570,7 @@ final class AppModel: ObservableObject {
     }
 
     private func record(_ intents: [ControllerIntent]) {
+        guard !isTerminating else { return }
         guard let intent = intents.last else { return }
         lastIntent = intent
 

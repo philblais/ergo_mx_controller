@@ -79,6 +79,28 @@ public final class MXErgoObserver: @unchecked Sendable {
         return loop.stopAndWait(timeout: timeout)
     }
 
+    /// Waits for real observer teardown without blocking the main actor. Short
+    /// waiter deadlines do not end cleanup; the application's independent quit
+    /// deadline can cancel termination while this same cleanup keeps waiting.
+    public func stopAndWaitForTermination() async -> Bool {
+        guard let run = captureHandoffRun() else { return stopAndWait(timeout: 0) }
+        while true {
+            switch await stopForHandoff(expectedRun: run) {
+            case let .stopped(receipt):
+                guard receipt.finalPendingRequestCount == 0,
+                      receipt.callbackDeliveryQuiesced else { return false }
+                switch receipt.ownershipDisposition {
+                case .managerClosed, .neverAcquired: return true
+                case .releaseUncertain: return false
+                }
+            case .timedOut:
+                continue
+            case .cancelled, .notRunning, .runMismatch:
+                return false
+            }
+        }
+    }
+
     /// Installs a restart fence for one captured run. A clean stop then cannot
     /// start another run until the matching token is released. Abandoning the
     /// holder leaves the fence in place.

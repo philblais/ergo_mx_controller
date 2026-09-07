@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import MXErgoCore
 
 @main
 struct MXErgoControllerApp: App {
@@ -9,6 +10,7 @@ struct MXErgoControllerApp: App {
     init() {
         let model = AppModel()
         _model = StateObject(wrappedValue: model)
+        ControllerLaunch.termination = { model.requestTermination() }
         ControllerLaunch.bootstrap = {
             ControllerWindowPresenter.shared.showOnceOnLaunch(model: model)
             model.bootstrapOnLaunch()
@@ -34,10 +36,19 @@ struct MXErgoControllerApp: App {
 @MainActor
 enum ControllerLaunch {
     static var bootstrap: (() -> Void)?
+    static var termination: (() -> ApplicationTerminationDecision)?
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        switch ControllerLaunch.termination?() ?? .cancel {
+        case .terminateNow: return .terminateNow
+        case .terminateLater: return .terminateLater
+        case .cancel: return .terminateCancel
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         ControllerLaunch.bootstrap?()
     }
@@ -65,6 +76,7 @@ private struct ControllerStatusMenu: View {
 
         Divider()
 
+        if let message = model.terminationStatusText { Text(message) }
         Text(connectionStatusText)
         if !model.inputMonitoringGranted {
             Button("Grant Input Monitoring…") {
@@ -88,12 +100,12 @@ private struct ControllerStatusMenu: View {
                 model.start()
                 showControllerWindow()
             }
-            .disabled(model.runtimeOwnerBlocksRestart)
+            .disabled(model.runtimeOwnerBlocksRestart || model.isTerminating)
         } else {
             Button("Stop observer") {
                 model.stop()
             }
-            .disabled(model.firmwareMigrationCommitInProgress)
+            .disabled(model.firmwareMigrationCommitInProgress || model.isTerminating)
         }
 
         Divider()

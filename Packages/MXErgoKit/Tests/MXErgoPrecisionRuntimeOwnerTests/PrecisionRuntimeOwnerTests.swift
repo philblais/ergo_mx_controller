@@ -61,7 +61,7 @@ import Testing
     #expect(await owner.phase == .bound)
     #expect(await owner.blocksObserverRestart)
     await owner.prepareForQuit()
-    #expect(await owner.phase == .bound)
+    #expect(await owner.phase == .shutDown)
     #expect(events.values.isEmpty)
     #expect(coordinator.beginStop(runID: runID))
     #expect(coordinator.performTeardown(
@@ -853,4 +853,53 @@ private final class LockedOwnerEvents: @unchecked Sendable {
     func append(_ value: String) {
         lock.withLock { storage.append(value) }
     }
+}
+
+
+@Test func quitRejectsNewActionsAndDropsLatePrecisionCallbacks() async throws {
+    let runID = UUID()
+    let intent = ownerLifecycleIntent(observerRunID: runID)
+    let owner = PrecisionRuntimeOwner(
+        launchID: intent.launchID, observerRunID: runID, intent: intent,
+        lifecycle: PrecisionRuntimeLifecycle(
+            intent: intent,
+            fence: MXErgoObserverRestartFence(
+                fenceID: UUID(), capturedRunID: runID, observerID: UUID()
+            ),
+            hostHandoff: OwnerStubHandoff(events: nil),
+            releaseFence: { _ in Issue.record("Quit must keep the fence"); return false }
+        )
+    )
+    let recorder = LockedOwnerIntents()
+    let press: [UInt8] = [0x11, 0xFF, 0x0A, 0, 0, 0xED]
+        + Array(repeating: 0, count: 14)
+    let release: [UInt8] = [0x11, 0xFF, 0x0A, 0, 0, 0]
+        + Array(repeating: 0, count: 14)
+    await owner.setControlEventHandler { recorder.append($0) }
+    await owner.deliverUnsolicitedHIDPP(press)
+    #expect(owner.precisionHeld.isHeld)
+    await owner.prepareForQuit()
+    await owner.prepareForQuit()
+    await owner.setControlEventHandler { recorder.append($0) }
+    await owner.setDiversionStatusHandler { _ in Issue.record("Late status handler must stay disabled") }
+    await owner.deliverUnsolicitedHIDPP(press)
+    await owner.noteVerticalScroll(notches: 1, at: 10)
+    await owner.deliverUnsolicitedHIDPP(release)
+    #expect(!owner.precisionHeld.isHeld)
+    #expect(recorder.values.isEmpty)
+    #expect(await owner.phase == .shutDown)
+    await #expect(throws: PrecisionRuntimeOwnerError.notBound) {
+        try await owner.confirmAdmission(
+            explicitlyConfirmed: true, competitorProbe: { [] },
+            sessionProvider: { ownerSession() }, rootGenerationProvider: { 1 }
+        )
+    }
+    await #expect(throws: PrecisionRuntimeOwnerError.notBound) {
+        try await owner.confirmDeactivation(explicitlyConfirmed: true)
+    }
+}
+
+@Test func terminationWaitForAnUnstartedObserverCompletesWithoutHardware() async {
+    let observer = MXErgoObserver()
+    #expect(await observer.stopAndWaitForTermination())
 }

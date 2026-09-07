@@ -1920,3 +1920,46 @@ endpoint-owned revalidation in milestone 2B2; this proof does not establish
 post-close liveness or continuity across reacquisition. No public API, package
 product, dependency edge, SET site, retry, journal write, or event behavior was
 added. The build was not installed or launched. No live HID operation was run.
+
+
+The endpoint-liveness portion of the second daily-use milestone connects
+transport environment validation to the acquired input endpoint's synchronous
+lifecycle state. The ownership layer checks its request-admission gate, checks
+the retained input endpoint, and checks admission again. Shutdown therefore
+refuses validation while output is still draining, even though input callbacks
+remain active until the later quiescence barrier.
+
+The production transport factory requires a connection validator. Environment
+checks sample it before consulting external context and again after each
+awaited session, Root-generation, or competitor check. Composition supplies the
+acquired endpoint validator and checks both sides of its context providers.
+Captured session and generation values remain authorization context; they can
+no longer independently establish that the endpoint is active. Readers without
+a liveness implementation refuse validation.
+
+Input startup rechecks state after activation and cannot publish active input
+following removal during registration or activation. A completed cancel handler
+is not overwritten with a cancelling state during startup failure. Installing
+a disconnect handler after removal replays terminal status outside the lifecycle
+lock, so delayed registration cannot lose that notification or deadlock a
+handler that queries the endpoint.
+
+Eight new regressions raise the package total from 427 to 435. They cover
+removal during activation, delayed input cancellation, late/reentrant handler
+registration, inactive endpoints, disconnect while context providers are
+suspended, and removal during the final competitor probe. The existing ordered
+shutdown test additionally verifies rejection while output drain is blocked and
+input is still active. All 435 tests passed without skips, and the full app and
+helper builds, signing checks, and isolation audits passed. Two unchanged
+baseline runs hit existing short-deadline timing failures; those two tests
+passed with the crash harness in a focused run, and the post-change full suite
+passed without changing their deadlines.
+
+This is milestone 2B2 only. Endpoint lifetime is now checked directly, but fresh
+Root/firmware validation and continuity across reacquisition remain milestone
+2B3. This does not reinterpret the observer's pre-stop proof as current hardware
+identity, or eliminate the unavoidable race after a final lifecycle check.
+Existing request admission and ambiguous-write handling remain authoritative.
+No public API, product, dependency edge, output call site, retry, automatic
+recovery, journal write, or event mapping was added. The build was not installed
+or launched. No live HID operation was run.

@@ -119,10 +119,15 @@ import Testing
         output: output
     )
     try await coordinator.start()
+    try coordinator.validateActiveConnection()
     let shutdown = Task { await coordinator.shutdownAndDrain() }
 
     try await waitUntil { events.contains("output-drain-begin") }
     #expect(!coordinator.isAcceptingRequests)
+    try input.validateActiveConnection()
+    #expect(throws: PrecisionIOHIDOwnershipError.shuttingDown) {
+        try coordinator.validateActiveConnection()
+    }
     #expect(!events.contains("input-shutdown-begin"))
     #expect(!events.contains("release"))
     await #expect(throws: PrecisionIOHIDOwnershipError.shuttingDown) {
@@ -421,6 +426,12 @@ private final class FakeOwnedInput:
         events.record("input-shutdown-begin")
         shutdownGate?.wait()
         events.record("input-shutdown-end")
+    }
+
+    func validateActiveConnection() throws {
+        guard events.contains("input-start"), !events.contains("input-shutdown-begin") else {
+            throw PrecisionTransportReportIOError.disconnected
+        }
     }
 
     func beginRequest(_ frame: PrecisionTransportOutputFrame) throws {

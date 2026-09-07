@@ -228,9 +228,16 @@ package enum PrecisionRuntimeCompositionFactory {
                     binding: configuration.binding,
                     writer: endpoint,
                     reader: endpoint,
-                    sessionProvider: configuration.sessionProvider,
-                    rootGenerationProvider:
-                        configuration.rootGenerationProvider,
+                    sessionProvider: {
+                        try await validatedEndpointEvidence(
+                            endpoint: endpoint, provider: configuration.sessionProvider
+                        )
+                    },
+                    rootGenerationProvider: {
+                        try await validatedEndpointEvidence(
+                            endpoint: endpoint, provider: configuration.rootGenerationProvider
+                        )
+                    },
                     competitorProbe: {
                         try configuration.competitorProbe()
                     },
@@ -241,11 +248,24 @@ package enum PrecisionRuntimeCompositionFactory {
                             sha256: snapshot.sha256
                         )
                     },
+                    connectionValidator: { try endpoint.validateActiveConnection() },
                     operationTimeoutNanoseconds:
                         configuration.operationTimeoutNanoseconds
                 )
             }
         )
+    }
+
+    /// External values remain authorized binding context. Liveness comes from
+    /// the acquired input endpoint, checked on both sides of each suspension.
+    static func validatedEndpointEvidence<Value: Sendable>(
+        endpoint: any PrecisionIOHIDAcquiredEndpoint,
+        provider: @Sendable () async throws -> Value
+    ) async throws -> Value {
+        try endpoint.validateActiveConnection()
+        let value = try await provider()
+        try endpoint.validateActiveConnection()
+        return value
     }
 
     static func make(

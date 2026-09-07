@@ -364,6 +364,7 @@ private func inputFixture(
 private final class RecordingIOHIDCalls: @unchecked Sendable {
     private let lock = NSLock()
     private var eventsStorage: [String] = []
+    var removeDuringActivation = false
     private var inputCallback: IOHIDReportCallback?
     private var inputContext: UnsafeMutableRawPointer?
     private var removalCallback: IOHIDCallback?
@@ -413,7 +414,10 @@ private final class RecordingIOHIDCalls: @unchecked Sendable {
                 cancelHandler = handler
                 lock.unlock()
             },
-            activate: { [self] in record("activate") },
+            activate: { [self] in
+                record("activate")
+                if removeDuringActivation { fireRemoval(senderMatches: true) }
+            },
             cancel: { [self] in
                 lock.lock()
                 eventsStorage.append("cancel")
@@ -664,4 +668,68 @@ private func sourceText(under directory: URL) throws -> String {
 
 private enum PrecisionIOHIDInputTestError: Error {
     case timedOut
+}
+
+
+@Test func inputConnectionValidationTracksRemovalBeforeNotificationDelivery() throws {
+    let fixture = try inputFixture(completeCancellationImmediately: false)
+    #expect(throws: PrecisionIOHIDInputError.notActive) {
+        try fixture.session.validateActiveConnection()
+    }
+    try fixture.session.start()
+    try fixture.session.validateActiveConnection()
+    fixture.calls.fireRemoval(senderMatches: false)
+    try fixture.session.validateActiveConnection()
+    fixture.calls.fireRemoval(senderMatches: true)
+    #expect(throws: PrecisionIOHIDInputError.notActive) {
+        try fixture.session.validateActiveConnection()
+    }
+    fixture.calls.completeCancellation()
+    #expect(throws: PrecisionIOHIDInputError.permanentlyStopped) {
+        try fixture.session.validateActiveConnection()
+    }
+    fixture.session.shutdownAndWait()
+}
+
+@Test func lateDisconnectHandlerReceivesTerminalStateOutsideTheInputLock() throws {
+    let fixture = try inputFixture()
+    try fixture.session.start()
+    fixture.calls.fireRemoval(senderMatches: true)
+    let notifications = LockedCounter()
+    fixture.session.setDisconnectHandler {
+        // Reentrant validation would deadlock if registration held the lock.
+        #expect(throws: PrecisionIOHIDInputError.permanentlyStopped) {
+            try fixture.session.validateActiveConnection()
+        }
+        notifications.increment()
+    }
+    #expect(notifications.value == 1)
+    fixture.calls.fireRemoval(senderMatches: true)
+    #expect(notifications.value == 1)
+    fixture.session.setDisconnectHandler(nil)
+    fixture.session.shutdownAndWait()
+}
+
+@Test func inputConnectionValidationRejectsShutdownBeforeCallbacksQuiesce() async throws {
+    let fixture = try inputFixture(completeCancellationImmediately: false)
+    try fixture.session.start()
+    let shutdown = Task.detached { fixture.session.shutdownAndWait() }
+    try await waitUntil { fixture.calls.events.contains("cancel") }
+    #expect(throws: PrecisionIOHIDInputError.notActive) {
+        try fixture.session.validateActiveConnection()
+    }
+    fixture.calls.completeCancellation()
+    await shutdown.value
+}
+
+
+@Test func removalDuringActivationCannotPublishAnActiveInputSession() throws {
+    let fixture = try inputFixture()
+    fixture.calls.removeDuringActivation = true
+    #expect(throws: PrecisionIOHIDInputError.permanentlyStopped) {
+        try fixture.session.start()
+    }
+    #expect(!fixture.session.isActive)
+    #expect(fixture.session.isStopped)
+    fixture.session.shutdownAndWait()
 }

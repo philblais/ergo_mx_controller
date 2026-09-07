@@ -403,6 +403,7 @@ private final class FakeRuntimeEndpoint:
     private let lock = NSLock()
     private let configuredCloseReturn: Int32
     private var closeReturnStorage: Int32?
+    private var connectionActive = false
     private var disconnectHandler: (@Sendable () -> Void)?
 
     init(
@@ -418,11 +419,13 @@ private final class FakeRuntimeEndpoint:
     func start() async throws {
         events.record("endpoint-start")
         if let startError { throw startError }
+        lock.withLock { connectionActive = true }
     }
 
     func shutdownAndDrain() async {
         let shouldRecord = lock.withLock { () -> Bool in
             guard closeReturnStorage == nil else { return false }
+            connectionActive = false
             closeReturnStorage = configuredCloseReturn
             return true
         }
@@ -461,14 +464,23 @@ private final class FakeRuntimeEndpoint:
         _ = reason
     }
 
-    func disconnected() {}
+    func validateActiveConnection() throws {
+        try lock.withLock {
+            guard connectionActive else { throw PrecisionTransportReportIOError.disconnected }
+        }
+    }
+
+    func disconnected() { fireDisconnect() }
 
     func setDisconnectHandler(_ handler: (@Sendable () -> Void)?) {
         lock.withLock { disconnectHandler = handler }
     }
 
     func fireDisconnect() {
-        let handler = lock.withLock { disconnectHandler }
+        let handler = lock.withLock {
+            connectionActive = false
+            return disconnectHandler
+        }
         handler?()
     }
 }
@@ -776,4 +788,71 @@ private func sourceText(under directory: URL) throws -> String {
     return try files.map {
         try String(contentsOf: $0, encoding: .utf8)
     }.joined(separator: "\n")
+}
+
+
+private actor EndpointEvidenceGate {
+    private var waiting: CheckedContinuation<Void, Never>?
+    private var entered: CheckedContinuation<Void, Never>?
+    private var started = false
+    func wait() async {
+        started = true
+        entered?.resume()
+        entered = nil
+        await withCheckedContinuation { waiting = $0 }
+    }
+    func waitUntilStarted() async {
+        guard !started else { return }
+        await withCheckedContinuation { entered = $0 }
+    }
+    func release() { waiting?.resume(); waiting = nil }
+}
+
+@Test func endpointEvidenceRejectsCachedValuesAfterDisconnectDuringSuspension() async throws {
+    let endpoint = FakeRuntimeEndpoint(events: RuntimeEventRecorder(), closeReturn: 0)
+    try await endpoint.start()
+    let gate = EndpointEvidenceGate()
+    let read = Task {
+        try await PrecisionRuntimeCompositionFactory.validatedEndpointEvidence(endpoint: endpoint) {
+            await gate.wait()
+            return UInt64(17)
+        }
+    }
+    await gate.waitUntilStarted()
+    endpoint.fireDisconnect()
+    await gate.release()
+    await #expect(throws: PrecisionTransportReportIOError.disconnected) {
+        try await read.value
+    }
+    await endpoint.shutdownAndDrain()
+}
+
+@Test func endpointEvidenceRefusesToConsultProvidersWhenAlreadyDisconnected() async throws {
+    let endpoint = FakeRuntimeEndpoint(events: RuntimeEventRecorder(), closeReturn: 0)
+    try await endpoint.start()
+    endpoint.fireDisconnect()
+    let calls = RuntimeCounter()
+    await #expect(throws: PrecisionTransportReportIOError.disconnected) {
+        try await PrecisionRuntimeCompositionFactory.validatedEndpointEvidence(endpoint: endpoint) {
+            calls.increment()
+            return UInt64(17)
+        }
+    }
+    #expect(calls.value == 0)
+    await endpoint.shutdownAndDrain()
+}
+
+@Test func endpointEvidencePreservesContextOnlyWhileInputRemainsActive() async throws {
+    let endpoint = FakeRuntimeEndpoint(events: RuntimeEventRecorder(), closeReturn: 0)
+    try await endpoint.start()
+    let value = try await PrecisionRuntimeCompositionFactory.validatedEndpointEvidence(endpoint: endpoint) {
+        UInt64(17)
+    }
+    #expect(value == 17)
+    await endpoint.shutdownAndDrain()
+    await #expect(throws: PrecisionTransportReportIOError.disconnected) {
+        try await PrecisionRuntimeCompositionFactory.validatedEndpointEvidence(endpoint: endpoint) {
+            UInt64(17)
+        }
+    }
 }

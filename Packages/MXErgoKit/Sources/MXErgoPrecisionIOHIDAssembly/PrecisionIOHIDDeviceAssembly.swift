@@ -150,6 +150,10 @@ final class PrecisionIOHIDDeviceAssembly:
         await endpoint.shutdownAndDrain()
     }
 
+    func validateActiveConnection() throws {
+        try endpoint.validateActiveConnection()
+    }
+
     func beginRequest(_ frame: PrecisionTransportOutputFrame) throws {
         try endpoint.beginRequest(frame)
     }

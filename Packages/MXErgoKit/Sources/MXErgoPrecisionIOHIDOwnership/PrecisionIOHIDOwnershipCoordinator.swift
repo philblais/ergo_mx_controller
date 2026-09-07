@@ -387,6 +387,15 @@ final class PrecisionIOHIDOwnershipCoordinator:
         )
     }
 
+    func validateActiveConnection() throws {
+        try admission.requireActive()
+        guard let input = token.retainedInputEndpoint else {
+            throw PrecisionIOHIDOwnershipError.permanentlyStopped
+        }
+        try input.validateActiveConnection()
+        try admission.requireActive()
+    }
+
     func beginRequest(_ frame: PrecisionTransportOutputFrame) throws {
         try admission.requireActive()
         guard let input = token.retainedInputEndpoint else {
@@ -470,6 +479,13 @@ private final class PrecisionIOHIDReleasingInputEndpoint:
         guard let retained = retainedInner() else { return }
         retained.shutdownAndWait()
         clear(ifIdenticalTo: retained)
+    }
+
+    func validateActiveConnection() throws {
+        guard let inner = retainedInner() else {
+            throw PrecisionIOHIDOwnershipError.permanentlyStopped
+        }
+        try inner.validateActiveConnection()
     }
 
     func beginRequest(_ frame: PrecisionTransportOutputFrame) throws {

@@ -152,12 +152,17 @@ final class PrecisionIOHIDInputSession:
             )
             didConfigureRuntime = true
             lifecycleCondition.lock()
+            guard lifecycleState == .starting, !disconnectDelivered else {
+                lifecycleCondition.unlock()
+                throw PrecisionIOHIDInputError.permanentlyStopped
+            }
             lifecycleState = .active
             lifecycleCondition.unlock()
             try runtime.activate()
+            try requireActive()
         } catch {
             lifecycleCondition.lock()
-            if didConfigureRuntime {
+            if didConfigureRuntime, lifecycleState != .stopped {
                 // Registration may already have transferred callback lifetime
                 // to IOHID. Only its cancel handler can prove quiescence.
                 lifecycleState = .cancelling
@@ -201,6 +206,10 @@ final class PrecisionIOHIDInputSession:
         lifecycleCondition.unlock()
     }
 
+    func validateActiveConnection() throws {
+        try requireActive()
+    }
+
     func beginRequest(_ frame: PrecisionTransportOutputFrame) throws {
         try requireActive()
         try callbackChannel.beginRequest(frame)
@@ -240,7 +249,11 @@ final class PrecisionIOHIDInputSession:
     func setDisconnectHandler(_ handler: (@Sendable () -> Void)?) {
         lifecycleCondition.lock()
         extraDisconnectHandler = handler
+        let alreadyDisconnected = disconnectDelivered
         lifecycleCondition.unlock()
+        // Registration and removal are linearized by the same condition lock.
+        // Notify outside it so handlers may safely query this endpoint.
+        if alreadyDisconnected { handler?() }
     }
 
     func ioHIDInputReport(
@@ -319,7 +332,7 @@ final class PrecisionIOHIDInputSession:
     private func requireActive() throws {
         lifecycleCondition.lock()
         defer { lifecycleCondition.unlock() }
-        guard lifecycleState == .active else {
+        guard lifecycleState == .active, !disconnectDelivered else {
             if lifecycleState == .stopped {
                 throw PrecisionIOHIDInputError.permanentlyStopped
             }

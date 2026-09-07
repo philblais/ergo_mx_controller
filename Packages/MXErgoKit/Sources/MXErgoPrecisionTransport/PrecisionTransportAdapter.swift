@@ -41,6 +41,9 @@ package protocol PrecisionTransportReportWriter: Sendable {
 }
 
 package protocol PrecisionTransportReportReader: Sendable {
+    /// Samples endpoint-owned lifecycle state without I/O. This attests active
+    /// input ownership only, not Root/firmware identity or reconnect continuity.
+    func validateActiveConnection() throws
     /// Arms a single request window before the matching writer is entered.
     func beginRequest(_ frame: PrecisionTransportOutputFrame) throws
     func read(for requestID: UUID) async throws -> PrecisionTransportInputFrame
@@ -51,6 +54,13 @@ package protocol PrecisionTransportReportReader: Sendable {
         reason: PrecisionTransportReportIOError
     )
     func disconnected()
+}
+
+extension PrecisionTransportReportReader {
+    /// Readers without an explicit liveness implementation cannot attest it.
+    package func validateActiveConnection() throws {
+        throw PrecisionTransportReportIOError.disconnected
+    }
 }
 
 package struct PrecisionTransportDurableSnapshot: Sendable, Equatable {
@@ -126,6 +136,7 @@ package enum PrecisionTransportFactory {
         rootGenerationProvider: @escaping RootGenerationProvider,
         competitorProbe: @escaping CompetitorProbe,
         durableSnapshotLoader: @escaping DurableSnapshotLoader,
+        connectionValidator: @escaping @Sendable () throws -> Void,
         operationTimeoutNanoseconds: UInt64 = 5_000_000_000
     ) throws -> any PrecisionTransportSession {
         try PrecisionTransportAdapter(
@@ -137,6 +148,7 @@ package enum PrecisionTransportFactory {
             rootGenerationProvider: rootGenerationProvider,
             competitorProbe: competitorProbe,
             durableSnapshotLoader: durableSnapshotLoader,
+            connectionValidator: connectionValidator,
             operationTimeoutNanoseconds: operationTimeoutNanoseconds
         )
     }
@@ -192,6 +204,7 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
     private let rootGenerationProvider: RootGenerationProvider
     private let competitorProbe: CompetitorProbe
     private let durableSnapshotLoader: DurableSnapshotLoader
+    private let connectionValidator: @Sendable () throws -> Void
     private let operationTimeoutNanoseconds: UInt64
     private var correlator: HIDPP20RequestCorrelator
     private var state: State = .idle
@@ -206,6 +219,7 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
         rootGenerationProvider: @escaping RootGenerationProvider,
         competitorProbe: @escaping CompetitorProbe,
         durableSnapshotLoader: @escaping DurableSnapshotLoader,
+        connectionValidator: @escaping @Sendable () throws -> Void = {},
         operationTimeoutNanoseconds: UInt64 = 5_000_000_000
     ) throws {
         guard plan.device == binding.session.device,
@@ -224,6 +238,7 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
         self.rootGenerationProvider = rootGenerationProvider
         self.competitorProbe = competitorProbe
         self.durableSnapshotLoader = durableSnapshotLoader
+        self.connectionValidator = connectionValidator
         self.operationTimeoutNanoseconds = operationTimeoutNanoseconds
         correlator = HIDPP20RequestCorrelator(
             connectionEpoch: binding.session.connectionEpoch
@@ -649,13 +664,16 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
         expectedSession: DeviceTransactionSession,
         stateToken: StateToken? = nil
     ) async throws {
+        try connectionValidator()
         let current = try await sessionProvider()
         try requireStateTokenIfNeeded(stateToken)
+        try connectionValidator()
         guard current == binding.session, current == expectedSession else {
             throw PrecisionTransportError.invalidSession
         }
         let rootGeneration = try await rootGenerationProvider()
         try requireStateTokenIfNeeded(stateToken)
+        try connectionValidator()
         guard rootGeneration == binding.rootGeneration else {
             throw PrecisionTransportError.staleRootGeneration
         }
@@ -663,6 +681,7 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .sorted()
         try requireStateTokenIfNeeded(stateToken)
+        try connectionValidator()
         guard competitors.isEmpty else {
             throw PrecisionTransportError.competingProcesses(competitors)
         }

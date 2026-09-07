@@ -1019,6 +1019,7 @@ private func makeAdapter(
     reader: any PrecisionTransportReportReader,
     competitorProbe: @escaping PrecisionTransportAdapter.CompetitorProbe,
     sessionProvider: PrecisionTransportAdapter.SessionProvider? = nil,
+    connectionValidator: @escaping @Sendable () throws -> Void = {},
     operationTimeoutNanoseconds: UInt64 = 5_000_000_000
 ) throws -> PrecisionTransportAdapter {
     try PrecisionTransportAdapter(
@@ -1044,6 +1045,7 @@ private func makeAdapter(
                 sha256: sha256(data)
             )
         },
+        connectionValidator: connectionValidator,
         operationTimeoutNanoseconds: operationTimeoutNanoseconds
     )
 }
@@ -1785,4 +1787,38 @@ private func waitUntil(
     .map { try String(contentsOf: $0, encoding: .utf8) }
     .joined(separator: "\n")
     #expect(!appText.contains("MXErgoPrecisionTransport"))
+}
+
+
+private final class TestConnectionValidity: @unchecked Sendable {
+    private let lock = NSLock()
+    private var active = true
+    func disconnect() { lock.withLock { active = false } }
+    func validate() throws {
+        try lock.withLock {
+            guard active else { throw PrecisionTransportReportIOError.disconnected }
+        }
+    }
+}
+
+@Test func connectionRemovalDuringCompetitorProbeCannotReturnACurrentSession() async throws {
+    let fixture = try precisionFixture()
+    let gate = TestSuspensionGate()
+    await gate.arm()
+    let connection = TestConnectionValidity()
+    let adapter = try makeAdapter(
+        fixture: fixture,
+        journalURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString),
+        writer: ScriptedPrecisionWriter(steps: []),
+        reader: BlockingPrecisionReader(initialFrames: []),
+        competitorProbe: { await gate.waitIfArmed(); return [] },
+        connectionValidator: { try connection.validate() }
+    )
+    let read = Task { try await adapter.currentSession() }
+    try await waitUntil(nanoseconds: 5_000_000_000) { await gate.isWaiting }
+    connection.disconnect()
+    await gate.release()
+    await #expect(throws: PrecisionTransportReportIOError.disconnected) {
+        try await read.value
+    }
 }

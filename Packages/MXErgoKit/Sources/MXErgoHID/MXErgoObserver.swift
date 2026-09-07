@@ -25,6 +25,7 @@ public final class MXErgoObserver: @unchecked Sendable {
     private let lock = NSLock()
     private let observerID = UUID()
     private let handoffCoordinator = MXErgoObserverHandoffCoordinator()
+    private var precisionBindingStore: MXErgoObserverPrecisionBindingStore?
     private var inputLoop: InputLoop?
 
     public init() {}
@@ -37,8 +38,11 @@ public final class MXErgoObserver: @unchecked Sendable {
             lock.unlock()
             return
         }
+        let bindingStore = MXErgoObserverPrecisionBindingStore(runID: runID)
+        precisionBindingStore = bindingStore
         let loop = InputLoop(
             runID: runID,
+            precisionBindingStore: bindingStore,
             handoffCoordinator: handoffCoordinator,
             handler: handler,
             didFinish: { [weak self] finishedRunID in
@@ -152,6 +156,17 @@ public final class MXErgoObserver: @unchecked Sendable {
                     runID: $0.runID
                 )
             }
+        }
+    }
+
+    /// Returns only sealed pre-stop observations for the retained run. The
+    /// caller must separately require a clean teardown receipt for this run.
+    package func sealedPrecisionBinding(
+        for run: MXErgoObserverHandoffRun
+    ) -> MXErgoObserverPrecisionBinding? {
+        lock.withLock {
+            guard run.observerID == observerID else { return nil }
+            return precisionBindingStore?.sealedBinding(for: run.runID)
         }
     }
 
@@ -324,6 +339,7 @@ public final class MXErgoObserver: @unchecked Sendable {
 
 private final class InputLoop: @unchecked Sendable {
     let runID: UUID
+    private let precisionBindingStore: MXErgoObserverPrecisionBindingStore
     private let handoffCoordinator: MXErgoObserverHandoffCoordinator
     private let handler: MXErgoObserver.Handler
     private let didFinish: @Sendable (UUID) -> Void
@@ -356,6 +372,7 @@ private final class InputLoop: @unchecked Sendable {
     private var pendingMappedControlPreflight: PendingMappedControlPreflight?
 
     private struct PendingRootQuery {
+        let evidenceRevision: UInt64
         let id: UUID
         let epoch: UInt64
         let deviceID: String
@@ -405,6 +422,7 @@ private final class InputLoop: @unchecked Sendable {
     }
 
     private struct PendingPrecisionPreflight {
+        let evidenceRevision: UInt64
         let id: UUID
         let epoch: UInt64
         let deviceID: String
@@ -425,11 +443,13 @@ private final class InputLoop: @unchecked Sendable {
 
     init(
         runID: UUID,
+        precisionBindingStore: MXErgoObserverPrecisionBindingStore,
         handoffCoordinator: MXErgoObserverHandoffCoordinator,
         handler: @escaping MXErgoObserver.Handler,
         didFinish: @escaping @Sendable (UUID) -> Void
     ) {
         self.runID = runID
+        self.precisionBindingStore = precisionBindingStore
         self.handoffCoordinator = handoffCoordinator
         self.handler = handler
         self.didFinish = didFinish
@@ -716,6 +736,11 @@ private final class InputLoop: @unchecked Sendable {
     }
 
     private func clearRequestStateForShutdown() {
+        precisionBindingStore.seal(
+            properties: Array(matchingDeviceProperties.values),
+            feature: resolvedFeature?.descriptor,
+            epoch: rootQueryCorrelator.connectionEpoch
+        )
         pendingRootQuery = nil
         pendingControlEnumeration = nil
         pendingReportingSnapshot = nil
@@ -781,6 +806,7 @@ private final class InputLoop: @unchecked Sendable {
         }
 
         pendingRootQuery = PendingRootQuery(
+            evidenceRevision: precisionBindingStore.currentRevision,
             id: requestID,
             epoch: epoch,
             deviceID: entry.key,
@@ -945,6 +971,7 @@ private final class InputLoop: @unchecked Sendable {
               pending.epoch == epoch else { return }
 
         pendingFirmwareFingerprint = nil
+        precisionBindingStore.invalidate()
         rootQueryCorrelator.timeout(id: id, connectionEpoch: epoch)
         pending.completion(.timedOut(
             stage: pending.stage,
@@ -1092,6 +1119,7 @@ private final class InputLoop: @unchecked Sendable {
               pending.epoch == epoch else { return }
 
         pendingControlEnumeration = nil
+        precisionBindingStore.invalidate()
         rootQueryCorrelator.timeout(id: id, connectionEpoch: epoch)
         pending.completion(.timedOut(
             stage: pending.stage,
@@ -1103,6 +1131,7 @@ private final class InputLoop: @unchecked Sendable {
         expectation: MXErgoPrecisionPreflightExpectation,
         completion: @escaping MXErgoObserver.PrecisionPreflightCompletion
     ) {
+        precisionBindingStore.beginPreflight()
         guard !precisionPreflightAttempted else {
             completion(.rejected(.alreadyAttempted))
             return
@@ -1161,6 +1190,7 @@ private final class InputLoop: @unchecked Sendable {
         }
 
         pendingPrecisionPreflight = PendingPrecisionPreflight(
+            evidenceRevision: precisionBindingStore.currentRevision,
             id: requestID,
             epoch: epoch,
             deviceID: entry.key,
@@ -1219,6 +1249,7 @@ private final class InputLoop: @unchecked Sendable {
               pending.epoch == epoch else { return }
 
         pendingPrecisionPreflight = nil
+        precisionBindingStore.invalidate()
         rootQueryCorrelator.timeout(id: id, connectionEpoch: epoch)
         pending.completion(.timedOut(requestBytes: pending.request.bytes))
     }
@@ -1359,6 +1390,7 @@ private final class InputLoop: @unchecked Sendable {
               pending.epoch == epoch else { return }
 
         pendingMappedControlPreflight = nil
+        precisionBindingStore.invalidate()
         rootQueryCorrelator.timeout(id: id, connectionEpoch: epoch)
         pending.completion(.timedOut(
             controlID: pending.sequence.currentControlID ?? 0,
@@ -1509,6 +1541,7 @@ private final class InputLoop: @unchecked Sendable {
               pending.epoch == epoch else { return }
 
         pendingReportingSnapshot = nil
+        precisionBindingStore.invalidate()
         rootQueryCorrelator.timeout(id: id, connectionEpoch: epoch)
         pending.completion(.timedOut(
             stage: pending.stage,
@@ -1534,6 +1567,7 @@ private final class InputLoop: @unchecked Sendable {
               pending.epoch == epoch else { return }
 
         pendingRootQuery = nil
+        precisionBindingStore.invalidate()
         rootQueryCorrelator.timeout(id: id, connectionEpoch: epoch)
         pending.completion(.timedOut(requestBytes: pending.request.bytes))
     }
@@ -1542,6 +1576,7 @@ private final class InputLoop: @unchecked Sendable {
         guard result == kIOReturnSuccess else { return }
         let properties = HIDDevicePropertyDecoder.decode(device)
         guard properties.isMXErgo else { return }
+        precisionBindingStore.invalidate()
         let capabilities = HIDReportCapabilityInspector.outputCapabilities(for: device)
         matchingDevices[properties.id] = device
         matchingDeviceProperties[properties.id] = properties
@@ -1554,6 +1589,7 @@ private final class InputLoop: @unchecked Sendable {
     }
 
     fileprivate func deviceRemoved(_ device: IOHIDDevice) {
+        precisionBindingStore.invalidate()
         let properties = HIDDevicePropertyDecoder.decode(device)
         matchingDevices.removeValue(forKey: properties.id)
         matchingDeviceProperties.removeValue(forKey: properties.id)
@@ -1729,6 +1765,10 @@ private final class InputLoop: @unchecked Sendable {
                     epoch: pending.epoch,
                     deviceID: pending.deviceID,
                     descriptor: descriptor
+                )
+                precisionBindingStore.recordRoot(
+                    deviceID: pending.deviceID, feature: descriptor,
+                    epoch: pending.epoch, expectedRevision: pending.evidenceRevision
                 )
                 pending.completion(.success(
                     requestBytes: pending.request.bytes,
@@ -1910,6 +1950,20 @@ private final class InputLoop: @unchecked Sendable {
                 let state = try MXErgoReadOnlyPrecisionPreflight.decodeResponse(
                     response,
                     expectation: pending.expectation
+                )
+                guard matchingDeviceProperties.count == 1,
+                      let properties = matchingDeviceProperties[pending.deviceID],
+                      pending.epoch == rootQueryCorrelator.connectionEpoch,
+                      resolvedFeature?.epoch == pending.epoch,
+                      resolvedFeature?.deviceID == pending.deviceID,
+                      resolvedFeature?.descriptor == pending.expectation.feature else {
+                    precisionBindingStore.invalidate()
+                    pending.completion(.disconnected(requestBytes: pending.request.bytes))
+                    return
+                }
+                precisionBindingStore.recordPreflight(
+                    properties: properties, feature: pending.expectation.feature,
+                    epoch: pending.epoch, expectedRevision: pending.evidenceRevision
                 )
                 let session = RestoreOnlyHardwareTrialSession(
                     device: pending.expectation.device,

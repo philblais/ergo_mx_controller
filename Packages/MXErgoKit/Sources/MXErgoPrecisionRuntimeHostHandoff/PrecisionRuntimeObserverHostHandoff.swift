@@ -3,8 +3,9 @@ import MXErgoHID
 import MXErgoHIDPP
 import MXErgoPrecisionRuntimeAdmission
 
-/// Fresh repository evidence sampled only after observer teardown succeeds.
-/// It prevents a receipt from echoing stale admission arguments as proof.
+/// External authorization context, checked after observer teardown. Production
+/// additionally requires sealed pre-stop observations from the exact run.
+/// Neither establishes the liveness of a subsequently acquired endpoint.
 package struct PrecisionRuntimeObserverHostEvidence: Sendable, Equatable {
     package let session: DeviceTransactionSession
     package let rootGeneration: UInt64
@@ -103,13 +104,34 @@ package actor PrecisionRuntimeObserverHostHandoff:
             rootGeneration: intent.rootGeneration,
             observerRunID: handoffRun.runID
         )
-        self.evidenceProvider = evidenceProvider
+        let expectedSession = intent.session
+        self.evidenceProvider = {
+            try await Self.validatedExternalEvidence(
+                proof: observer.sealedPrecisionBinding(for: handoffRun),
+                expectedRunID: handoffRun.runID,
+                expectedSession: expectedSession,
+                evidenceProvider: evidenceProvider
+            )
+        }
         stopOperation = { [observer, handoffRun] timeoutNanoseconds in
             await observer.stopForHandoff(
                 expectedRun: handoffRun,
                 timeoutNanoseconds: timeoutNanoseconds
             )
         }
+    }
+
+    static func validatedExternalEvidence(
+        proof: MXErgoObserverPrecisionBinding?,
+        expectedRunID: UUID,
+        expectedSession: DeviceTransactionSession,
+        evidenceProvider: EvidenceProvider
+    ) async throws -> PrecisionRuntimeObserverHostEvidence {
+        guard let proof, proof.runID == expectedRunID,
+              proof.matches(expectedSession) else {
+            throw PrecisionRuntimeObserverHostHandoffError.evidenceUnavailable
+        }
+        return try await evidenceProvider()
     }
 
     /// Internal seam for deterministic, hardware-free contract tests.

@@ -1,4 +1,5 @@
 import Foundation
+import MXErgoCore
 import MXErgoHIDPP
 import Testing
 @testable import MXErgoHID
@@ -499,4 +500,42 @@ private func waitForHandoffEvent(
         await Task.yield()
     }
     Issue.record("Timed out waiting for handoff event: \(event)")
+}
+
+
+@Test func cachedExternalEvidenceCannotSubstituteForSealedObserverProof() async throws {
+    let run = UUID()
+    let session = handoffSession()
+    let proof = MXErgoObserverPrecisionBinding(
+        runID: run,
+        properties: HIDDeviceProperties(
+            id: session.device.deviceID, vendorID: 0x046D, productID: 0xB01D,
+            productName: "MX Ergo", transport: session.device.transport,
+            serialNumber: session.device.serialNumber, locationID: 29,
+            primaryUsagePage: 1, primaryUsage: 2),
+        feature: HIDPP20FeatureDescriptor(index: 7, type: 0, version: 4),
+        connectionEpoch: 41
+    )
+    let events = LockedHandoffEvents()
+    let provider: PrecisionRuntimeObserverHostHandoff.EvidenceProvider = {
+        events.append("cached evidence")
+        return PrecisionRuntimeObserverHostEvidence(session: session, rootGeneration: 17)
+    }
+    for scenario in 0..<3 {
+        await expectHandoffError(.evidenceUnavailable) {
+            _ = try await PrecisionRuntimeObserverHostHandoff.validatedExternalEvidence(
+                proof: scenario == 0 ? nil : proof,
+                expectedRunID: scenario == 1 ? UUID() : run,
+                expectedSession: scenario == 2 ? handoffSession(connectionEpoch: 42) : session,
+                evidenceProvider: provider
+            )
+        }
+    }
+    #expect(events.values.isEmpty)
+    let evidence = try await PrecisionRuntimeObserverHostHandoff.validatedExternalEvidence(
+        proof: proof, expectedRunID: run, expectedSession: session,
+        evidenceProvider: provider
+    )
+    #expect(evidence.session == session)
+    #expect(events.values == ["cached evidence"])
 }

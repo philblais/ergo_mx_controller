@@ -1887,3 +1887,36 @@ provenance-bound observations remains milestone 2B and requires its own review.
 No package product, dependency edge, SET site, retry, automatic restore, or new
 journal write was added. The build was not installed or launched. No live HID
 operation was run.
+
+
+The observer-provenance portion of the second daily-use milestone adds a
+sealed pre-stop observer binding. The InputLoop records the physical properties,
+resolved Root descriptor, and correlated Precision preflight epoch before
+publishing the result to the UI. The proof is sealed on the observer run loop
+immediately before teardown clears operational state. Exactly one matching
+device, the same feature, and the same epoch must remain present at that point.
+A valid preflight reporting response can attest the binding even when its state
+is different from baseline, preserving the existing explicit recovery path.
+
+Every matching-device callback and correlator timeout invalidates this proof.
+Root and preflight requests retain a revision, so a reply from before a topology
+change cannot recreate valid evidence afterward. A failed/new preflight clears
+its previous proof. Teardown cannot subsequently gain new proof, and a proof
+from another run cannot be reused. The production host handoff now requires
+this binding in addition to its independently validated clean-close receipt;
+matching values supplied by the app cannot substitute for absent observer proof.
+
+Eight regression tests raise the package total from 419 to 427. All 427 passed
+without skips, and the full main-app/helper build, signing, and isolation checks
+passed. An earlier run encountered a timeout in the unchanged
+adapterDeadlineAfterApplyEntryIsPromptOutcomeUnknownAndStillDrains test; the
+baseline and final full runs passed without modifying that timing path.
+
+This is milestone 2B1, not completion of session freshness. The sealed binding
+attests only the observed physical identity, feature descriptor, and connection
+epoch before close. Firmware identity and the app's root-generation counter
+remain authorization context. The app/runtime captured providers still need
+endpoint-owned revalidation in milestone 2B2; this proof does not establish
+post-close liveness or continuity across reacquisition. No public API, package
+product, dependency edge, SET site, retry, journal write, or event behavior was
+added. The build was not installed or launched. No live HID operation was run.

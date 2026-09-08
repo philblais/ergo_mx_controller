@@ -30,7 +30,7 @@ public enum PrecisionSetupGuide {
     ) -> State {
         if let stopReason { return .blocked(stopReason) }
         if readiness == .recover { return .blocked("Recovery needs a separate review. Open recovery controls in Advanced.") }
-        if completedJournalAvailable { return .blocked("A completed session record needs archiving. Open Advanced and review Retire completed runtime journal before preparing again.") }
+        if completedJournalAvailable { return .blocked("A completed session record needs archiving. Use Archive completed session in Controls before preparing again.") }
         if operationInProgress || progress.values.contains(.working) { return .working }
         for step in Step.allCases {
             guard let status = progress[step] else {

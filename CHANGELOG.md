@@ -2125,3 +2125,32 @@ with app-level integration coverage. These still use the existing Advanced
 controls. No new device commands, SET bytes, automatic retry, recovery,
 journal mutation path, dependency edge, or launch behavior was added.
 The app was not installed or launched. No live HID operation was run.
+
+
+Milestone 3C brings explicit session cleanup into Controls. Controls and Advanced
+share the same restore, release, and archive actions and confirmation views.
+Owner confirmations capture the bound-session UUID and recheck it against the
+current action gates. Release sets the operation-in-progress guard before its
+first suspension and resets guided preparation only after successful release.
+An admitted runtime, including one whose button is restored, cannot roll over.
+Audio is paused before deactivation and stays off if restoration fails.
+
+Archive confirmation displays and retains the exact journal-rotation review.
+The existing rotator verifies those bytes under the device-operation lease;
+a changed record is rejected. Recovery and disconnected sessions continue
+through Advanced, preserving explicit recovery rollover. No action runs on
+appearance, and no new device command, retry, journal authority, dependency
+edge, automatic release, or automatic archive was introduced.
+
+Six decision tests raise the package total from 473 to 479. Full verification
+passed all 479 tests without skips, all four signed builds, and signing/isolation
+audits. Existing journal tests cover a changed review; the new tests cover
+active/restored/prepared states, archive eligibility, concurrent work, stale
+UUIDs, and recovery rollover. The advisor's design review identified the
+overlapping-release race, which is guarded before the first await. Its final
+follow-up was unavailable due to the usage limit; the implementation was
+reviewed in the main task against the stated requirements.
+
+Milestone 3 remains partial. Next is app-level coverage of these action paths;
+live UI and signed-app hardware acceptance also remain pending. The build was
+not installed or launched. No live HID operation was run.

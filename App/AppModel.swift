@@ -61,6 +61,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var lastWheelNotches: Int?
     @Published private(set) var tiltEventCount = 0
     @Published private(set) var lastTiltNotches: Int?
+    @Published private(set) var precisionSessionActionStatus: String?
     @Published private var guidedPrecisionFailure: String?
     @Published private var guidedReadinessDisposition: PrecisionSetupGuide.Readiness?
     @Published private var runtimeOwnerBindingID: UUID?
@@ -1404,21 +1405,25 @@ final class AppModel: ObservableObject {
         return nil
     }
 
-    func confirmJournalRotation() {
-        guard !isTerminating else { return }
-        guard journalRotationGateFailureText == nil else { return }
+    @discardableResult
+    func confirmJournalRotation(reviewed: PrecisionRuntimeJournalRotationReview? = nil) -> Bool {
+        guard !isTerminating else { return false }
+        guard journalRotationGateFailureText == nil else { return false }
         journalRotationInProgress = true
         defer { journalRotationInProgress = false }
+        var archived = false
         do {
-            guard let review = try PrecisionRuntimeJournalRotator.review(
-                runtimeJournalURL: Self.runtimeJournalFileURL
-            ) else {
+            let candidate: PrecisionRuntimeJournalRotationReview?
+            if let reviewed { candidate = reviewed }
+            else { candidate = try PrecisionRuntimeJournalRotator.review(runtimeJournalURL: Self.runtimeJournalFileURL) }
+            guard let review = candidate else {
                 journalRotationAvailable = false
                 journalRotationStatusText =
                     "No runtime journal on disk; nothing was retired"
-                return
+                return false
             }
             let receipt = try PrecisionRuntimeJournalRotator.rotate(review)
+            archived = true
             journalRotationAvailable = false
             journalRotationSummary = nil
             journalRotationStatusText =
@@ -1427,6 +1432,7 @@ final class AppModel: ObservableObject {
             journalRotationStatusText = journalRotationFailureText(error)
         }
         refreshJournalRotationReview()
+        return archived
     }
 
     private func journalRotationFailureText(_ error: Error) -> String {
@@ -1557,12 +1563,17 @@ final class AppModel: ObservableObject {
 
     func completeRuntimeOwnerSessionRollover() async {
         guard !isTerminating else { return }
-        guard runtimeOwnerCanRollover, let owner = runtimeOwner else { return }
+        guard runtimeOwnerCanRollover, !runtimeOwnerOperationInProgress,
+              let owner = runtimeOwner else { return }
+        runtimeOwnerOperationInProgress = true
+        defer { runtimeOwnerOperationInProgress = false }
         do {
             try await owner.completeSessionRollover()
             stopWheelObserver()
             runtimeOwner = nil
             runtimeOwnerBindingID = nil
+            guidedEnableAttempt = PrecisionSetupGuide.EnableAttempt()
+            guidedPrecisionFailure = nil
             runtimeOwnerSession = nil
             runtimeOwnerRootGeneration = nil
             refreshJournalRotationReview()
@@ -3810,7 +3821,7 @@ extension AppModel {
             return "The button is restored. This session still owns the connection; quit and reopen the app before preparing another session."
         }
         if runtimeOwnerAuthorizationExpired {
-            return "The previous confirmation window expired. Open setup to release the old session and prepare again."
+            return "The previous confirmation window expired. Release the expired preparation below, then review setup again."
         }
         return "Tap to mute and hold-and-scroll for volume. Setup and explicit confirmation are required each session."
     }
@@ -3825,7 +3836,7 @@ extension AppModel {
         } else if runtimeOwnerDeviceDisconnected {
             stopReason = "The device disconnected. Open Advanced to review the connection before preparing again."
         } else if runtimeOwnerAuthorizationExpired {
-            stopReason = "Preparation expired. Open Advanced to release the previous session and prepare again."
+            stopReason = "Preparation expired. Release the expired preparation in Controls, then review setup again."
         } else if runtimeOwnerIsAdmitted {
             stopReason = "This session already owns the device. Use the current audio or deactivation controls."
         } else if runtimeOwnerIsBound && !runtimeOwnerCanAdmit && !runtimeOwnerBindInProgress {
@@ -3913,5 +3924,75 @@ extension AppModel {
             return
         }
         setAudioExecutionEnabled(true)
+    }
+}
+
+extension AppModel {
+    var precisionSessionActions: Set<PrecisionSessionActions.Action> {
+        PrecisionSessionActions.available(bound: runtimeOwnerIsBound,
+            admitted: runtimeOwnerIsAdmitted, diverted: runtimeOwnerControlIsDiverted,
+            canDeactivate: runtimeOwnerCanDeactivate, canRelease: runtimeOwnerCanRollover,
+            completedJournal: journalRotationAvailable, recovery: runtimeOwnerNeedsRecovery || runtimeOwnerCanRecover,
+            disconnected: runtimeOwnerDeviceDisconnected,
+            busy: runtimeOwnerOperationInProgress || runtimeOwnerBindInProgress || journalRotationInProgress
+                || rootQueryInProgress || firmwareFingerprintInProgress || controlEnumerationInProgress
+                || reportingSnapshotInProgress || recoveryRehearsalInProgress || transactionSimulationInProgress
+                || restoreTrialSimulationInProgress || precisionPreflightInProgress
+                || mappedLivePreflightInProgress || firmwareMigrationCommitInProgress,
+            terminating: isTerminating)
+    }
+
+    func sessionActionConfirmationID(_ action: PrecisionSessionActions.Action) -> UUID? {
+        guard precisionSessionActions.contains(action), action != .archive else { return nil }
+        return runtimeOwnerBindingID
+    }
+
+    func confirmPrecisionSessionAction(_ action: PrecisionSessionActions.Action, expected: UUID) async {
+        guard PrecisionSessionActions.acceptsOwnerAction(action, expected: expected,
+            current: runtimeOwnerBindingID, available: precisionSessionActions) else {
+            precisionSessionActionStatus = "The session changed. Review the current controls before confirming again."
+            return
+        }
+        switch action {
+        case .deactivate:
+            setAudioExecutionEnabled(false)
+            await confirmRuntimeOwnerDeactivation()
+            guard !isTerminating, runtimeOwnerBindingID == expected else { return }
+            precisionSessionActionStatus = runtimeOwnerIsAdmitted && !runtimeOwnerControlIsDiverted
+                && !runtimeOwnerNeedsRecovery && !runtimeOwnerDeviceDisconnected
+                ? "Precision is restored and audio is off. Quit and reopen before starting another session."
+                : "Restoration did not complete. Audio is paused; review the result in Advanced."
+        case .release:
+            await completeRuntimeOwnerSessionRollover()
+            guard !isTerminating else { return }
+            precisionSessionActionStatus = runtimeOwnerIsBound
+                ? "The session could not be released. Review the result in Advanced."
+                : "The prepared session was released. You can review preparation again."
+        case .archive: return
+        }
+    }
+
+    func completedSessionArchiveReview() -> PrecisionRuntimeJournalRotationReview? {
+        guard precisionSessionActions.contains(.archive) else { return nil }
+        do {
+            let review = try PrecisionRuntimeJournalRotator.review(runtimeJournalURL: Self.runtimeJournalFileURL)
+            if review == nil { refreshJournalRotationReview() }
+            return review
+        } catch {
+            precisionSessionActionStatus = "The completed record could not be reviewed. Open Advanced for details."
+            journalRotationStatusText = journalRotationFailureText(error)
+            return nil
+        }
+    }
+
+    func confirmCompletedSessionArchive(_ review: PrecisionRuntimeJournalRotationReview) {
+        guard precisionSessionActions.contains(.archive) else {
+            precisionSessionActionStatus = "The session state changed. Review it before archiving."
+            return
+        }
+        let archived = confirmJournalRotation(reviewed: review)
+        precisionSessionActionStatus = archived
+            ? "The completed record was archived. You can now prepare Precision again."
+            : "The record could not be archived. Open Advanced to review its current state."
     }
 }

@@ -1,5 +1,6 @@
 import AppKit
 import MXErgoCore
+import MXErgoPrecisionRuntimeOwner
 import MXErgoHIDPP
 import Combine
 import SwiftUI
@@ -7,6 +8,8 @@ import SwiftUI
 struct ObserverMenuView: View {
     @ObservedObject var model: AppModel
     @State private var showingAdvanced = false
+    @State private var pendingSessionAction: SessionActionConfirmation?
+    @State private var pendingSessionArchive: PrecisionRuntimeJournalRotationReview?
     @State private var showingPrecisionSetup = false
     @State private var pendingSetupStep: PrecisionSetupGuide.Step?
     @State private var pendingSetupOwner: UUID?
@@ -25,9 +28,6 @@ struct ObserverMenuView: View {
     @State private var showingRuntimeOwnerBindConfirmation = false
     @State private var showingRuntimeOwnerAdmitConfirmation = false
     @State private var showingRuntimeOwnerRecoverConfirmation = false
-    @State private var showingRuntimeOwnerDeactivateConfirmation = false
-    @State private var showingRuntimeOwnerRolloverConfirmation = false
-    @State private var showingJournalRotationConfirmation = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -137,15 +137,72 @@ struct ObserverMenuView: View {
             if model.runtimeOwnerControlIsDiverted && !model.runtimeOwnerNeedsRecovery {
                 audioTestSection
             }
+            if !model.runtimeOwnerNeedsRecovery && !model.runtimeOwnerCanRecover && !model.runtimeOwnerDeviceDisconnected {
+                precisionSessionControls
+            }
             if !model.runtimeOwnerIsAdmitted && !model.runtimeOwnerNeedsRecovery {
                 DisclosureGroup("Prepare Precision audio", isExpanded: $showingPrecisionSetup) {
                     guidedPrecisionSetup.padding(.top, 6)
                 }
             }
-            Button(model.runtimeOwnerNeedsRecovery ? "Open recovery controls…" : "Advanced setup and deactivation…") {
+            Button(model.runtimeOwnerNeedsRecovery ? "Open recovery controls…" : "Advanced setup and diagnostics…") {
                 showingAdvanced = true
             }
             .controlSize(.small)
+        }
+    }
+
+    private var precisionSessionControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if model.precisionSessionActions.contains(.deactivate) {
+                Button("Restore Precision button…") {
+                    if let token = model.sessionActionConfirmationID(.deactivate) {
+                        pendingSessionAction = SessionActionConfirmation(action: .deactivate, bindingID: token)
+                    }
+                }
+            }
+            if model.precisionSessionActions.contains(.release) {
+                Button(model.runtimeOwnerAuthorizationExpired ? "Release expired preparation…" : "Release prepared session…") {
+                    if let token = model.sessionActionConfirmationID(.release) {
+                        pendingSessionAction = SessionActionConfirmation(action: .release, bindingID: token)
+                    }
+                }
+            }
+            if model.precisionSessionActions.contains(.archive) {
+                Button("Archive completed session…") { pendingSessionArchive = model.completedSessionArchiveReview() }
+                Text("Keep the completed record as a backup so a fresh session can be prepared.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if let status = model.precisionSessionActionStatus {
+                Text(status).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .controlSize(.small)
+        .confirmationDialog(pendingSessionAction?.action == .deactivate
+            ? "Restore the Precision button?" : "Release this prepared session?",
+            isPresented: Binding(get: { pendingSessionAction != nil },
+                                 set: { if !$0 { pendingSessionAction = nil } })) {
+            if let confirmation = pendingSessionAction {
+                Button(confirmation.action == .deactivate ? "Restore button and stop audio" : "Release session") {
+                    Task { await model.confirmPrecisionSessionAction(confirmation.action, expected: confirmation.bindingID) }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(pendingSessionAction?.action == .deactivate
+                ? "This pauses Precision audio and restores the button's saved setting, then checks the result. Keep BetterTouchTool and Logi Options quit. The connection remains owned until you quit. A failed device change is not retried automatically."
+                : "This releases the prepared session without changing device settings. It does not activate Precision or start a new preparation. You will need to confirm any later activation separately.")
+        }
+        .confirmationDialog("Archive this completed session record?",
+            isPresented: Binding(get: { pendingSessionArchive != nil },
+                                 set: { if !$0 { pendingSessionArchive = nil } })) {
+            if let review = pendingSessionArchive {
+                Button("Archive completed record") { model.confirmCompletedSessionArchive(review) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The record is kept as a backup, not deleted. Device settings and the recovery baseline stay unchanged. Archiving stops if the record has changed since this review.\n\n" + (pendingSessionArchive?.summary ?? ""))
         }
     }
 
@@ -1260,45 +1317,7 @@ struct ObserverMenuView: View {
                 Text("BetterTouchTool and Logi Options must be fully quit. This stops the current observer and runs explicit Precision recover for CID 00ED. It can send one restore SET. It does not retry, re-admit, or inverse-SET on failure. Power-cycle first if you only needed the firmware default.")
             }
 
-            Button("Deactivate Precision…") {
-                showingRuntimeOwnerDeactivateConfirmation = true
-            }
-            .controlSize(.small)
-            .disabled(
-                !model.runtimeOwnerCanDeactivate
-                    || model.runtimeOwnerOperationInProgress
-            )
-            .confirmationDialog(
-                "Deactivate Precision and send one restore SET?",
-                isPresented: $showingRuntimeOwnerDeactivateConfirmation
-            ) {
-                Button("Cancel", role: .cancel) {}
-                Button("Deactivate and send SET", role: .destructive) {
-                    Task { await model.confirmRuntimeOwnerDeactivation() }
-                }
-            } message: {
-                Text("This sends the reviewed restore SET for Precision CID 00ED and requires an independent GET. It does not restart the observer. Precision mute and hold+scroll volume stop after deactivation.")
-            }
-
-            Button("Release for session rollover…") {
-                showingRuntimeOwnerRolloverConfirmation = true
-            }
-            .controlSize(.small)
-            .disabled(
-                !model.runtimeOwnerCanRollover
-                    || model.runtimeOwnerOperationInProgress
-            )
-            .confirmationDialog(
-                "Release the observer restart fence for a new session?",
-                isPresented: $showingRuntimeOwnerRolloverConfirmation
-            ) {
-                Button("Cancel", role: .cancel) {}
-                Button("Release the fence") {
-                    Task { await model.completeRuntimeOwnerSessionRollover() }
-                }
-            } message: {
-                Text("This discards the bound runtime owner and lifts the restart fence so the observer can start on a new connection. It sends no HID command and does not restore CID 00ED. If Precision may still be diverted on the hardware, recover it on the new connection before relying on the button.")
-            }
+            precisionSessionControls
 
             if let summary = model.inputDiagnosticsSummary {
                 Divider()
@@ -1351,22 +1370,6 @@ struct ObserverMenuView: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
-            }
-            Button("Retire completed runtime journal…") {
-                showingJournalRotationConfirmation = true
-            }
-            .controlSize(.small)
-            .disabled(model.journalRotationGateFailureText != nil)
-            .confirmationDialog(
-                "Retire the completed runtime journal?",
-                isPresented: $showingJournalRotationConfirmation
-            ) {
-                Button("Cancel", role: .cancel) {}
-                Button("Archive and retire") {
-                    model.confirmJournalRotation()
-                }
-            } message: {
-                Text("This renames the completed journal so a fresh one can bootstrap from the unchanged recovery baseline. It is never deleted, sends no HID command, opens no device, and refuses any journal still holding active, ambiguous, conflicted, or recovery-required evidence.")
             }
             if let gate = model.journalRotationGateFailureText,
                model.journalRotationAvailable {
@@ -1925,4 +1928,9 @@ private extension PrecisionSetupGuide.Step {
         case .bind: "Reserve this session for Precision. You will still confirm activation separately. Preparation expires; if it expires, release the session in Advanced before preparing again. Connection monitoring cannot restart until the session is released."
         }
     }
+}
+
+private struct SessionActionConfirmation {
+    let action: PrecisionSessionActions.Action
+    let bindingID: UUID
 }

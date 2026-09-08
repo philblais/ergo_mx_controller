@@ -6,6 +6,7 @@ import SwiftUI
 
 struct ObserverMenuView: View {
     @ObservedObject var model: AppModel
+    @State private var showingAdvanced = false
     @State private var showingRootQueryConfirmation = false
     @State private var showingFirmwareFingerprintConfirmation = false
     @State private var showingFirmwareMigrationDryRunConfirmation = false
@@ -34,17 +35,38 @@ struct ObserverMenuView: View {
 
             Divider()
 
-            permissionSection
-            connectionSection
-            protocolSafetySection
-            reportSection
-            eventLayerSection
-            diagnosticsLogSection
-            loginItemSection
-            scrollAxisSection
-            calibrationSection
-            intentPreviewSection
-            audioTestSection
+            Picker("View", selection: $showingAdvanced) {
+                Text("Controls").tag(false)
+                Text("Advanced").tag(true)
+            }
+            .pickerStyle(.segmented)
+
+            if showingAdvanced {
+                Text("Setup and diagnostics")
+                    .font(.headline)
+                Text("Precision setup still uses the reviewed steps below. Device changes require confirmation.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                protocolSafetySection
+                audioTestSection
+                connectionSection
+                reportSection
+                eventLayerDiagnosticsSection
+                diagnosticsLogSection
+                scrollAxisSection
+                calibrationSection
+                intentPreviewSection
+            } else {
+                Label(model.connectionSummary, systemImage: "computermouse")
+                    .font(.subheadline.weight(.medium))
+                permissionSection
+                Divider()
+                eventLayerSection
+                Divider()
+                precisionSummarySection
+                Divider()
+                loginItemSection
+            }
 
             Divider()
 
@@ -78,6 +100,10 @@ struct ObserverMenuView: View {
         .disabled(model.isTerminating)
         .frame(width: 370)
         .onAppear { model.refreshPermissionStatus() }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            guard model.eventLayerEnabled else { return }
+            model.refreshEventLayerDiagnostics()
+        }
     }
 
     private var header: some View {
@@ -88,17 +114,30 @@ struct ObserverMenuView: View {
                 Text("MX Ergo Controller")
                     .font(.headline)
                 Spacer()
-                Text("AUDIO OPT-IN")
-                    .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(.blue.opacity(0.14), in: Capsule())
             }
 
-            Text("Thumb, tilt and wheel-click actions are replaced only while the BetterTouchTool replacement below is switched on; quit BTT first or both will act. After Input Monitoring is granted, this window should show reports when you press buttons. Precision mute/volume only work after Bind → Admit, with Audio test on.")
+            Text("Your everyday controls and Precision audio.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var precisionSummarySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Precision audio: \(model.precisionSummary)", systemImage: "speaker.wave.2")
+                .font(.subheadline.weight(.medium))
+            Text(model.precisionSummaryDetail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if model.runtimeOwnerControlIsDiverted && !model.runtimeOwnerNeedsRecovery {
+                audioTestSection
+            }
+            Button(model.runtimeOwnerNeedsRecovery ? "Open recovery controls…" : "Open Precision setup…") {
+                showingAdvanced = true
+            }
+            .controlSize(.small)
         }
     }
 
@@ -138,7 +177,7 @@ struct ObserverMenuView: View {
                     model.openAccessibilitySettings()
                 }
                 .controlSize(.small)
-                Text("Required to suppress and post events: the BetterTouchTool replacement and the Precision scroll swallow both need it. The MX Ergo itself is not affected either way.")
+                Text("Allow Accessibility to use button remapping and Precision hold-and-scroll volume.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -243,15 +282,7 @@ struct ObserverMenuView: View {
 
     /// The BetterTouchTool replacement. Its switch is remembered across
     /// launches; turning it on takes over five controls globally.
-    private var eventLayerSection: some View {
-        eventLayerBody
-            .onReceive(
-                Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-            ) { _ in
-                guard model.eventLayerEnabled else { return }
-                model.refreshEventLayerDiagnostics()
-            }
-    }
+    private var eventLayerSection: some View { eventLayerBody }
 
     private var eventLayerBody: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -259,7 +290,7 @@ struct ObserverMenuView: View {
                 get: { model.eventLayerEnabled },
                 set: { model.setEventLayerEnabled($0, remembering: true) }
             )) {
-                Text("Replace BetterTouchTool for thumb, tilt and wheel click")
+                Text("Button remapping")
                     .font(.subheadline.weight(.medium))
             }
             .toggleStyle(.switch)
@@ -285,6 +316,26 @@ struct ObserverMenuView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            DisclosureGroup("Button actions") {
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
+                    ForEach(model.eventLayerBindings, id: \.trigger) { binding in
+                        detailRow(binding.control, binding.intent)
+                    }
+                }
+                .font(.caption)
+                .padding(.top, 5)
+            }
+
+            Text("Thumb buttons, wheel tilt, and wheel click. Keep BetterTouchTool quit to avoid duplicate actions. These mappings also affect matching controls on other mice.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var eventLayerDiagnosticsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Button remapping diagnostics").font(.subheadline.weight(.medium))
             if model.eventLayerEnabled {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
                     ForEach(model.eventLayerBindings, id: \.trigger) { binding in
@@ -337,6 +388,10 @@ struct ObserverMenuView: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            if !model.eventLayerEnabled {
+                Text("Enable button remapping in Controls to inspect its events.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -1699,8 +1754,8 @@ struct ObserverMenuView: View {
             }
 
             Text(model.audioExecutionEnabled
-                ? "Mute and volume execute; all other actions remain preview-only."
-                : "Preview only—actions are not executed while Audio test is off.")
+                ? "Precision mute and volume are enabled. Ordinary button remapping has its own switch."
+                : "Precision audio is off. Ordinary button remapping has its own switch.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -1735,7 +1790,7 @@ struct ObserverMenuView: View {
             .font(.caption)
             .foregroundStyle(model.audioStatus.isFailure ? .orange : .secondary)
 
-            Text("Disable BetterTouchTool's Precision mute and volume triggers before enabling this test. The switch resets to off whenever the app launches.")
+            Text("Tap Precision to mute, or hold it and scroll to change volume. Keep BetterTouchTool and Logi Options quit. Audio resets to off when the app launches.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1759,12 +1814,12 @@ struct ObserverMenuView: View {
 
     private var reportPlaceholder: String {
         guard !model.devices.isEmpty else {
-            return "Reports appear after the MX Ergo connects. This build does not remap buttons."
+            return "Reports appear while the observer is running and the MX Ergo is connected."
         }
         guard model.inputMonitoringGranted else {
-            return "Grant Input Monitoring in System Settings, then click this window again. Move the ball or press a button; remapping is not live."
+            return "Grant Input Monitoring in System Settings, then return here and move the ball or press a button."
         }
-        return "Move the ball or press a button. The report count should increase. Thumb, tilt, and wheel-click still belong to BetterTouchTool or macOS."
+        return "Move the ball or press a button to inspect incoming reports. Button remapping is controlled separately in Controls."
     }
 
     private func hexPair(_ device: HIDDeviceProperties) -> String {

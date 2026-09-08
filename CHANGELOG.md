@@ -2050,3 +2050,34 @@ attended signed-app validation of the new transcript and failure gate. No new
 product or dependency edge, physical output call site, SET bytes, retry,
 automatic recovery, protected journal write, or event mapping was introduced.
 The build was not installed or launched. No live HID operation was run.
+
+
+Milestone 3A adds a daily-use Controls panel and a separate Advanced view.
+Controls shows connection, permissions, remembered button remapping, an
+expandable action list, Precision/audio state, and launch-at-login settings.
+Raw reports, packet tools, simulations, calibration, and diagnostic injection
+buttons remain available in Advanced. Existing Precision setup and recovery
+controls and their confirmation dialogs remain there; this is not yet the
+guided activation workflow.
+
+The menu bar and Controls panel share connection and Precision summaries.
+Recovery takes precedence over an active label; an admitted runtime with a
+restored button is shown as inactive, and disabling audio while the button is
+still diverted is shown as paused. The explanation distinguishes pausing audio
+from restoring the button. A stopped observer is not presented as a disconnected
+device while an admitted Precision session owns the connection. Diagnostics
+refresh in both views. Stale claims that ordinary remapping is unavailable or
+preview-only were corrected.
+
+The full verification workflow passed all 462 tests without skips, signed app
+and helper builds, and signature/isolation audits. No tests or timing limits
+were changed. The earlier timing failures did not recur in this session's
+baseline or final verification. The UI was compile-checked and reviewed in
+source; live layout and interaction acceptance remain pending.
+
+Milestone 3 remains partial. Next is the guided preparation/confirmation flow,
+including expired preparation and eligible completed-journal handling, with
+orchestration regression coverage. No authorization, journal handling, device
+command, retry, automatic activation, event synthesis, dependency edge, or
+launch behavior was changed. The build was not installed or launched.
+No live HID operation was run.

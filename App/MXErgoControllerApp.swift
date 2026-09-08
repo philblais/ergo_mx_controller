@@ -83,14 +83,7 @@ private struct ControllerStatusMenu: View {
                 model.openInputMonitoringSettings()
             }
         }
-        if let report = model.lastReport {
-            Text("HID reports: \(report.count)")
-        } else {
-            Text("HID reports: none yet")
-        }
-        if let intent = model.lastIntent {
-            Text("Last preview: \(intent.name)")
-        }
+        Text("Precision audio: \(model.precisionSummary)")
         Text(model.eventLayerEnabled
             ? "Button remapping active. Keep BetterTouchTool quit to avoid duplicate actions."
             : "Button remapping inactive. Open the controller to enable it.")
@@ -115,17 +108,7 @@ private struct ControllerStatusMenu: View {
         }
     }
 
-    private var connectionStatusText: String {
-        if model.status == .stopped {
-            return "Observer stopped"
-        }
-
-        if model.devices.isEmpty {
-            return "Waiting for MX Ergo"
-        }
-
-        return "MX Ergo connected"
-    }
+    private var connectionStatusText: String { model.connectionSummary }
 
     private func showControllerWindow() {
         ControllerWindowPresenter.shared.show(model: model)

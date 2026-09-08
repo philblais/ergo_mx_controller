@@ -3751,3 +3751,56 @@ private enum PrecisionReadinessAppError: LocalizedError {
         }
     }
 }
+
+
+extension AppModel {
+    /// Runtime ownership outlives observation and can outlive diversion.
+    /// Present those facts separately instead of treating a stopped observer
+    /// or an admitted runtime as the device's current control state.
+    var connectionSummary: String {
+        if runtimeOwnerDeviceDisconnected { return "MX Ergo disconnected" }
+        if runtimeOwnerIsAdmitted { return "MX Ergo connected · Precision session" }
+        switch status {
+        case .stopped: return "Connection not being monitored"
+        case .starting: return "Looking for MX Ergo…"
+        case .observing: return devices.isEmpty ? "Waiting for MX Ergo" : "MX Ergo connected"
+        case .failed: return "Connection needs attention"
+        }
+    }
+
+    var precisionSummary: String {
+        if runtimeOwnerNeedsRecovery { return "Recovery required" }
+        if runtimeOwnerOperationInProgress || runtimeOwnerBindInProgress { return "Working…" }
+        if runtimeOwnerDeviceDisconnected { return "Disconnected" }
+        if runtimeOwnerControlIsDiverted {
+            if audioExecutionEnabled && audioStatus.isFailure { return "Audio needs attention" }
+            return audioExecutionEnabled ? "Active" : "Audio paused"
+        }
+        if runtimeOwnerIsAdmitted { return "Inactive · button restored" }
+        if runtimeOwnerAuthorizationExpired { return "Preparation expired" }
+        if runtimeOwnerCanAdmit { return "Ready for confirmation" }
+        return "Inactive"
+    }
+
+    var precisionSummaryDetail: String {
+        if runtimeOwnerNeedsRecovery {
+            return "Precision needs a recovery review. Open the recovery controls before trying to enable it again."
+        }
+        if runtimeOwnerOperationInProgress || runtimeOwnerBindInProgress {
+            return "Wait for the current Precision operation to finish."
+        }
+        if runtimeOwnerDeviceDisconnected {
+            return "Reconnect the MX Ergo, then review its state in Precision setup. Activation will not restart automatically."
+        }
+        if runtimeOwnerControlIsDiverted {
+            return "The Precision button is assigned to this app. Deactivate it in Precision setup to restore its usual behavior before quitting; switching audio off only pauses mute and volume."
+        }
+        if runtimeOwnerIsAdmitted {
+            return "The button is restored. This session still owns the connection; quit and reopen the app before preparing another session."
+        }
+        if runtimeOwnerAuthorizationExpired {
+            return "The previous confirmation window expired. Open setup to release the old session and prepare again."
+        }
+        return "Tap to mute and hold-and-scroll for volume. Setup and explicit confirmation are required each session."
+    }
+}

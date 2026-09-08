@@ -1963,3 +1963,38 @@ Existing request admission and ambiguous-write handling remain authoritative.
 No public API, product, dependency edge, output call site, retry, automatic
 recovery, journal write, or event mapping was added. The build was not installed
 or launched. No live HID operation was run.
+
+
+The pure connection-verification sequence prepares the next part of milestone
+2B3 without changing the runtime writer. Its package-only state machine emits
+Root GetFeature(0x1B04), Root GetFeature(0x0003), GetDeviceInfo, each bounded
+GetFwInfo, and a final Root GetFeature(0x1B04) consistency check. Completion
+requires the initial and final full Root descriptors to match each other and
+the expected feature index/version, plus exact equality with the canonical
+firmware identity. Its Observation is transcript evidence only, not endpoint
+provenance, continuity with a previous observer, or permission to send a SET.
+
+Every composite response key is used once. The three Root reads use distinct
+software IDs. Firmware replies do not echo their entity index, so each firmware
+request uses a distinct nonzero software ID. Entity count 16 is refused before
+any firmware-entity request; reusing an ID or using zero would weaken correlation.
+The maximum is 15 entities, 19 requests, and 64 response candidates. The tracked
+historical MX Ergo record has three firmware entities. Unrelated input cannot
+advance a stage, and correlated errors, echoed requests, malformed packets,
+changed features, or a changed fingerprint terminate the sequence. Explicit
+abort is sticky and also invalidates a completed observation.
+
+Fourteen regression tests raise the package total from 435 to 449, all passing
+without skips. They cover delayed Root/firmware replies, entity bounds 1/15/16,
+full-descriptor drift, firmware drift, correlated errors and echoes, malformed
+input, candidate limits, single-flight requests, and abort at every stage.
+A source audit confirms no other production source references the sequence.
+The full app/helper builds, signing checks, and isolation audits passed.
+
+Milestone 2 remains partial. The next review must connect this verifier to the
+acquired endpoint through the sole reviewed output seam, bind responses to that
+endpoint and its lifetime, enforce deadlines/drain on failure, and prevent SET
+admission until the new evidence is accepted. This commit changes no writer
+allowlist, I/O implementation, package product, dependency edge, SET bytes,
+retry policy, or journal authority. The build was not installed or launched.
+No live HID operation was run.

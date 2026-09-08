@@ -61,6 +61,10 @@ final class AppModel: ObservableObject {
     @Published private(set) var lastWheelNotches: Int?
     @Published private(set) var tiltEventCount = 0
     @Published private(set) var lastTiltNotches: Int?
+    @Published private var guidedPrecisionFailure: String?
+    @Published private var guidedReadinessDisposition: PrecisionSetupGuide.Readiness?
+    @Published private var runtimeOwnerBindingID: UUID?
+    @Published private var guidedEnableAttempt = PrecisionSetupGuide.EnableAttempt()
     @Published private(set) var audioExecutionEnabled = false
     @Published private(set) var audioStatus: AudioExecutionStatus = .disabled
     @Published private(set) var inputMonitoringGranted = CGPreflightListenEventAccess()
@@ -1069,6 +1073,7 @@ final class AppModel: ObservableObject {
 
         precisionReadinessAttempted = true
         precisionReadinessSnapshot = nil
+        guidedReadinessDisposition = nil
         precisionReadinessStatusText =
             "Scanning competitors and validating immutable lifecycle evidence…"
 
@@ -1130,11 +1135,13 @@ final class AppModel: ObservableObject {
                         runtimeJournalData: runtimeData,
                         reloadedRuntimeJournalData: reloadedRuntime
                     )
+                guidedReadinessDisposition = .recover
                 precisionReadinessStatusText =
                     "Reconnect-recovery inputs are ready for review only—not authorized. Confirm Recover to send one restore SET."
             } else {
                 precisionReadinessSnapshot = try PrecisionTemporaryDiversionReadinessAudit
                     .evaluate(input)
+                guidedReadinessDisposition = .activate
                 precisionReadinessStatusText =
                     "Lifecycle inputs are ready for review only—not authorized for execution"
             }
@@ -1306,6 +1313,8 @@ final class AppModel: ObservableObject {
                 }
             )
             runtimeOwner = owner
+            runtimeOwnerBindingID = UUID()
+            guidedEnableAttempt = PrecisionSetupGuide.EnableAttempt()
             runtimeOwnerSession = session
             runtimeOwnerRootGeneration = rootGeneration
             await owner.setControlEventHandler { [weak self] intent in
@@ -1553,6 +1562,7 @@ final class AppModel: ObservableObject {
             try await owner.completeSessionRollover()
             stopWheelObserver()
             runtimeOwner = nil
+            runtimeOwnerBindingID = nil
             runtimeOwnerSession = nil
             runtimeOwnerRootGeneration = nil
             refreshJournalRotationReview()
@@ -3219,6 +3229,7 @@ final class AppModel: ObservableObject {
         let hadReview = precisionReadinessAttempted
             || precisionReadinessSnapshot != nil
         precisionReadinessSnapshot = nil
+        guidedReadinessDisposition = nil
         if hadReview {
             precisionReadinessStatusText = reason
         }
@@ -3802,5 +3813,105 @@ extension AppModel {
             return "The previous confirmation window expired. Open setup to release the old session and prepare again."
         }
         return "Tap to mute and hold-and-scroll for volume. Setup and explicit confirmation are required each session."
+    }
+}
+
+extension AppModel {
+    var precisionSetupState: PrecisionSetupGuide.State {
+        let stopReason: String?
+        if isTerminating { stopReason = "Wait for shutdown to finish." }
+        else if runtimeOwnerNeedsRecovery || runtimeOwnerCanRecover {
+            stopReason = "Recovery needs a separate review. Open recovery controls in Advanced."
+        } else if runtimeOwnerDeviceDisconnected {
+            stopReason = "The device disconnected. Open Advanced to review the connection before preparing again."
+        } else if runtimeOwnerAuthorizationExpired {
+            stopReason = "Preparation expired. Open Advanced to release the previous session and prepare again."
+        } else if runtimeOwnerIsAdmitted {
+            stopReason = "This session already owns the device. Use the current audio or deactivation controls."
+        } else if runtimeOwnerIsBound && !runtimeOwnerCanAdmit && !runtimeOwnerBindInProgress {
+            stopReason = runtimeOwnerStatusText
+        } else if guidedEnableAttempt.consumed {
+            stopReason = "This activation was already attempted. Open Advanced to review the result before preparing another session."
+        } else if !accessibilityGranted || !inputMonitoringGranted {
+            stopReason = "Grant Input Monitoring and Accessibility above, then return to setup."
+        } else if audioExecutionEnabled {
+            stopReason = "Turn off Precision audio in Advanced before preparing a new session."
+        } else if let failure = guidedPrecisionFailure, !runtimeOwnerIsBound {
+            stopReason = failure
+        } else { stopReason = nil }
+
+        func progress(_ complete: Bool, attempted: Bool, working: Bool = false,
+                      gate: String?, failure: String) -> PrecisionSetupGuide.Progress {
+            if working { return .working }
+            if complete { return .complete }
+            if attempted { return .blocked(failure + " Open Advanced to review before trying again.") }
+            if let gate { return .blocked(gate) }
+            return .pending
+        }
+        let currentRoot = rootQuerySucceeded && rootEvidenceGeneration == connectionGeneration
+        let currentFirmware = firmwareFingerprint != nil && firmwareEvidenceGeneration == connectionGeneration
+        let stages: [PrecisionSetupGuide.Step: PrecisionSetupGuide.Progress] = [
+            .connection: progress(currentRoot, attempted: rootQueryAttempted,
+                working: rootQueryInProgress, gate: rootQueryGateFailureText, failure: rootQueryStatusText),
+            .firmware: progress(currentFirmware, attempted: firmwareFingerprintAttempted,
+                working: firmwareFingerprintInProgress, gate: firmwareFingerprintGateFailureText, failure: firmwareFingerprintStatusText),
+            .restorePreview: progress(!restorePacketPlans.isEmpty && currentRoot && currentFirmware,
+                attempted: restorePacketPreviewAttempted, gate: restorePacketPreviewGateFailureText, failure: restorePacketPreviewStatusText),
+            .selfTest: progress(restoreTrialSimulationReport != nil && currentRoot && currentFirmware,
+                attempted: restoreTrialSimulationAttempted, working: restoreTrialSimulationInProgress,
+                gate: restoreTrialSimulationGateFailureText, failure: restoreTrialSimulationStatusText),
+            .baseline: progress(precisionPreflightSnapshot != nil && precisionPreflightEvidenceGeneration == connectionGeneration,
+                attempted: precisionPreflightAttempted, working: precisionPreflightInProgress,
+                gate: precisionPreflightGateFailureText, failure: precisionPreflightStatusText),
+            .readiness: progress(precisionReadinessSnapshot != nil && guidedReadinessDisposition == .activate,
+                attempted: precisionReadinessAttempted, gate: precisionReadinessGateFailureText, failure: precisionReadinessStatusText),
+            .bind: progress(runtimeOwnerCanAdmit, attempted: false, working: runtimeOwnerBindInProgress,
+                gate: precisionReadinessGateFailureText, failure: runtimeOwnerStatusText)
+        ]
+        return PrecisionSetupGuide.evaluate(stages,
+            operationInProgress: runtimeOwnerOperationInProgress || runtimeOwnerBindInProgress
+                || firmwareMigrationCommitInProgress || controlEnumerationInProgress
+                || reportingSnapshotInProgress || mappedLivePreflightInProgress
+                || recoveryRehearsalInProgress || transactionSimulationInProgress
+                || journalRotationInProgress,
+            stopReason: stopReason, readiness: guidedReadinessDisposition,
+            completedJournalAvailable: journalRotationAvailable)
+    }
+
+    func performGuidedPrecisionStep(_ step: PrecisionSetupGuide.Step) async {
+        guard PrecisionSetupGuide.accepts(step, current: precisionSetupState) else { return }
+        switch step {
+        case .connection: performOneShotRootQuery()
+        case .firmware: performReadOnlyFirmwareFingerprint()
+        case .restorePreview: performRestoreOnlyPacketPreview()
+        case .selfTest: performRestoreOnlyHardwareTrialSimulation()
+        case .baseline: performReadOnlyPrecisionPreflight()
+        case .readiness: performPrecisionLifecycleReadinessReview()
+        case .bind:
+            await bindDormantRuntimeOwner()
+            if !runtimeOwnerCanAdmit && !runtimeOwnerCanRecover {
+                guidedPrecisionFailure = runtimeOwnerStatusText + " Open Advanced to review this session."
+            }
+        }
+    }
+
+    var precisionSetupConfirmationID: UUID? {
+        guard precisionSetupState == .readyForConfirmation, runtimeOwner != nil else { return nil }
+        return runtimeOwnerBindingID
+    }
+
+    func confirmGuidedPrecisionAudio(expectedOwner: UUID) async {
+        let ready = precisionSetupState == .readyForConfirmation
+        guard guidedEnableAttempt.consume(expected: expectedOwner,
+            current: runtimeOwnerBindingID, ready: ready) else { return }
+        await confirmRuntimeOwnerAdmission()
+        guard PrecisionSetupGuide.shouldEnableAudio(expected: expectedOwner,
+            current: runtimeOwnerBindingID, diverted: runtimeOwnerControlIsDiverted,
+            recovery: runtimeOwnerNeedsRecovery, disconnected: runtimeOwnerDeviceDisconnected,
+            terminating: isTerminating, operationInProgress: runtimeOwnerOperationInProgress) else {
+            setAudioExecutionEnabled(false)
+            return
+        }
+        setAudioExecutionEnabled(true)
     }
 }

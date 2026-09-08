@@ -2081,3 +2081,47 @@ orchestration regression coverage. No authorization, journal handling, device
 command, retry, automatic activation, event synthesis, dependency edge, or
 launch behavior was changed. The build was not installed or launched.
 No live HID operation was run.
+
+
+Milestone 3B adds user-driven Precision preparation to the Controls panel.
+The guide presents device support, firmware identity, offline restore preview,
+offline self-test, live baseline comparison, readiness review, and session
+binding one at a time. Each action reuses the existing AppModel gate and
+operation. No step runs on appearance or chains automatically. A separate
+Enable Precision audio confirmation invokes the existing admission method;
+audio is enabled only after the same session reports active diversion.
+
+The presentation-only `PrecisionSetupGuide` in the existing Core target orders
+steps without carrying device evidence or execution authority. Missing or
+invalidated predecessor evidence blocks advancement; concurrent work blocks
+new actions. Captured step confirmations are rechecked before dispatch.
+Readiness is explicitly classified as activation or recovery and cleared when
+the underlying snapshot is invalidated. Recovery and completed journals route
+to Advanced before guided binding or preparation, respectively. Expiry,
+disconnection, failed preparation, and failed activation also stop the guide.
+
+A fresh UUID is assigned whenever an owner is bound and cleared on release.
+The final dialog captures it and must match immediately before admission and
+before enabling audio. A separate guided enable-attempt latch is consumed
+before the await, preventing the guide from offering another attempt after
+failure. This complements rather than replaces the runtime's one-use authority.
+Admission without active diversion, recovery, disconnection, termination, or
+ongoing work cannot enable audio.
+
+Eleven decision regression tests raise the total from 462 to 473. They cover
+ordered prerequisites, invalidated/missing evidence, concurrent work, stale
+step and owner confirmations, recovery-before-bind, completed-journal routing,
+one-use enable attempts, and audio gating. AppModel wiring was reviewed in
+source and compiled with the app; live UI interaction is still unvalidated.
+The read-only advisor approved the corrected implementation. Full verification
+passed all 473 tests without skips, all four signed builds, and signing/isolation
+audits. An earlier full run hit a timing-sensitive drain test; it passed in the
+focused run and the unchanged full rerun. The baseline also reproduced its
+known disconnect timeout. No deadlines or test expectations were weakened.
+
+Milestone 3 remains partial. Next: bring eligible completed-session archival,
+expired-session release, and explicit deactivation into the daily-use flow,
+with app-level integration coverage. These still use the existing Advanced
+controls. No new device commands, SET bytes, automatic retry, recovery,
+journal mutation path, dependency edge, or launch behavior was added.
+The app was not installed or launched. No live HID operation was run.

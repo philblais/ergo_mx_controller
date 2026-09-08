@@ -7,6 +7,9 @@ import SwiftUI
 struct ObserverMenuView: View {
     @ObservedObject var model: AppModel
     @State private var showingAdvanced = false
+    @State private var showingPrecisionSetup = false
+    @State private var pendingSetupStep: PrecisionSetupGuide.Step?
+    @State private var pendingSetupOwner: UUID?
     @State private var showingRootQueryConfirmation = false
     @State private var showingFirmwareFingerprintConfirmation = false
     @State private var showingFirmwareMigrationDryRunConfirmation = false
@@ -134,10 +137,72 @@ struct ObserverMenuView: View {
             if model.runtimeOwnerControlIsDiverted && !model.runtimeOwnerNeedsRecovery {
                 audioTestSection
             }
-            Button(model.runtimeOwnerNeedsRecovery ? "Open recovery controls…" : "Open Precision setup…") {
+            if !model.runtimeOwnerIsAdmitted && !model.runtimeOwnerNeedsRecovery {
+                DisclosureGroup("Prepare Precision audio", isExpanded: $showingPrecisionSetup) {
+                    guidedPrecisionSetup.padding(.top, 6)
+                }
+            }
+            Button(model.runtimeOwnerNeedsRecovery ? "Open recovery controls…" : "Advanced setup and deactivation…") {
                 showingAdvanced = true
             }
             .controlSize(.small)
+        }
+    }
+
+    private var guidedPrecisionSetup: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            switch model.precisionSetupState {
+            case .working:
+                ProgressView("Preparing Precision…")
+                    .controlSize(.small)
+            case let .blocked(reason):
+                Label("Setup needs attention", systemImage: "exclamationmark.triangle")
+                    .font(.caption.weight(.semibold))
+                Text(reason).font(.caption).foregroundStyle(.secondary)
+            case let .next(step):
+                Text("Step \(step.rawValue + 1) of 7 · \(step.setupTitle)")
+                    .font(.caption.weight(.semibold))
+                Text(step.setupExplanation)
+                    .font(.caption).foregroundStyle(.secondary)
+                Button(step.setupTitle + "…") { pendingSetupStep = step }
+                    .controlSize(.small)
+            case .readyForConfirmation:
+                Text("Preparation complete")
+                    .font(.caption.weight(.semibold))
+                Text("You can now enable tap-to-mute and hold-and-scroll volume for this session.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Enable Precision audio…") { pendingSetupOwner = model.precisionSetupConfirmationID }
+                    .controlSize(.small)
+            }
+        }
+        .padding(10)
+        .background(.blue.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+        .confirmationDialog("Continue Precision preparation?", isPresented: Binding(
+            get: { pendingSetupStep != nil },
+            set: { if !$0 { pendingSetupStep = nil } }
+        )) {
+            if let step = pendingSetupStep {
+                Button(step.setupTitle) {
+                    Task { await model.performGuidedPrecisionStep(step) }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(pendingSetupStep?.setupExplanation ?? "")
+        }
+        .confirmationDialog("Enable Precision audio for this session?",
+                            isPresented: Binding(
+                                get: { pendingSetupOwner != nil },
+                                set: { if !$0 { pendingSetupOwner = nil } }
+                            )) {
+            if let owner = pendingSetupOwner {
+                Button("Enable Precision audio", role: .destructive) {
+                    Task { await model.confirmGuidedPrecisionAudio(expectedOwner: owner) }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Keep BetterTouchTool and Logi Options fully quit. This checks the connected device, then changes the Precision button assignment and enables tap-to-mute and hold-and-scroll volume. Restore the button in Precision setup before quitting if you need its usual behavior; quitting does not restore it. A failed device change will not be retried automatically.")
         }
     }
 
@@ -1833,6 +1898,31 @@ struct ObserverMenuView: View {
             Text(label)
             Text(value)
                 .textSelection(.enabled)
+        }
+    }
+}
+
+private extension PrecisionSetupGuide.Step {
+    var setupTitle: String {
+        switch self {
+        case .connection: "Check device support"
+        case .firmware: "Check device software"
+        case .restorePreview: "Check saved button settings"
+        case .selfTest: "Run the safety self-test"
+        case .baseline: "Check the current button setting"
+        case .readiness: "Review readiness"
+        case .bind: "Prepare this session"
+        }
+    }
+    var setupExplanation: String {
+        switch self {
+        case .connection: "Read the connected MX Ergo's supported controls. This does not change its button settings."
+        case .firmware: "Read the device software identity and compare it during preparation. This does not change its button settings."
+        case .restorePreview: "Check the saved restore settings locally. This step sends nothing to the device."
+        case .selfTest: "Test the restoration logic with a simulated device. Your trackball is not changed."
+        case .baseline: "Read the Precision button's current setting and compare it with the saved baseline. No button setting is changed."
+        case .readiness: "Review the collected evidence and check for competing software. This step does not enable Precision."
+        case .bind: "Reserve this session for Precision. You will still confirm activation separately. Preparation expires; if it expires, release the session in Advanced before preparing again. Connection monitoring cannot restart until the session is released."
         }
     }
 }

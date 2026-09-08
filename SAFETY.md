@@ -136,6 +136,15 @@ identity, one feature and session generation, exact journal bytes, the immutable
 packet bytes, and a monotonic expiry. It is consumed before effects and
 re-checked after every awaited handoff.
 
+Before constructing the live Precision transport, startup must obtain a fresh
+read-only Root/firmware transcript from the acquired endpoint that matches the
+authorized binding. This evidence grants no SET permission. Verification output
+requires a sequence-issued token matching the exact UUID, session, packet bytes,
+and endpoint metadata; the normal SET allowlist remains separate. Input is armed
+before output, deadlines and candidate limits are bounded, and failure drains
+physical output before releasing ownership. Captured observer values remain
+authorization context, not a substitute for current endpoint evidence.
+
 ## 9. Teardown order is fixed
 
 Shutdown always: closes request admission, disconnects the transport, waits for

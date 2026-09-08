@@ -266,7 +266,7 @@ private func advance(_ sequence: inout PrecisionReadOnlyConnectionVerification,
     }
 }
 
-@Test func connectionVerificationRemainsPackageOnlyAndUnwiredToOutput() throws {
+@Test func connectionVerificationHasOnlyTheReviewedProductionDriver() throws {
     let packageRoot = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let sourceURL = packageRoot.appendingPathComponent(
@@ -280,6 +280,10 @@ private func advance(_ sequence: inout PrecisionReadOnlyConnectionVerification,
         at: packageRoot.appendingPathComponent("Sources"), includingPropertiesForKeys: nil))
     for case let file as URL in sources where file.pathExtension == "swift" && file != sourceURL {
         let text = try String(contentsOf: file, encoding: .utf8)
-        #expect(!text.contains("PrecisionReadOnlyConnectionVerification"))
+        if file.lastPathComponent == "PrecisionConnectionVerificationDriver.swift" {
+            #expect(text.contains("PrecisionReadOnlyConnectionVerification"))
+        } else {
+            #expect(!text.contains("PrecisionReadOnlyConnectionVerification"))
+        }
     }
 }

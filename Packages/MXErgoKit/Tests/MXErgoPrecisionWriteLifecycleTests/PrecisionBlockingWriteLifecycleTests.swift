@@ -613,6 +613,8 @@ private func outputFrame(
 ) -> PrecisionTransportOutputFrame {
     let bytes: [UInt8]
     switch kind {
+    case .connectionVerification:
+        preconditionFailure("Verification frames require a sequence-issued token")
     case .getReporting:
         bytes = fixture.plan.verificationRequest.bytes
     case .applyTemporaryDiversion:
@@ -924,4 +926,48 @@ private func sourceText(under directory: URL) throws -> String {
         result += try String(contentsOf: file, encoding: .utf8)
     }
     return result
+}
+
+
+@Test func verificationCancellationBeforeSchedulingMakesNoBlockingCall() async throws {
+    let fixture = try writeFixture()
+    let scheduler = ManualScheduler()
+    let calls = LockedCounter()
+    let writer = try makeWriter(fixture: fixture, scheduler: scheduler) { _ in calls.increment(); return 0 }
+    var sequence = try PrecisionReadOnlyConnectionVerification(expectedSession: fixture.binding.session)
+    let request = try sequence.beginOutputRequest()
+    let frame = PrecisionTransportOutputFrame(requestID: request.requestID, reportType: .output,
+        reportID: 0x11, bytes: request.message.bytes, device: fixture.binding.session.device,
+        connectionEpoch: fixture.binding.session.connectionEpoch, rootGeneration: fixture.binding.rootGeneration,
+        connectionVerification: request)
+    let task = Task { try await writer.write(frame) }
+    try await waitUntil { scheduler.count == 1 }
+    writer.cancelPendingWrite(requestID: request.requestID, reason: .timeout)
+    await #expect(throws: PrecisionTransportReportIOError.timeout) { try await task.value }
+    scheduler.runNext()
+    #expect(calls.value == 0)
+    await writer.shutdownAndDrain()
+}
+
+@Test func verificationTimeoutAfterEntryRetainsOutputUntilPhysicalDrain() async throws {
+    let fixture = try writeFixture()
+    let gate = BlockingCallGate(returnCode: 0)
+    let writer = try makeWriter(fixture: fixture, blockingCall: gate.invoke)
+    var sequence = try PrecisionReadOnlyConnectionVerification(expectedSession: fixture.binding.session)
+    let request = try sequence.beginOutputRequest()
+    let frame = PrecisionTransportOutputFrame(requestID: request.requestID, reportType: .output,
+        reportID: 0x11, bytes: request.message.bytes, device: fixture.binding.session.device,
+        connectionEpoch: fixture.binding.session.connectionEpoch, rootGeneration: fixture.binding.rootGeneration,
+        connectionVerification: request)
+    let task = Task { try await writer.write(frame) }
+    try await waitUntil { gate.entryCount == 1 }
+    writer.cancelPendingWrite(requestID: request.requestID, reason: .timeout)
+    await #expect(throws: PrecisionTransportReportIOError.timeout) { try await task.value }
+    #expect(writer.isDraining)
+    #expect(!writer.isStopped)
+    let drain = Task { await writer.shutdownAndDrain() }
+    gate.release()
+    await drain.value
+    #expect(writer.isStopped)
+    #expect(writer.entryCount == 1)
 }

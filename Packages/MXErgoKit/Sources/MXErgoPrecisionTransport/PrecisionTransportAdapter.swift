@@ -14,6 +14,21 @@ package struct PrecisionTransportOutputFrame: Sendable, Equatable {
     package let device: JournalDeviceIdentity
     package let connectionEpoch: UInt64
     package let rootGeneration: UInt64
+    package let connectionVerification: PrecisionConnectionVerificationRequest?
+
+    package init(requestID: UUID, reportType: PrecisionTransportReportType,
+                 reportID: UInt8, bytes: [UInt8], device: JournalDeviceIdentity,
+                 connectionEpoch: UInt64, rootGeneration: UInt64,
+                 connectionVerification: PrecisionConnectionVerificationRequest? = nil) {
+        self.requestID = requestID
+        self.reportType = reportType
+        self.reportID = reportID
+        self.bytes = bytes
+        self.device = device
+        self.connectionEpoch = connectionEpoch
+        self.rootGeneration = rootGeneration
+        self.connectionVerification = connectionVerification
+    }
 }
 
 package struct PrecisionTransportInputFrame: Sendable, Equatable {

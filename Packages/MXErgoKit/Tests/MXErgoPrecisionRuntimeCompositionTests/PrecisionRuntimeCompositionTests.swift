@@ -19,6 +19,7 @@ import Testing
 
     let runtime = try await PrecisionRuntimeCompositionFactory.make(
         configuration: fixture.configuration,
+        verifyConnection: { _, _ in },
         acquire: { plan, binding, operationLease in
             #expect(plan == fixture.plan)
             #expect(binding == fixture.binding)
@@ -36,7 +37,7 @@ import Testing
         }
     )
 
-    #expect(events.values == ["acquire", "transport-make", "endpoint-start"])
+    #expect(events.values == ["acquire", "endpoint-start", "transport-make"])
     #expect(snapshotReads.value == 1)
     #expect(try await runtime.lifecycleState() == .inactive)
 
@@ -80,6 +81,7 @@ import Testing
 
     let runtime = try await PrecisionRuntimeCompositionFactory.make(
         configuration: configuration,
+        verifyConnection: { _, _ in },
         acquire: { _, _, _ in
             events.record("acquire")
             return endpoint
@@ -146,6 +148,7 @@ import Testing
     do {
         _ = try await PrecisionRuntimeCompositionFactory.make(
             configuration: invalidConfiguration,
+            verifyConnection: { _, _ in },
             acquire: { _, _, _ in
                 events.record("acquire")
                 throw RuntimeTestError.unused
@@ -186,6 +189,7 @@ import Testing
     do {
         _ = try await PrecisionRuntimeCompositionFactory.make(
             configuration: invalidConfiguration,
+            verifyConnection: { _, _ in },
             acquire: { _, _, _ in
                 events.record("acquire")
                 throw RuntimeTestError.unused
@@ -213,6 +217,7 @@ import Testing
     do {
         _ = try await PrecisionRuntimeCompositionFactory.make(
             configuration: fixture.configuration,
+            verifyConnection: { _, _ in },
             acquire: { _, _, _ in endpoint },
             makeTransport: { _, acquired in
                 #expect(acquired === endpoint)
@@ -227,8 +232,8 @@ import Testing
         #expect(failure.deviceCloseReturn == 81)
     }
 
-    #expect(events.values == ["transport-make", "endpoint-shutdown"])
-    #expect(events.count("endpoint-start") == 0)
+    #expect(events.values == ["endpoint-start", "transport-make", "endpoint-shutdown"])
+    #expect(events.count("endpoint-start") == 1)
 }
 
 @Test func endpointStartFailureDisconnectsThenDrainsAndReportsCloseResult() async throws {
@@ -247,6 +252,7 @@ import Testing
     do {
         _ = try await PrecisionRuntimeCompositionFactory.make(
             configuration: fixture.configuration,
+            verifyConnection: { _, _ in },
             acquire: { _, _, _ in endpoint },
             makeTransport: { _, _ in transport }
         )
@@ -259,7 +265,6 @@ import Testing
 
     #expect(events.values == [
         "endpoint-start",
-        "transport-disconnect",
         "endpoint-shutdown",
     ])
 }
@@ -275,6 +280,7 @@ import Testing
     )
     let runtime = try await PrecisionRuntimeCompositionFactory.make(
         configuration: fixture.configuration,
+        verifyConnection: { _, _ in },
         acquire: { _, _, _ in endpoint },
         makeTransport: { _, _ in transport }
     )
@@ -303,6 +309,7 @@ import Testing
     )
     let runtime = try await PrecisionRuntimeCompositionFactory.make(
         configuration: fixture.configuration,
+        verifyConnection: { _, _ in },
         acquire: { _, _, _ in endpoint },
         makeTransport: { _, _ in transport }
     )
@@ -855,4 +862,55 @@ private actor EndpointEvidenceGate {
             UInt64(17)
         }
     }
+}
+
+
+@Test func verificationFailureClosesEndpointBeforeAnyTransportCanExist() async throws {
+    let fixture = try runtimeFixture()
+    let events = RuntimeEventRecorder()
+    let endpoint = FakeRuntimeEndpoint(events: events, closeReturn: 0)
+    let transports = RuntimeCounter()
+    do {
+        _ = try await PrecisionRuntimeCompositionFactory.make(configuration: fixture.configuration,
+            verifyConnection: { _, _ in throw RuntimeTestError.unused },
+            acquire: { _, _, _ in endpoint },
+            makeTransport: { _, _ in
+                transports.increment()
+                return FakeRuntimeTransport(session: fixture.binding.session, events: events)
+            })
+        Issue.record("Verification failure must prevent runtime publication")
+    } catch let failure as PrecisionRuntimeCompositionFailure {
+        #expect(failure.phase == .connectionVerification)
+        #expect(failure.deviceCloseReturn == 0)
+    }
+    #expect(transports.value == 0)
+    #expect(events.values == ["endpoint-start", "endpoint-shutdown"])
+}
+
+@Test func cancellationDuringVerificationCannotPublishOrConstructTransport() async throws {
+    let fixture = try runtimeFixture()
+    let events = RuntimeEventRecorder()
+    let endpoint = FakeRuntimeEndpoint(events: events, closeReturn: 0)
+    let gate = EndpointEvidenceGate()
+    let transports = RuntimeCounter()
+    let task = Task {
+        try await PrecisionRuntimeCompositionFactory.make(configuration: fixture.configuration,
+            verifyConnection: { _, _ in await gate.wait() },
+            acquire: { _, _, _ in endpoint },
+            makeTransport: { _, _ in
+                transports.increment()
+                return FakeRuntimeTransport(session: fixture.binding.session, events: events)
+            })
+    }
+    await gate.waitUntilStarted()
+    #expect(transports.value == 0)
+    task.cancel()
+    await gate.release()
+    do { _ = try await task.value; Issue.record("Cancelled verification must fail") }
+    catch let failure as PrecisionRuntimeCompositionFailure {
+        #expect(failure.phase == .connectionVerification)
+        #expect(failure.underlying is CancellationError)
+    }
+    #expect(transports.value == 0)
+    #expect(endpoint.deviceCloseReturn == 0)
 }

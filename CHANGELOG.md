@@ -1998,3 +1998,55 @@ admission until the new evidence is accepted. This commit changes no writer
 allowlist, I/O implementation, package product, dependency edge, SET bytes,
 retry policy, or journal authority. The build was not installed or launched.
 No live HID operation was run.
+
+
+The connection-verification integration completes the live path for milestone
+2B3. Startup activates the acquired endpoint and runs the fixed read-only
+sequence before constructing the normal Precision transport, coordinator, or
+lifecycle. Root descriptors and canonical firmware must match the authorized
+binding. Callback source metadata and endpoint-owned liveness are checked;
+competitors are checked between requests and again after the final read window
+ends. The startup lease is revalidated before transport construction.
+
+Only the pure sequence can mint the new package-only request token. The sole
+reviewed output seam accepts it only when the UUID, session, immutable packet
+bytes, and existing endpoint binding metadata match exactly. The existing
+write lifecycle consumes each UUID once. Missing or substituted tokens cannot
+admit verification packets, and a verification token cannot carry apply or
+restore SET bytes. The normal three-packet allowlist is unchanged.
+
+Verification arms input before output, uses a per-request deadline capped at
+five seconds in production and a thirty-second total deadline, and applies the
+existing candidate/request bounds. Timeout or cancellation cancels both sides
+and ends the request window. Startup failures drain physical output and close
+the endpoint before returning an error; logical write completion does not
+release a still-running physical writer. No normal transport is constructed
+when verification fails or startup is cancelled.
+
+Thirteen regression tests raise the package total from 449 to 462. They cover
+forged/replayed tokens, queued and entered output cancellation, startup rollback,
+delayed replies, changed firmware, foreign source metadata, disconnect,
+competitor arrival, read cancellation, per-request and overall deadlines,
+invalid deadlines, and the final gate after the read window closes.
+
+All thirteen new tests passed in the expanded 462-test runs. The full workflow
+passed with 459 tests before the last three test-only additions, including all
+four signed builds and isolation audits. The expanded full runs encountered
+existing scheduling-sensitive timeout failures in
+`concurrentDisconnectWakesABlockedReplyReadAndPoisonsTheAttempt` and
+`cancellationInsideTheWriterBoundaryConsumesOneAttemptAndPoisons`. These were
+also observed on the unchanged baseline; the disconnect test passed in isolation.
+No test deadline or expectation was weakened. The expanded full suite is not
+claimed clean; deterministic synchronization of these old tests remains a
+separate hardening task. No tests were skipped.
+
+The read-only advisor found no blocking defect. Milestone 2 is implementation-
+complete in code and deterministic regression coverage; acceptance on the real
+MX Ergo remains pending. Fresh transcript equality is not proof of uninterrupted
+physical connection with the earlier observer, and the unavoidable race after
+the final lifecycle check remains guarded by ordinary request admission and
+ambiguous-write handling. Next: milestone 3's daily-use interface, followed by
+attended signed-app validation of the new transcript and failure gate. No new
+product or dependency edge, physical output call site, SET bytes, retry,
+automatic recovery, protected journal write, or event mapping was introduced.
+The build was not installed or launched. No live HID operation was run.

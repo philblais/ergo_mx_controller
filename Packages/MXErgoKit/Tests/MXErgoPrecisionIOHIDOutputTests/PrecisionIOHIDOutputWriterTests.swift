@@ -540,6 +540,8 @@ private func outputFrame(
 ) -> PrecisionTransportOutputFrame {
     let bytes: [UInt8]
     switch kind {
+    case .connectionVerification:
+        preconditionFailure("Verification frames require a sequence-issued token")
     case .getReporting:
         bytes = fixture.plan.verificationRequest.bytes
     case .applyTemporaryDiversion:
@@ -788,4 +790,42 @@ private func sourceText(under directory: URL) throws -> String {
         result += try String(contentsOf: file, encoding: .utf8)
     }
     return result
+}
+
+
+@Test func verificationTokenIsRequiredExactAndOneUseAtThePhysicalOutputSeam() async throws {
+    let fixture = try outputFixture()
+    let runtime = RecordingOutputRuntime(descriptor: validDescriptor())
+    let writer = try PrecisionIOHIDOutputWriter(plan: fixture.plan, binding: fixture.binding, runtime: runtime)
+    var sequence = try PrecisionReadOnlyConnectionVerification(expectedSession: fixture.binding.session)
+    let request = try sequence.beginOutputRequest()
+    func frame(id: UUID? = nil, bytes: [UInt8]? = nil, root: UInt64? = nil,
+               token: PrecisionConnectionVerificationRequest?) -> PrecisionTransportOutputFrame {
+        PrecisionTransportOutputFrame(requestID: id ?? request.requestID, reportType: .output,
+            reportID: 0x11, bytes: bytes ?? request.message.bytes, device: fixture.binding.session.device,
+            connectionEpoch: fixture.binding.session.connectionEpoch,
+            rootGeneration: root ?? fixture.binding.rootGeneration, connectionVerification: token)
+    }
+    let foreignSession = DeviceTransactionSession(device: fixture.binding.session.device,
+        featureID: 0x1B04, featureVersion: 3, featureIndex: fixture.binding.session.featureIndex,
+        connectionEpoch: fixture.binding.session.connectionEpoch + 1)
+    var foreign = try PrecisionReadOnlyConnectionVerification(expectedSession: foreignSession)
+    let foreignRequest = try foreign.beginOutputRequest()
+    for invalid in [
+        frame(token: nil), frame(id: UUID(), token: request),
+        frame(bytes: fixture.plan.applySetRequest.bytes, token: request),
+        frame(bytes: fixture.plan.restoreSetRequest.bytes, token: request),
+        frame(root: fixture.binding.rootGeneration + 1, token: request),
+        frame(id: foreignRequest.requestID, token: foreignRequest)
+    ] {
+        await #expect(throws: PrecisionWriteLifecycleError.invalidFrame) { try await writer.write(invalid) }
+    }
+    #expect(runtime.calls.isEmpty)
+    #expect(try await writer.write(frame(token: request)) == 0)
+    #expect(runtime.calls == [RecordedOutputCall(reportID: 0x11, bytes: request.message.bytes)])
+    await #expect(throws: PrecisionWriteLifecycleError.duplicateRequest(request.requestID)) {
+        try await writer.write(frame(token: request))
+    }
+    #expect(runtime.calls.count == 1)
+    await writer.shutdownAndDrain()
 }

@@ -13,6 +13,7 @@ enum PrecisionWriteLifecycleError: Error, Sendable, Equatable {
 
 package enum PrecisionReviewedOutputKind: Sendable, Equatable, Hashable {
     case getReporting
+    case connectionVerification
     case applyTemporaryDiversion
     case restoreTemporaryDiversion
 }
@@ -400,11 +401,22 @@ final class PrecisionBlockingWriteLifecycle:
               frame.bytes.first == HIDPP20LongMessage.reportID,
               frame.device == binding.session.device,
               frame.connectionEpoch == binding.session.connectionEpoch,
-              frame.rootGeneration == binding.rootGeneration,
-              let kind = reviewedBytes.first(where: {
-                $0.value == frame.bytes
-              })?.key else {
+              frame.rootGeneration == binding.rootGeneration else {
             throw PrecisionWriteLifecycleError.invalidFrame
+        }
+        let kind: PrecisionReviewedOutputKind
+        if let request = frame.connectionVerification {
+            guard request.requestID == frame.requestID,
+                  request.session == binding.session,
+                  request.message.bytes == frame.bytes else {
+                throw PrecisionWriteLifecycleError.invalidFrame
+            }
+            kind = .connectionVerification
+        } else {
+            guard let reviewed = reviewedBytes.first(where: { $0.value == frame.bytes })?.key else {
+                throw PrecisionWriteLifecycleError.invalidFrame
+            }
+            kind = reviewed
         }
         return PrecisionReviewedOutputRecord(
             requestID: frame.requestID,

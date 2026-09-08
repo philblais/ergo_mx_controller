@@ -8,6 +8,7 @@ package enum PrecisionRuntimeCompositionPhase: Sendable, Equatable {
     case configurationValidation
     case transportConstruction
     case endpointStart
+    case connectionVerification
 }
 
 /// Preserves both the primary construction failure and the direct-device
@@ -214,6 +215,13 @@ package enum PrecisionRuntimeCompositionFactory {
     ) async throws -> PrecisionRuntimeComposition {
         try await make(
             configuration: configuration,
+            verifyConnection: { configuration, endpoint in
+                _ = try await PrecisionConnectionVerificationDriver.verify(
+                    endpoint: endpoint, binding: configuration.binding,
+                    competitorProbe: configuration.competitorProbe,
+                    requestTimeoutNanoseconds: min(configuration.operationTimeoutNanoseconds, 5_000_000_000)
+                )
+            },
             acquire: { plan, binding, operationLease in
                 try PrecisionIOHIDAcquisitionFactory.make(
                     plan: plan,
@@ -270,6 +278,7 @@ package enum PrecisionRuntimeCompositionFactory {
 
     static func make(
         configuration: PrecisionRuntimeCompositionConfiguration,
+        verifyConnection: @Sendable (PrecisionRuntimeCompositionConfiguration, any PrecisionIOHIDAcquiredEndpoint) async throws -> Void,
         acquire: Acquire,
         makeTransport: MakeTransport
     ) async throws -> PrecisionRuntimeComposition {
@@ -306,6 +315,29 @@ package enum PrecisionRuntimeCompositionFactory {
             configuration.binding,
             configuration.operationLease
         )
+        do {
+            try Task.checkCancellation()
+            try await endpoint.start()
+        } catch {
+            await endpoint.shutdownAndDrain()
+            throw PrecisionRuntimeCompositionFailure(
+                phase: .endpointStart, underlying: error,
+                deviceCloseReturn: endpoint.deviceCloseReturn
+            )
+        }
+        do {
+            try await verifyConnection(configuration, endpoint)
+            try Task.checkCancellation()
+            try endpoint.validateActiveConnection()
+            try startupSafetyLease.validate()
+        } catch {
+            endpoint.disconnected()
+            await endpoint.shutdownAndDrain()
+            throw PrecisionRuntimeCompositionFailure(
+                phase: .connectionVerification, underlying: error,
+                deviceCloseReturn: endpoint.deviceCloseReturn
+            )
+        }
         let transport: any PrecisionTransportSession
         do {
             try Task.checkCancellation()
@@ -330,7 +362,6 @@ package enum PrecisionRuntimeCompositionFactory {
         )
         do {
             try Task.checkCancellation()
-            try await endpoint.start()
             if let handler = configuration.unsolicitedHIDPPHandler {
                 endpoint.setUnsolicitedHIDPPHandler { frame in
                     handler(frame.bytes)

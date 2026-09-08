@@ -24,7 +24,21 @@ package struct PrecisionConnectionVerificationObservation: Sendable, Equatable {
     package let requestCount: Int
 }
 
-/// Pure, unwired read-only sequence. The eventual driver must separately bind
+/// Exact read-only packet capability. Only the fixed sequence can mint it;
+/// its UUID is consumed by the existing output lifecycle's replay protection.
+package struct PrecisionConnectionVerificationRequest: Sendable, Equatable {
+    package let requestID: UUID
+    package let session: DeviceTransactionSession
+    package let message: HIDPP20LongMessage
+
+    fileprivate init(session: DeviceTransactionSession, message: HIDPP20LongMessage) {
+        requestID = UUID()
+        self.session = session
+        self.message = message
+    }
+}
+
+/// Pure read-only sequence. The driver must separately bind
 /// source/device lifetime, enforce a deadline, and abort on timeout or removal.
 /// Each response key is used once: firmware replies do not echo entity indexes.
 package struct PrecisionReadOnlyConnectionVerification: Sendable {
@@ -61,6 +75,11 @@ package struct PrecisionReadOnlyConnectionVerification: Sendable {
             throw PrecisionConnectionVerificationError.invalidExpectedSession
         }
         expected = expectedSession
+    }
+
+    package mutating func beginOutputRequest() throws -> PrecisionConnectionVerificationRequest {
+        let message = try beginRequest()
+        return PrecisionConnectionVerificationRequest(session: expected, message: message)
     }
 
     /// Consumes a stage once; calling again cannot obtain a resend packet.

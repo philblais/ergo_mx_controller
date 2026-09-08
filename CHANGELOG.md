@@ -2154,3 +2154,35 @@ reviewed in the main task against the stated requirements.
 Milestone 3 remains partial. Next is app-level coverage of these action paths;
 live UI and signed-app hardware acceptance also remain pending. The build was
 not installed or launched. No live HID operation was run.
+
+
+Milestone 3D extracts the app's confirmed restore/release sequencing into one
+persistent MainActor `PrecisionSessionActionFlow` in the existing Core target.
+AppModel supplies fresh snapshots and the existing runtime operations, then
+maps typed outcomes to status text. Controls and Advanced reach this same flow;
+AppModel no longer duplicates its effect ordering or completion classification.
+
+The flow rejects overlapping calls, cancelled tasks, stale session UUIDs,
+unavailable actions, and contradictory initial state before dispatch. It pauses
+audio before restoration, checks cancellation again, and awaits every operation
+it has already started. Its in-progress guard remains set through the final
+state read. Restoration succeeds only for the same admitted, restored session
+outside recovery, disconnection, or termination. Release succeeds only with no
+binding and no bound, admitted, or diverted state. Replacement sessions and
+termination suppress completion messages rather than describing an old action
+as the new session's result.
+
+Twelve deterministic async tests raise the total from 479 to 491. They exercise
+exact effect order, failed restore/release, suspended duplicate calls, stale
+confirmations and completions, contradictory flags, cancellation before and
+after entry, disconnect/recovery, and termination. Construction has no effects.
+The tests invoke production orchestration with fake effects; AppModel wiring is
+compiled and source-reviewed, not exercised through a running GUI or a full
+AppModel test fixture. Full verification passed all 491 tests without skips,
+all four signed builds, and signing/isolation audits.
+
+The advisor approved the extraction design and final implementation. No dependency edge,
+device command, retry, automatic action, journal mutation, or launch behavior
+was added. Milestone 3 remains partial: quiet routine-login startup and attended
+UI/hardware acceptance remain. The build was not installed or launched.
+No live HID operation was run.

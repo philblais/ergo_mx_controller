@@ -231,6 +231,7 @@ final class AppModel: ObservableObject {
     private var eventLayerAutostartAbandoned = false
     private var loggedLastObserved: String?
     private let launchID = UUID()
+    private let precisionSessionActionFlow = PrecisionSessionActionFlow()
     private var runtimeOwner: PrecisionRuntimeOwner?
     private var runtimeOwnerSession: DeviceTransactionSession?
     private var runtimeOwnerRootGeneration: UInt64?
@@ -3948,27 +3949,28 @@ extension AppModel {
     }
 
     func confirmPrecisionSessionAction(_ action: PrecisionSessionActions.Action, expected: UUID) async {
-        guard PrecisionSessionActions.acceptsOwnerAction(action, expected: expected,
-            current: runtimeOwnerBindingID, available: precisionSessionActions) else {
+        let outcome = await precisionSessionActionFlow.perform(action, expected: expected,
+            snapshot: {
+                .init(bindingID: self.runtimeOwnerBindingID, available: self.precisionSessionActions,
+                    bound: self.runtimeOwnerIsBound, admitted: self.runtimeOwnerIsAdmitted,
+                    diverted: self.runtimeOwnerControlIsDiverted, recovery: self.runtimeOwnerNeedsRecovery,
+                    disconnected: self.runtimeOwnerDeviceDisconnected, terminating: self.isTerminating)
+            },
+            pauseAudio: { self.setAudioExecutionEnabled(false) },
+            deactivate: { await self.confirmRuntimeOwnerDeactivation() },
+            release: { await self.completeRuntimeOwnerSessionRollover() })
+        switch outcome {
+        case .unavailable:
             precisionSessionActionStatus = "The session changed. Review the current controls before confirming again."
-            return
-        }
-        switch action {
-        case .deactivate:
-            setAudioExecutionEnabled(false)
-            await confirmRuntimeOwnerDeactivation()
-            guard !isTerminating, runtimeOwnerBindingID == expected else { return }
-            precisionSessionActionStatus = runtimeOwnerIsAdmitted && !runtimeOwnerControlIsDiverted
-                && !runtimeOwnerNeedsRecovery && !runtimeOwnerDeviceDisconnected
-                ? "Precision is restored and audio is off. Quit and reopen before starting another session."
-                : "Restoration did not complete. Audio is paused; review the result in Advanced."
-        case .release:
-            await completeRuntimeOwnerSessionRollover()
-            guard !isTerminating else { return }
-            precisionSessionActionStatus = runtimeOwnerIsBound
-                ? "The session could not be released. Review the result in Advanced."
-                : "The prepared session was released. You can review preparation again."
-        case .archive: return
+        case .restored:
+            precisionSessionActionStatus = "Precision is restored and audio is off. Quit and reopen before starting another session."
+        case .restorationFailed:
+            precisionSessionActionStatus = "Restoration did not complete. Audio is paused; review the result in Advanced."
+        case .released:
+            precisionSessionActionStatus = "The prepared session was released. You can review preparation again."
+        case .releaseFailed:
+            precisionSessionActionStatus = "The session could not be released. Review the result in Advanced."
+        case .busy, .interrupted: return
         }
     }
 

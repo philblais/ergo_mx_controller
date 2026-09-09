@@ -740,3 +740,36 @@ than relying on ordinary HID. The 2026-08-27 baseline recorded all nine controls
 at `flags 0000` while BTT was in daily use, so either BTT diverts and restores
 around each use, or it reads the vendor interface by some other means. Not
 investigated, and not needed: this app already has a working path.
+
+### Installed-app launch/status observation — 2026-09-09
+
+At approximately 15:39 PDT, the Release built from `d75919d` was opened from
+`/Applications/MX Ergo Controller.app` on macOS 26.6.2 (25G83). Its executable
+SHA-256 is `f23c7f794e05208bc58892ed5bf79511dd4db95ac9edba4c5e5e3c3f29afd105`.
+The signature had verified, and the same source passed all 517 tests in normal
+parallel verification plus the signed builds and audits.
+
+The user confirmed BetterTouchTool/Logitech software was uninstalled or not
+running, had switched the trackball off and on, and accepted the same mappings
+on other mice. The prelaunch process check found no controller or matching
+competitor. The method of quitting the former Xcode copy was not observed.
+After launch there was exactly one controller: PID 97686 at the installed path.
+
+The native accessibility tree and window image showed Controls open, MX Ergo
+connected, Input Monitoring granted, Accessibility granted, Button remapping
+On/Active, Launch at login On, and Precision audio Inactive. Expanded actions
+listed wheel click → Mission Control, lower thumb → Desktop right, upper thumb
+→ Desktop left, left tilt → Back, right tilt → Forward. This establishes the
+displayed status and mappings only; no physical action or login result is
+claimed. Permission and remapping settings were not changed by the task.
+
+The five protected record hashes and runtime journal matched before and after
+launch. Baseline remains `60ab614927d20871994ad0ebe7368158af9a26b2c1d60f7a2ab3c51635f77097`;
+runtime remains `fec5d33366c243242a845595cacae8100dc42e8ba94eb5f0846a6993604e06b3`.
+No archive, Precision activation, restore, recovery, or explicit HID++ query was
+invoked. The observer was running; no request/response transcript was captured.
+
+Window-close/reopen is not marked passed: an automated close followed by a
+status read showed a window again, but tool reactivation could account for it.
+Manual close/reopen, five physical controls, coexistence, preference persistence,
+login, Precision use/restoration, and working-week acceptance remain pending.

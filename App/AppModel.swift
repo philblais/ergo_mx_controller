@@ -74,7 +74,7 @@ final class AppModel: ObservableObject {
     /// exists so the requirement is visible before anything depends on it.
     @Published private(set) var accessibilityGranted = AXIsProcessTrusted()
     /// The BetterTouchTool replacement for the five ordinary-HID controls.
-    /// Promoted 2026-09-05. Off after every launch: enabling it takes over
+    /// Promoted 2026-09-05. Resumes its remembered preference at launch; enabling it takes over
     /// wheel click, both thumbs and both wheel tilts globally. It never
     /// touches the MX Ergo, and stopping it restores everything at once.
     @Published private(set) var eventLayerEnabled = false
@@ -187,6 +187,9 @@ final class AppModel: ObservableObject {
         "No completed runtime journal to retire"
     @Published private(set) var journalRotationSummary: String?
     @Published private(set) var journalRotationAvailable = false
+    /// Presentation only: a failed read-only review must remain visible at
+    /// login. It does not classify recovery or authorize journal operations.
+    @Published private(set) var runtimeJournalNeedsReview = false
     @Published private(set) var journalRotationInProgress = false
     @Published private(set) var inputDiagnosticsSummary: String?
     @Published private(set) var inputDiagnosticsInterpretation: String?
@@ -294,6 +297,25 @@ final class AppModel: ObservableObject {
         requestInputMonitoringIfNeeded()
         refreshJournalRotationReview()
         start()
+    }
+
+    var savedPrecisionNeedsReview: Bool {
+        recoveryJournalNeedsAttention || runtimeOwnerNeedsRecovery
+            || (runtimeOwner == nil && runtimeJournalNeedsReview)
+    }
+
+    /// Read after bootstrap has refreshed the journal review. A disconnected
+    /// trackball alone is normal at login and does not demand a window.
+    var launchNeedsAttention: Bool {
+        ControllerLaunchPresentation.needsAttention(
+            inputMonitoringGranted: inputMonitoringGranted,
+            accessibilityGranted: accessibilityGranted,
+            remappingRemembered: eventLayerRemembered,
+            remappingEnabled: eventLayerEnabled,
+            remappingNeedsAttention: eventLayerNeedsAttention,
+            loginItem: loginItemStatus,
+            savedPrecisionNeedsReview: savedPrecisionNeedsReview
+        )
     }
 
     func start() {
@@ -1377,17 +1399,20 @@ final class AppModel: ObservableObject {
                 runtimeJournalURL: Self.runtimeJournalFileURL
             ) else {
                 journalRotationAvailable = false
+                runtimeJournalNeedsReview = false
                 journalRotationSummary = nil
                 journalRotationStatusText =
                     "No runtime journal on disk; the next admission creates one"
                 return
             }
             journalRotationAvailable = true
+            runtimeJournalNeedsReview = false
             journalRotationSummary = review.summary
             journalRotationStatusText =
                 "A completed runtime journal is blocking further operations. Retiring it archives the file and lets a fresh journal bootstrap from the unchanged baseline."
         } catch {
             journalRotationAvailable = false
+            runtimeJournalNeedsReview = true
             journalRotationSummary = nil
             journalRotationStatusText = journalRotationFailureText(error)
         }

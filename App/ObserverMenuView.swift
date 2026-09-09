@@ -63,6 +63,12 @@ struct ObserverMenuView: View {
                 Label(model.connectionSummary, systemImage: "computermouse")
                     .font(.subheadline.weight(.medium))
                 permissionSection
+                if model.savedPrecisionNeedsReview {
+                    Label("Saved Precision state needs review.", systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Button("Review in Advanced") { showingAdvanced = true }
+                }
                 Divider()
                 eventLayerSection
                 Divider()

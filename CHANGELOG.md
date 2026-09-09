@@ -2186,3 +2186,46 @@ device command, retry, automatic action, journal mutation, or launch behavior
 was added. Milestone 3 remains partial: quiet routine-login startup and attended
 UI/hardware acceptance remain. The build was not installed or launched.
 No live HID operation was run.
+
+
+Milestone 3E separates startup services from controller-window presentation.
+The app captures its launch reason synchronously in the AppKit launch callback,
+then bootstraps before evaluating attention. Only a core open-application Apple
+event with the login marker in its property-data descriptor qualifies as login.
+Missing or unrecognized launch evidence displays the controller. Login stays
+menu-only after a prior window presentation when no attention is required.
+The first launch with the new presentation preference displays the controller.
+
+The existing Core target owns the one-shot presentation decision. Both menu
+appearance hooks remain bootstrap-only; a quiet decision is consumed just like
+a visible one. Explicit Open and app-reopen requests raise the controller
+independently. The new preference is recorded only after the window is visible.
+Ordinary remapping still uses its existing remembered On/Off preference and
+startup gates; presentation neither writes that preference nor changes login
+registration or Precision activation.
+
+Missing Input Monitoring, unavailable remembered remapping, remapping errors,
+login-registration attention, and saved Precision problems surface the window.
+The existing read-only runtime-journal review supplies a presentation flag:
+absent or eligible completed records clear it; every review failure sets it.
+This does not classify a record as recoverable or grant execution authority.
+Controls and the status menu explain that saved state needs review, with an
+explicit route to Advanced. A disconnected trackball alone and a remapping
+preference of Off do not demand a window.
+
+Nine decision tests raise the package total from 491 to 500. They cover quiet
+login with working remapping or remembered Off, first and unrecognized launches,
+required permissions, remapping failure, login-registration states, saved-state
+attention, and duplicate visible/quiet decisions. Full verification passed all
+500 tests without skips, all four signed builds, and signing/isolation audits.
+The advisor reviewed the design and corrected the launch-marker interpretation
+against the maintained [LaunchAtLogin implementation](https://github.com/sindresorhus/LaunchAtLogin-Modern/blob/main/Sources/LaunchAtLogin/LaunchAtLogin.swift#L32-L40). AppKit wiring is compiled
+and source-reviewed; actual login event delivery, window reopening, preference
+persistence across launches, and UI interactions require attended acceptance.
+
+Milestone 3's planned presentation features are implemented; acceptance remains
+open. Next: validate the installed build through login, ordinary controls,
+Precision preparation/use/restore, and normal interruptions using the runbook.
+No dependency edge, new device command, retry, automatic Precision activation,
+recovery, or journal mutation path was introduced. The build was not installed
+or launched. No live HID operation was run.

@@ -2262,3 +2262,42 @@ separate Xcode debug copy was running during preparation and was left running.
 Next requires user attendance, quitting competing software, an agreed ordinary
 input scope, and the current installed-build checklist. No GUI, login, or
 physical-control scenario is claimed passed. No live HID operation was run.
+
+
+Diagnostics hardening addresses the remaining logger concurrency warnings and
+a reproduced file-size defect. A standalone run of the previous logger wrote
+600,051 bytes after one oversized entry despite its 524,288-byte cap. The app
+now aliases `BoundedDiagnosticsLog` in the existing Core target so the actual
+writer can be tested without constructing AppModel or opening a device.
+
+The writer is checked Sendable. A serial queue preserves command order and
+keeps file I/O off the caller's thread; mutex-protected storage owns the handle,
+byte count, and cached timestamp formatter. There is no unchecked Sendable
+assertion. Start, append, and stop remain asynchronous with the same app call
+sites. A queue barrier supports deterministic reads in tests; it is not a
+durability guarantee or a new shutdown flush.
+
+Each entry reserves room for the rollover marker. Oversized entries retain a
+valid UTF-8 prefix and an explicit truncation marker, and rollover starts at
+offset zero. A failed create/write/truncate closes the writer; logging resumes
+only after an explicit start. The obsolete claim that diagnostics never include
+pointer movement is removed: the caller continues to select raw reports exactly
+as before. Reusing the formatter avoids constructing one per report. The file
+is bounded; dispatch backlog and real-session CPU/memory use remain to be measured.
+
+Eight tests raise the package total from 500 to 508. They cover disabled
+construction, submission order, post-stop appends, restart, repeated wrapping,
+UTF-8 truncation, marker accounting at a small cap, concurrent producers, and
+an unavailable path followed by explicit restart. Full verification passed all
+508 tests without skips, all four signed builds, and signing/isolation audits.
+The main Release build also passed with Swift warnings treated as errors; the
+previous DiagnosticsLog Sendable warnings are gone.
+
+The signed Release candidate was installed without launch, and its files match
+the preserved candidate. Its executable SHA-256 is
+`4d70fc34318e6b593855ece4bface9a708627c08e1f407c0f98bc0dd1080af9e`.
+The prior candidate remains available for rollback. Protected records and the
+runtime journal match their starting hashes. No dependency edge, device command,
+event synthesis, journal authority, preference, or termination behavior changed.
+Attended installed-app, login, ordinary-control, Precision, and working-week
+acceptance remain pending. No live HID operation was run.

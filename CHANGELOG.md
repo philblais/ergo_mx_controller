@@ -2386,3 +2386,18 @@ records and the runtime journal still match their recorded hashes.
 This closes the three recorded timing flakes; it is not a claim that every
 possible scheduling issue has been eliminated. Attended installed-app and
 working-week acceptance remain open. No live HID operation was run.
+
+
+Acceptance preparation refreshes the installed app to the verified `d75919d`
+Release candidate. Its executable SHA-256 is
+`f23c7f794e05208bc58892ed5bf79511dd4db95ac9edba4c5e5e3c3f29afd105`.
+All six installed files match the preserved bundle; the previous installed
+candidate is preserved for rollback. The signature verifies on macOS 26.6.2
+(25G83). The existing 517-test normal parallel verification and signed-build
+results apply to this unchanged source; no redundant suite run was performed.
+
+The app was not launched, and the separate running Xcode copy was not quit.
+The five protected records and runtime journal match their recorded hashes.
+User confirmation of normal quit, competing-software exit, power cycle, and
+ordinary-remapping scope remains the next gate. All attended acceptance rows
+remain unobserved. No live HID operation was run.

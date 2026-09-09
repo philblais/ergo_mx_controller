@@ -169,10 +169,20 @@ package enum PrecisionTransportFactory {
     }
 }
 
-/// Dormant, unexported transport boundary with injected report I/O.
-///
-/// This target has no package product or application/helper dependency. It
-/// imports no IOKit API and can reach output only through an injected writer.
+// Internal timing seam for deterministic deadline tests. The package factory
+// always uses the real monotonic clock and cancellation-aware Task.sleep.
+struct PrecisionTransportTiming: Sendable {
+    let nowNanoseconds: @Sendable () -> UInt64
+    let sleepNanoseconds: @Sendable (UInt64) async throws -> Void
+
+    static let continuous = PrecisionTransportTiming(
+        nowNanoseconds: { DispatchTime.now().uptimeNanoseconds },
+        sleepNanoseconds: { try await Task.sleep(nanoseconds: $0) }
+    )
+}
+
+/// Unexported transport boundary with injected report I/O. It imports no IOKit
+/// API and can reach output only through an injected writer.
 /// SET acknowledgement is retained as evidence; a separate reporting GET is
 /// the only source of authoritative state.
 actor PrecisionTransportAdapter: PrecisionTransportSession {
@@ -221,6 +231,7 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
     private let durableSnapshotLoader: DurableSnapshotLoader
     private let connectionValidator: @Sendable () throws -> Void
     private let operationTimeoutNanoseconds: UInt64
+    private let timing: PrecisionTransportTiming
     private var correlator: HIDPP20RequestCorrelator
     private var state: State = .idle
     private var consumedAttemptIDs: Set<UUID> = []
@@ -235,7 +246,8 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
         competitorProbe: @escaping CompetitorProbe,
         durableSnapshotLoader: @escaping DurableSnapshotLoader,
         connectionValidator: @escaping @Sendable () throws -> Void = {},
-        operationTimeoutNanoseconds: UInt64 = 5_000_000_000
+        operationTimeoutNanoseconds: UInt64 = 5_000_000_000,
+        timing: PrecisionTransportTiming = .continuous
     ) throws {
         guard plan.device == binding.session.device,
               binding.session.featureID == ReprogControlsV4.featureID,
@@ -255,6 +267,7 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
         self.durableSnapshotLoader = durableSnapshotLoader
         self.connectionValidator = connectionValidator
         self.operationTimeoutNanoseconds = operationTimeoutNanoseconds
+        self.timing = timing
         correlator = HIDPP20RequestCorrelator(
             connectionEpoch: binding.session.connectionEpoch
         )
@@ -722,9 +735,9 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
         kind: PendingKind,
         expectedSession: DeviceTransactionSession
     ) async throws -> HIDPP20CorrelatedReply {
-        let started = DispatchTime.now().uptimeNanoseconds
+        let started = timing.nowNanoseconds()
         while true {
-            let elapsed = DispatchTime.now().uptimeNanoseconds &- started
+            let elapsed = timing.nowNanoseconds() &- started
             guard elapsed < operationTimeoutNanoseconds else {
                 throw PrecisionTransportReportIOError.timeout
             }
@@ -808,11 +821,12 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
     ) async throws -> Int32 {
         let writer = self.writer
         let timeout = operationTimeoutNanoseconds
+        let timing = self.timing
         return try await withTaskCancellationHandler {
             try await withThrowingTaskGroup(of: Int32.self) { group in
                 group.addTask { try await writer.write(frame) }
                 group.addTask {
-                    try await Task.sleep(nanoseconds: timeout)
+                    try await timing.sleepNanoseconds(timeout)
                     writer.cancelPendingWrite(
                         requestID: frame.requestID,
                         reason: .timeout
@@ -838,13 +852,14 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
         requestID: UUID
     ) async throws -> PrecisionTransportInputFrame {
         let reader = self.reader
+        let timing = self.timing
         return try await withTaskCancellationHandler {
             try await withThrowingTaskGroup(
                 of: PrecisionTransportInputFrame.self
             ) { group in
                 group.addTask { try await reader.read(for: requestID) }
                 group.addTask {
-                    try await Task.sleep(nanoseconds: timeout)
+                    try await timing.sleepNanoseconds(timeout)
                     reader.cancelRequest(requestID, reason: .timeout)
                     throw PrecisionTransportReportIOError.timeout
                 }

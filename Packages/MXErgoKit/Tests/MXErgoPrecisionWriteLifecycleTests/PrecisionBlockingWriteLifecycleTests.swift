@@ -435,6 +435,8 @@ import Testing
 @Test func adapterDeadlineAfterApplyEntryIsPromptOutcomeUnknownAndStillDrains() async throws {
     let fixture = try writeFixture()
     let call = SelectiveBlockingCall(blockedKind: .applyTemporaryDiversion)
+    defer { call.release() }
+    let clock = ManualTransportTiming()
     let writer = try makeWriter(fixture: fixture, blockingCall: call.invoke)
     let reader = ScriptedLifecycleReader(frames: [
         try reportingFrame(fixture.plan.baseline, fixture: fixture),
@@ -465,7 +467,8 @@ import Testing
                 sha256: sha256(data)
             )
         },
-        operationTimeoutNanoseconds: 25_000_000
+        operationTimeoutNanoseconds: 25_000_000,
+        timing: clock.timing
     )
     let coordinator = DeviceTransactionCoordinator(
         repository: repository,
@@ -481,12 +484,22 @@ import Testing
     )
     let activationFinished = LockedFlag()
     let activation = Task {
-        defer { activationFinished.set() }
+        defer {
+            activationFinished.set()
+            call.blockedEntry.finish()
+            clock.finishObservation()
+        }
         return try await lifecycle.activate()
     }
 
-    try await waitUntil { call.count(.applyTemporaryDiversion) == 1 }
-    try await waitUntil { activationFinished.value }
+    try await call.blockedEntry.wait()
+    try await clock.waitForPendingSleep()
+    let armed = try #require(try await repository.loadValidated())
+    #expect(try armed.control(PrecisionTemporaryDiversionPlan.controlID).phase == .applyMayHaveOccurred)
+    #expect(clock.pendingCount == 1)
+    clock.advance(by: 24_999_999)
+    #expect(!activationFinished.value)
+    clock.advance(by: 1)
     await #expect(throws: PrecisionTransportError.poisoned) {
         try await activation.value
     }
@@ -506,11 +519,13 @@ import Testing
     #expect(control.attempts.count == 1)
 
     let drainFinished = LockedFlag()
+    let drainEntered = LifecycleEntrySignal()
     let drain = Task {
+        drainEntered.signal()
         await writer.shutdownAndDrain()
         drainFinished.set()
     }
-    try await Task.sleep(nanoseconds: 20_000_000)
+    try await drainEntered.wait()
     #expect(!drainFinished.value)
     call.release()
     await drain.value
@@ -703,6 +718,7 @@ private final class BlockingCallGate: @unchecked Sendable {
 }
 
 private final class SelectiveBlockingCall: @unchecked Sendable {
+    let blockedEntry = LifecycleEntrySignal()
     private let condition = NSCondition()
     private let blockedKind: PrecisionReviewedOutputKind
     private var records: [PrecisionReviewedOutputRecord] = []
@@ -719,6 +735,7 @@ private final class SelectiveBlockingCall: @unchecked Sendable {
             condition.unlock()
             return 0
         }
+        blockedEntry.signal()
         while !released { condition.wait() }
         condition.unlock()
         return 0

@@ -2350,3 +2350,39 @@ and working-week acceptance remain pending.
 
 No dependency edge, HID output, event synthesis, journal, preference, or
 termination behavior changed. No live HID operation was run.
+
+
+Deterministic transport timing replaces three scheduler-sensitive test setups.
+The disconnect test waits for a buffered blocked-read entry signal. The writer
+cancellation test pauses at the recorded writer boundary, cancels, and releases
+that gate instead of sleeping and polling for a frame count. An operation that
+ends before entry closes its signal so the observing test fails rather than
+waiting indefinitely for an entry that cannot occur.
+
+`PrecisionTransportAdapter` now owns an internal Sendable timing value for its
+monotonic elapsed-time reads and deadline sleeps. The package factory has no
+timing argument and continues to use `DispatchTime.now` and cancellable
+`Task.sleep`, with the same operation deadlines. No product, dependency edge,
+package API, device command, recovery authority, or event behavior was added.
+
+The post-apply deadline test owns a manual monotonic clock. It waits for both
+the blocked SET entry and its current timer registration, verifies the durable
+write-ahead phase, then advances to one nanosecond before the deadline and
+finally to the deadline itself. The adapter must return poisoned/outcomeUnknown
+while the physical call remains blocked, and shutdown must drain that call
+without another apply or restore. Earlier preflight timers are cancelled and
+removed; advancing time cannot resurrect them. Explicit entry signals also
+replace the test's polling and arbitrary drain-check sleep.
+
+Two manual-clock tests cover cancellation before and after sleep registration,
+zero-duration sleep, monotonic advancement, and release only at the deadline.
+They raise the package total to 517. The five focused tests passed in parallel
+and sequential modes. The normal, unwrapped `scripts/verify.sh` passed all 517
+tests without skips, all four signed builds, and the signing/isolation audits.
+The main Release build also passed with Swift warnings treated as errors and
+its signature verified. That build was preserved without installation or launch;
+the installed backlog candidate remains unchanged. All five protected live
+records and the runtime journal still match their recorded hashes.
+This closes the three recorded timing flakes; it is not a claim that every
+possible scheduling issue has been eliminated. Attended installed-app and
+working-week acceptance remain open. No live HID operation was run.

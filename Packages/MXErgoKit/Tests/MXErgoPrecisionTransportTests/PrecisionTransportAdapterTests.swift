@@ -180,11 +180,11 @@ import Testing
         plan: fixture.plan,
         safetyGate: AlwaysAllowingTestSafetyGate()
     )
-    let task = Task { try await lifecycle.activate() }
-
-    try await waitUntil(nanoseconds: 1_000_000_000) {
-        reader.hasPendingRead
+    let task = Task {
+        defer { reader.pendingReadEntry.finish() }
+        return try await lifecycle.activate()
     }
+    try await reader.pendingReadEntry.wait()
     await adapter.disconnected()
 
     await #expect(throws: PrecisionTransportError.poisoned) {
@@ -582,20 +582,24 @@ import Testing
 
 @Test func cancellationInsideTheWriterBoundaryConsumesOneAttemptAndPoisons() async throws {
     let fixture = try precisionFixture()
+    let entry = TestEntrySignal()
+    let gate = TestSuspensionGate()
+    await gate.arm()
     let reader = ScriptedPrecisionReader(steps: [
         .frame(try reportingFrame(fixture.plan.baseline, fixture: fixture)),
     ])
     let writer = ScriptedPrecisionWriter(steps: [
         .returnCode(0),
-        .delay(nanoseconds: 2_000_000_000, returnCode: 0),
+        .pause(entry: entry, gate: gate),
     ])
     let harness = try await makeHarness(fixture: fixture, writer: writer, reader: reader)
-    let task = Task { try await harness.lifecycle.activate() }
-
-    try await waitUntil(nanoseconds: 1_000_000_000) {
-        writer.frameCount() >= 2
+    let task = Task {
+        defer { entry.finish() }
+        return try await harness.lifecycle.activate()
     }
+    try await entry.wait()
     task.cancel()
+    await gate.release()
     await #expect(throws: CancellationError.self) {
         try await task.value
     }
@@ -1050,6 +1054,26 @@ private func makeAdapter(
     )
 }
 
+// Buffered entry evidence survives an early callback. Finishing without an
+// entry makes a failed operation fail its observer instead of leaving it stuck.
+private struct TestEntrySignal: Sendable {
+    private let stream: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+
+    init() {
+        (stream, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
+    }
+
+    func signal() { continuation.yield(()); continuation.finish() }
+    func finish() { continuation.finish() }
+    func wait() async throws {
+        var iterator = stream.makeAsyncIterator()
+        guard await iterator.next() != nil else {
+            throw PrecisionTransportWaitError.operationEndedBeforeEntry
+        }
+    }
+}
+
 private actor TestSuspensionGate {
     private var armed = false
     private var continuation: CheckedContinuation<Void, Never>?
@@ -1238,7 +1262,7 @@ private final class ScriptedPrecisionWriter:
     @unchecked Sendable {
     enum Step: Sendable {
         case returnCode(Int32)
-        case delay(nanoseconds: UInt64, returnCode: Int32)
+        case pause(entry: TestEntrySignal, gate: TestSuspensionGate)
         case failure(PrecisionTransportReportIOError)
     }
 
@@ -1264,9 +1288,11 @@ private final class ScriptedPrecisionWriter:
         switch step {
         case let .returnCode(code):
             return code
-        case let .delay(nanoseconds, code):
-            try await Task.sleep(nanoseconds: nanoseconds)
-            return code
+        case let .pause(entry, gate):
+            entry.signal()
+            await gate.waitIfArmed()
+            try Task.checkCancellation()
+            return 0
         case let .failure(error):
             throw error
         }
@@ -1363,6 +1389,7 @@ private final class BlockingPrecisionReader:
     private var closed: [UUID: PrecisionTransportReportIOError] = [:]
     private var cancelCountStorage = 0
     private let lock = NSLock()
+    let pendingReadEntry = TestEntrySignal()
 
     init(initialFrames: [PrecisionTransportInputFrame]) {
         self.initialFrames = initialFrames
@@ -1383,6 +1410,7 @@ private final class BlockingPrecisionReader:
     func read(for requestID: UUID) async throws -> PrecisionTransportInputFrame {
         try await withCheckedThrowingContinuation { continuation in
             var immediate: Result<PrecisionTransportInputFrame, any Error>?
+            var entered = false
             lock.withLock {
                 if let reason = closed.removeValue(forKey: requestID) {
                     immediate = .failure(reason)
@@ -1394,8 +1422,10 @@ private final class BlockingPrecisionReader:
                     immediate = .failure(PrecisionCallbackChannelError.concurrentRead)
                 } else {
                     self.continuation = continuation
+                    entered = true
                 }
             }
+            if entered { pendingReadEntry.signal() }
             if let immediate { continuation.resume(with: immediate) }
         }
     }
@@ -1716,6 +1746,7 @@ private func sha256(_ data: Data) -> String {
 
 private enum PrecisionTransportWaitError: Error {
     case timedOut
+    case operationEndedBeforeEntry
 }
 
 private func waitUntil(

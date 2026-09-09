@@ -791,3 +791,24 @@ or Precision audio. Global mapping scope was accepted earlier, but other-mouse
 behavior itself was not separately reported. Precision was last observed
 inactive and the instructions kept it inactive; no activation or restoration
 was requested in this checklist.
+
+### Window/relaunch acceptance and inactive Precision review — 2026-09-09
+
+At approximately 15:49 PDT, the user reported “All good” for closing/reopening
+via the menu-bar Open command, closing/reopening from Applications, and normal
+Quit/relaunch with Button remapping still On and wheel click working. These
+three scenarios pass by user report for the installed candidate above.
+Remembered Off and login/restart behavior were not part of this checklist.
+
+The user also reported Precision tap/hold-and-scroll not working. A fresh UI
+inspection showed Precision audio Inactive and a completed session record
+blocking new preparation. This is consistent with the requested inactive
+test state; it is not an observed failure of activated Precision audio.
+
+The archive review was opened but not confirmed. It displayed transaction
+`2DF3478B-776F-4846-BD39-FF6825B27B77`, revision 6, status completed, Precision
+restoredVerified, and stated that archiving preserves a backup without changing
+device settings or the recovery baseline. This is a review of saved state,
+not a fresh physical observation. No archive, preparation query, activation,
+restore, or recovery was executed by the task in this step. Precision activation
+and functional acceptance remain pending.

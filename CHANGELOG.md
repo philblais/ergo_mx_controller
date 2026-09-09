@@ -2301,3 +2301,52 @@ runtime journal match their starting hashes. No dependency edge, device command,
 event synthesis, journal authority, preference, or termination behavior changed.
 Attended installed-app, login, ordinary-control, Precision, and working-week
 acceptance remain pending. No live HID operation was run.
+
+
+Diagnostics backlog hardening bounds retained append payloads independently of
+the existing file cap. The logger admits at most 512 KiB of payload and 1,024
+pending entries, including the entry currently being written. Oversized input
+is copied into a bounded UTF-8 payload before enqueueing; the queued closure
+does not retain the original string. Empty entries still consume an entry slot.
+
+A short admission lock orders submissions and reserves capacity without doing
+file I/O. Overload drops new entries and accumulates a count, reported before
+the next admitted entry or when stopping. Draining releases capacity even if
+the file write fails. Stop and restart remain available at capacity, and a
+restart clears the previous session's pending loss count. These are retained
+payload and entry-count limits, not a bound on total process memory; temporary
+conversion, queue overhead, and control commands are outside that accounting.
+
+Seven new tests pause an injected serial writer to check byte and entry limits,
+concurrent overload, oversized Unicode input, empty entries, stop at capacity,
+recovery after drain, and restart isolation without disk-speed assumptions.
+
+Verification also exposed two existing test synchronization defects. Both
+subprocess tests now register an actor-backed completion signal before launch
+instead of blocking a cooperative task in `Process.waitUntilExit()`. The lock
+test awaits child cleanup on success, error, and cancellation. The cancellation
+and reentrant-coordinator tests now wait for an explicit paused-invocation
+boundary and release it themselves instead of relying on sleeps and
+`Task.yield()`. The cancellation test additionally checks that write-ahead was
+visible before cancellation. The four affected tests pass; their original
+assertions and production deadlines are retained.
+
+All 515 tests passed without skips in the complete `scripts/verify.sh` workflow
+with `swift test --no-parallel`, followed by all four signed builds and audits.
+The log confirms exactly one test case ran at a time; concurrency within each
+test remained enabled. Two earlier default-parallel runs failed the historical
+disconnect and post-apply deadline tests. The first serial run exposed the
+subprocess cleanup hang, and the next exposed the cancellation timing race.
+Those logs are preserved. A clean default-parallel run is not claimed; replacing
+the remaining polling-based timeout tests is a separate maintenance task.
+
+The main Release build passed with Swift warnings treated as errors. The signed
+candidate was installed without launch, all installed files match the preserved
+bundle, and the prior candidate remains available for rollback. The executable
+SHA-256 is `ab82e4fdc14cd1f343a52521f2bfce650488cf7a90044a6941e59961b5d2620d`.
+Protected records and the runtime journal match their starting hashes. Attended
+UI/login, ordinary-control scope, Precision use/restore, logging CPU/memory,
+and working-week acceptance remain pending.
+
+No dependency edge, HID output, event synthesis, journal, preference, or
+termination behavior changed. No live HID operation was run.

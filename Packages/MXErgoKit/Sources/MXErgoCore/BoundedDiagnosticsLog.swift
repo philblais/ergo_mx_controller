@@ -4,41 +4,98 @@ import Synchronization
 /// A best-effort diagnostic file, separate from durable recovery journals.
 /// Callers choose its content; raw HID reports can include pointer movement.
 /// Commands are queued in submission order so logging does not perform file
-/// I/O on the caller's thread. File errors stop writing until an explicit start.
+/// I/O on the caller's thread. Pending append payloads are bounded independently
+/// of the file; overload drops new entries and records a loss notice when the
+/// next entry or stop reaches the writer. File errors require an explicit start.
 public final class BoundedDiagnosticsLog: Sendable {
-    private let queue = DispatchQueue(label: "com.phib.MXErgoController.DiagnosticsLog")
+    private let queue: DispatchQueue
     private let url: URL
     private let byteCap: Int
+    private let pendingByteCap: Int
+    private let pendingEntryCap: Int
+    // This lock only orders submissions and accounts for retained payloads.
+    // The caller never takes the storage lock or waits for file I/O.
+    private let admission = Mutex(Admission())
     // The queue orders commands; the mutex gives mutable storage a checked
     // Sendable boundary without asserting that the entire class is unchecked.
     private let storage = Mutex(Storage())
 
     public var path: String { url.path }
 
-    public init(url: URL, byteCap: Int = 512 * 1024) {
-        precondition(byteCap >= 128, "A log needs room for its timestamp and markers")
+    public convenience init(url: URL, byteCap: Int = 512 * 1024) {
+        self.init(url: url, byteCap: byteCap, pendingByteCap: 512 * 1024,
+            pendingEntryCap: 1024,
+            queue: DispatchQueue(label: "com.phib.MXErgoController.DiagnosticsLog"))
+    }
+
+    // An injected queue lets tests hold the writer still without sleeps or
+    // disk-speed assumptions. Production always uses its own serial queue.
+    init(url: URL, byteCap: Int, pendingByteCap: Int, pendingEntryCap: Int,
+         queue: DispatchQueue) {
+        precondition(byteCap >= 128 && byteCap < Int.max)
+        precondition(pendingByteCap >= 32 && pendingEntryCap > 0)
         self.url = url
         self.byteCap = byteCap
+        self.pendingByteCap = pendingByteCap
+        self.pendingEntryCap = pendingEntryCap
+        self.queue = queue
+    }
+
+    var pendingUsage: (entries: Int, bytes: Int) {
+        admission.withLock { ($0.entries, $0.bytes) }
     }
 
     public func start() {
-        queue.async { [self] in
-            storage.withLock { $0.start(at: url, byteCap: byteCap) }
+        admission.withLock {
+            $0.accepting = true
+            $0.dropped = 0
+            queue.async { [self] in
+                storage.withLock { $0.start(at: url, byteCap: byteCap) }
+            }
         }
     }
 
     public func stop() {
-        queue.async { [self] in
-            storage.withLock {
-                $0.write("--- diagnostics log closed ---", byteCap: byteCap)
-                $0.close()
+        admission.withLock {
+            $0.accepting = false
+            let dropped = $0.takeDropped()
+            queue.async { [self] in
+                storage.withLock {
+                    $0.noteDropped(dropped, byteCap: byteCap)
+                    $0.write("--- diagnostics log closed ---", byteCap: byteCap)
+                    $0.close()
+                }
             }
         }
     }
 
     public func append(_ line: String) {
-        queue.async { [self] in
-            storage.withLock { $0.write(line, byteCap: byteCap) }
+        guard admission.withLock({ $0.accepting }) else { return }
+        // Copy only a bounded UTF-8 prefix. Capturing the original String (or
+        // a Substring) in a queued closure could retain an arbitrarily large input.
+        let payload = Self.boundedPayload(line, limit: min(byteCap, pendingByteCap))
+        admission.withLock { state in
+            guard state.accepting else { return }
+            guard state.entries < pendingEntryCap,
+                  payload.count <= pendingByteCap - state.bytes else {
+                if state.dropped < Int.max { state.dropped += 1 }
+                return
+            }
+            state.entries += 1
+            state.bytes += payload.count
+            let dropped = state.takeDropped()
+            queue.async { [self] in
+                defer {
+                    admission.withLock {
+                        $0.entries -= 1
+                        $0.bytes -= payload.count
+                    }
+                }
+                storage.withLock {
+                    $0.noteDropped(dropped, byteCap: byteCap)
+                    $0.write(String(decoding: payload, as: UTF8.self), byteCap: byteCap)
+                }
+            }
         }
     }
 
@@ -46,7 +103,31 @@ public final class BoundedDiagnosticsLog: Sendable {
     /// read/test barrier, not a promise of durable storage or process-exit flush.
     public func waitForPendingWrites() async {
         await withCheckedContinuation { continuation in
-            queue.async { continuation.resume() }
+            admission.withLock { _ in
+                queue.async { continuation.resume() }
+            }
+        }
+    }
+
+    private static func boundedPayload(_ line: String, limit: Int) -> Data {
+        var data = Data(line.utf8.prefix(limit + 1))
+        guard data.count > limit else { return data }
+        let suffix = Data(" [truncated]".utf8)
+        data.removeSubrange((limit - suffix.count)..<data.count)
+        while String(data: data, encoding: .utf8) == nil { data.removeLast() }
+        data.append(suffix)
+        return data
+    }
+
+    private struct Admission {
+        var accepting = false
+        var entries = 0
+        var bytes = 0
+        var dropped = 0
+
+        mutating func takeDropped() -> Int {
+            defer { dropped = 0 }
+            return dropped
         }
     }
 
@@ -91,6 +172,11 @@ public final class BoundedDiagnosticsLog: Sendable {
             } catch {
                 close()
             }
+        }
+
+        mutating func noteDropped(_ count: Int, byteCap: Int) {
+            guard count > 0 else { return }
+            write("--- dropped \(count) diagnostics entries while writer was busy ---", byteCap: byteCap)
         }
 
         private func boundedEntry(_ line: String, limit: Int) -> Data {

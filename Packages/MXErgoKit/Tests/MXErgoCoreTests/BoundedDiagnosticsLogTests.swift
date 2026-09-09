@@ -139,3 +139,169 @@ private func logFixture(byteCap: Int = 1024) throws -> (URL, URL, BoundedDiagnos
     #expect(text.contains("available"))
     #expect(!text.contains("unavailable"))
 }
+
+private func backlogFixture(bytes: Int = 4096, entries: Int = 2) throws
+    -> (URL, URL, BoundedDiagnosticsLog, DispatchQueue) {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let url = directory.appendingPathComponent("diagnostics.log")
+    let queue = DispatchQueue(label: "diagnostics.backlog.test")
+    let log = BoundedDiagnosticsLog(url: url, byteCap: 4096,
+        pendingByteCap: bytes, pendingEntryCap: entries, queue: queue)
+    return (directory, url, log, queue)
+}
+
+@Test func diagnosticsFullBacklogStillAcceptsStopAndReportsLoss() async throws {
+    let (directory, url, log, queue) = try backlogFixture()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    do {
+        queue.suspend()
+        defer { queue.resume() }
+        log.start()
+        log.append("accepted-one")
+        log.append("accepted-two")
+        for _ in 0..<3 { log.append("discarded-entry") }
+        #expect(log.pendingUsage.entries == 2)
+        log.stop()
+        log.append("after-stop")
+    }
+    await log.waitForPendingWrites()
+    let text = try String(contentsOf: url, encoding: .utf8)
+    #expect(text.contains("accepted-one"))
+    #expect(text.contains("accepted-two"))
+    #expect(text.contains("dropped 3 diagnostics entries"))
+    #expect(!text.contains("discarded-entry"))
+    #expect(!text.contains("after-stop"))
+    #expect(text.split(separator: "\n").last?.contains("log closed") == true)
+    #expect(log.pendingUsage.entries == 0)
+    #expect(log.pendingUsage.bytes == 0)
+}
+
+@Test func diagnosticsByteQuotaIsIndependentOfTheEntryQuota() async throws {
+    let (directory, url, log, queue) = try backlogFixture(bytes: 32, entries: 100)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    do {
+        queue.suspend()
+        defer { queue.resume() }
+        log.start()
+        log.append(String(repeating: "a", count: 20))
+        log.append(String(repeating: "b", count: 20))
+        log.append("tiny")
+        #expect(log.pendingUsage.entries == 2)
+        #expect(log.pendingUsage.bytes == 24)
+        log.stop()
+    }
+    await log.waitForPendingWrites()
+    let text = try String(contentsOf: url, encoding: .utf8)
+    #expect(text.contains(String(repeating: "a", count: 20)))
+    #expect(!text.contains(String(repeating: "b", count: 20)))
+    #expect(text.contains("dropped 1 diagnostics entries"))
+    #expect(text.contains("tiny"))
+    #expect(text.components(separatedBy: "dropped 1").count == 2)
+}
+
+@Test func diagnosticsOversizedQueuedPayloadIsBoundedBeforeTheWriterRuns() async throws {
+    let (directory, url, log, queue) = try backlogFixture(bytes: 32)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    do {
+        queue.suspend()
+        defer { queue.resume() }
+        log.start()
+        log.append(String(repeating: "🖱é", count: 100_000))
+        #expect(log.pendingUsage.entries == 1)
+        #expect(log.pendingUsage.bytes <= 32)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        log.stop()
+    }
+    await log.waitForPendingWrites()
+    let text = try String(contentsOf: url, encoding: .utf8)
+    #expect(text.contains("🖱é"))
+    #expect(text.contains(" [truncated]"))
+    #expect(log.pendingUsage.bytes == 0)
+}
+
+@Test func diagnosticsDrainingReopensCapacityAndReportsLossBeforeTheNextEntry() async throws {
+    let (directory, url, log, queue) = try backlogFixture(entries: 1)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    do {
+        queue.suspend()
+        defer { queue.resume() }
+        log.start()
+        log.append("before-overload")
+        log.append("discarded-entry")
+    }
+    await log.waitForPendingWrites()
+    #expect(log.pendingUsage.entries == 0)
+    #expect(log.pendingUsage.bytes == 0)
+    log.append("after-drain")
+    log.stop()
+    await log.waitForPendingWrites()
+    let lines = try String(contentsOf: url, encoding: .utf8).split(separator: "\n")
+    let loss = try #require(lines.firstIndex { $0.contains("dropped 1") })
+    let next = try #require(lines.firstIndex { $0.contains("after-drain") })
+    #expect(loss < next)
+    #expect(!lines.contains { $0.contains("discarded-entry") })
+}
+
+@Test func diagnosticsRestartDoesNotCarryOldLossIntoTheNewSession() async throws {
+    let (directory, url, log, queue) = try backlogFixture(entries: 1)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    do {
+        queue.suspend()
+        defer { queue.resume() }
+        log.start()
+        log.append("old-entry")
+        for _ in 0..<5 { log.append("old-discarded") }
+        log.start()
+    }
+    await log.waitForPendingWrites()
+    #expect(log.pendingUsage.entries == 0)
+    log.append("new-entry")
+    log.stop()
+    await log.waitForPendingWrites()
+    let text = try String(contentsOf: url, encoding: .utf8)
+    #expect(text.contains("new-entry"))
+    #expect(!text.contains("old-entry"))
+    #expect(!text.contains("dropped"))
+}
+
+@Test func diagnosticsConcurrentOverloadCannotOversubscribeTheBudget() async throws {
+    let (directory, url, log, queue) = try backlogFixture(bytes: 64, entries: 8)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    do {
+        queue.suspend()
+        defer { queue.resume() }
+        log.start()
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<100 {
+                group.addTask { log.append(String(repeating: "x", count: 24)) }
+            }
+        }
+        #expect(log.pendingUsage.entries == 2)
+        #expect(log.pendingUsage.bytes == 48)
+        log.stop()
+    }
+    await log.waitForPendingWrites()
+    let text = try String(contentsOf: url, encoding: .utf8)
+    #expect(text.contains("dropped 98 diagnostics entries"))
+    #expect(log.pendingUsage.entries == 0)
+    #expect(log.pendingUsage.bytes == 0)
+}
+
+@Test func diagnosticsEmptyMessagesCannotBypassTheEntryLimit() async throws {
+    let (directory, url, log, queue) = try backlogFixture(entries: 4)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    do {
+        queue.suspend()
+        defer { queue.resume() }
+        log.start()
+        for _ in 0..<1000 { log.append("") }
+        #expect(log.pendingUsage.entries == 4)
+        #expect(log.pendingUsage.bytes == 0)
+        log.stop()
+    }
+    await log.waitForPendingWrites()
+    let text = try String(contentsOf: url, encoding: .utf8)
+    #expect(text.contains("dropped 996 diagnostics entries"))
+    #expect(log.pendingUsage.entries == 0)
+}

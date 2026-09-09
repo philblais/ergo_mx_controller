@@ -773,3 +773,21 @@ Window-close/reopen is not marked passed: an automated close followed by a
 status read showed a window again, but tool reactivation could account for it.
 Manual close/reopen, five physical controls, coexistence, preference persistence,
 login, Precision use/restoration, and working-week acceptance remain pending.
+
+### User-reported ordinary-control acceptance — 2026-09-09
+
+At approximately 15:42 PDT, the user reported “All the tests passed” in response
+to the five-control checklist for the installed `d75919d` Release candidate
+identified above. This records wheel click → Mission Control, lower thumb →
+desktop right, upper thumb → desktop left, left tilt → browser Back, and right
+tilt → browser Forward as passed by user report. The question also asked whether
+each action occurred once per press and normal clicking and scrolling still
+worked; those checks are included in the user's confirmation.
+
+These are user-reported physical results, not synthetic input or independently
+captured event traces. They do not establish login behavior, preference
+persistence, manual close/reopen, trackpad gestures, behavior on another mouse,
+or Precision audio. Global mapping scope was accepted earlier, but other-mouse
+behavior itself was not separately reported. Precision was last observed
+inactive and the instructions kept it inactive; no activation or restoration
+was requested in this checklist.

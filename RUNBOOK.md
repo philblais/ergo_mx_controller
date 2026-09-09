@@ -1,5 +1,12 @@
 # Hardware validation runbook
 
+For the current Controls/Advanced interface, start with
+[Personal v1 acceptance](ACCEPTANCE.md). The procedures below preserve the
+historical discovery and trial sequence; they are not an instruction to repeat
+baseline capture, metadata migration, or old restore trials on an established
+installation. Use the current checklist for ordinary controls, quiet login,
+and the guided Precision flow.
+
 Steps to exercise the app against the physical MX Ergo. They are ordered, and
 the order is load-bearing: later steps depend on evidence that earlier steps
 establish, and the app's gates enforce that chain.

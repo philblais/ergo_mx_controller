@@ -2229,3 +2229,36 @@ Precision preparation/use/restore, and normal interruptions using the runbook.
 No dependency edge, new device command, retry, automatic Precision activation,
 recovery, or journal mutation path was introduced. The build was not installed
 or launched. No live HID operation was run.
+
+
+Acceptance preparation adds a current Controls/Advanced checklist covering the
+exact installed build, manual/open/reopen behavior, remembered remapping On/Off,
+quiet login, ordinary-control scope, and the separately confirmed Precision
+apply/use/restore session. It records expected wire bytes and keeps every
+unobserved scenario marked not run. RUNBOOK.md routes current validation to
+that checklist while retaining historical procedures. README now distinguishes
+past hardware results from the candidate's pending acceptance and accurately
+describes the promoted event layer and runtime owner.
+
+Four outdated Advanced labels are corrected before handoff. Previews and the
+coordinator self-test describe their own lack of device writes instead of
+claiming that the entire app has no production sender. The enclosing badge now
+says review and confirm. No execution code, policy, journal, or dependency edge
+changed, and no redundant tests were added for wording alone.
+
+Full verification passed all 500 tests without skips, all four signed builds,
+and signing/isolation audits. The main app was also built in Release and its
+signature, bundle identifier, team, hardened runtime, and designated requirement
+were checked. The verified candidate was installed in /Applications without
+launching it. Every installed bundle file matches the preserved candidate;
+the prior installed app is preserved separately and its signature verifies.
+The candidate executable SHA-256 is
+`7f8dc031618d373d93be0e508f0f25cc9b4d53f6969f3abc153afbbb8fba6c5f`.
+
+The five protected live records and runtime journal match their starting
+hashes. The saved runtime record reports completed/restoredVerified; this is
+file evidence only and does not establish the device's current state. A
+separate Xcode debug copy was running during preparation and was left running.
+Next requires user attendance, quitting competing software, an agreed ordinary
+input scope, and the current installed-build checklist. No GUI, login, or
+physical-control scenario is claimed passed. No live HID operation was run.

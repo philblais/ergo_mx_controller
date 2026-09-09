@@ -14,6 +14,13 @@ proved with tests, and promoted only behind an explicit review. Read
 
 ## Where things stand
 
+The September 8 development work adds guarded lifecycle handling, fresh endpoint
+identity verification, Controls/Advanced, guided Precision preparation, session
+cleanup, and quiet routine-login presentation. Automated checks pass; these
+changes still need acceptance on the installed Release build. Use
+[the current acceptance checklist](ACCEPTANCE.md). The dated hardware results
+below describe earlier builds.
+
 **Working, and proved on hardware:** device matching and observation, bounded
 read-only HID++ discovery (Root, Device Information, control enumeration,
 reporting snapshot), the durable schema-v2 recovery baseline, and one authorized
@@ -88,8 +95,8 @@ Three findings from making it work, each recorded in
 **Reviewed but deliberately unauthorized:** the five BetterTouchTool-mapped CIDs
 (`0052`, `0053`, `0056`, `005B`, `005D`). Their diversion plan, readiness audit,
 action plan, event pump and live GET-only preflight all exist and all return
-`notAuthorizedForExecution`. No mapped SET is sent, and no synthetic event has
-ever been posted — the one call site that could is unreachable from any app.
+`notAuthorizedForExecution`. No mapped-control HID++ SET is sent. Ordinary
+button remapping uses the separately promoted event layer described above.
 
 Audio execution is disabled after every launch and must be explicitly enabled.
 
@@ -99,6 +106,7 @@ Audio execution is disabled after every launch and must be explicitly enabled.
 |---|---|
 | [SAFETY.md](SAFETY.md) | The eleven invariants, and the questions to ask before changing anything |
 | [RUNBOOK.md](RUNBOOK.md) | The ordered hardware-validation steps |
+| [ACCEPTANCE.md](ACCEPTANCE.md) | Current installed-build, login, ordinary-control, and guided Precision checks |
 | [CHANGELOG.md](CHANGELOG.md) | The full capability ledger and milestone history |
 | [Evidence/VALIDATION-RECORDS.md](Evidence/VALIDATION-RECORDS.md) | What the physical trackball actually did |
 | [Evidence/2026-08-30/](Evidence/2026-08-30/) | Preserved durable journals, pinned by SHA-256 |
@@ -115,9 +123,9 @@ Audio execution is disabled after every launch and must be explicitly enabled.
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionTransport/` — unexported Precision lifecycle adapter and bounded request-scoped callback inbox with injected report I/O, no IOKit linkage, and no concrete writer
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionIOHIDInput/` — productless callback owner for one already-open device; exposed across modules only as a narrow input-lifetime factory
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionWriteLifecycle/` — unexported, IOKit-free lifecycle for a mandatory injected blocking call; exact three-packet allowlist, prompt logical cancellation, and explicit physical drain
-- `Packages/MXErgoKit/Sources/MXErgoPrecisionIOHIDOutput/` — productless bridge containing the sole new SetReport call; its real-device constructor is fileprivate and its narrow factory is absent from runnable graphs
+- `Packages/MXErgoKit/Sources/MXErgoPrecisionIOHIDOutput/` — productless bridge containing the Precision runtime's sole SetReport call; its fileprivate real-device constructor is reached through the guarded runtime composition behind the owner facade
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionIOHIDOwnership/` — productless, IOKit-free admission, full-bundle quarantine, and explicit post-quiescence resource-release contract
-- `Packages/MXErgoKit/Sources/MXErgoPrecisionIOHIDAssembly/` — productless same-handle composition root for the input, output, and ownership factories; no discovery, open/close, product, or runnable dependency edge
+- `Packages/MXErgoKit/Sources/MXErgoPrecisionIOHIDAssembly/` — productless same-handle composition root for the input, output, and ownership factories; used internally by the runtime with no direct app entry point
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionIOHIDAcquisition/` — productless independent-manager enumeration and direct-open owner; one validated device is closed by the quarantined release anchor
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeJournal/` — productless package-only schema-v3 create-or-reuse bootstrap and canonical durable repository/snapshot source
 - `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeComposition/` — productless package-only owner that composes acquisition, transport, coordinator, and lifecycle with preflight validation and ordered shutdown
@@ -127,7 +135,7 @@ Audio execution is disabled after every launch and must be explicitly enabled.
 - `Packages/MXErgoKit/Sources/MXErgoEventLayer/` — public executable façade for the event layer: start, stop, the reviewed bindings, and read-only counters; it exposes no tap, poster, or policy, and its public API list is pinned by a test
 - `Packages/MXErgoKit/Sources/MXErgoEventSynthesis/` — productless, CoreGraphics-free BetterTouchTool-replacement policy; it decides what to suppress and what to inject, and structurally cannot cause an event to exist
 - `Packages/MXErgoKit/Sources/MXErgoEventTap/` — productless CGEvent seam holding the sole `CGEvent.post` call site; refuses to start without Accessibility and fails open on every error path
-- `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeOwner/` — public executable façade for bind, quit, and session rollover; it does not expose admit or a SET sender
+- `Packages/MXErgoKit/Sources/MXErgoPrecisionRuntimeOwner/` — public executable facade for binding, explicitly confirmed admission/recovery/deactivation, quit, and session rollover; it keeps raw device output behind the guarded runtime
 - `Packages/MXErgoKit/Tests/` — unit and boundary tests, including observer handoff/drain races, admission authorization, composition validation, acquisition failure cleanup, source-assembly rollback, teardown, cancellation, abandonment, and build-graph isolation
 
 For daily use the app lives in `/Applications`, built Release:

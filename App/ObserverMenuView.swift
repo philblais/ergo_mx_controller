@@ -585,7 +585,7 @@ struct ObserverMenuView: View {
                 Label("HID++ protocol foundation", systemImage: "shield.checkered")
                     .font(.subheadline.weight(.medium))
                 Spacer()
-                Text("READ-ONLY + JOURNAL")
+                Text("REVIEW + CONFIRM")
                     .font(.caption2.weight(.semibold))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
@@ -863,7 +863,7 @@ struct ObserverMenuView: View {
 
             if !model.restorePacketPlans.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("\(model.restorePacketPlans.count) physical controls • feature v3 • no sender exists")
+                    Text("\(model.restorePacketPlans.count) physical controls • feature v3 • preview only")
                         .font(.caption2.monospacedDigit().weight(.medium))
                     ForEach(model.restorePacketPlans, id: \.controlID) { plan in
                         Text(restorePacketDescription(plan))
@@ -895,7 +895,7 @@ struct ObserverMenuView: View {
                     model.performRestoreOnlyPacketPreview()
                 }
             } message: {
-                Text("The app will read the firmware-bound baseline and construct feature-v3 SetCidReporting plus GetCidReporting verification packets entirely in memory. It will not write the journal, call IOHID output, or change the MX Ergo. This build has no production SET sender.")
+                Text("The app will read the firmware-bound baseline and construct feature-v3 SetCidReporting plus GetCidReporting verification packets entirely in memory. This preview does not write the journal, send the packets, or change the MX Ergo. Precision activation and restoration are separate confirmed actions.")
             }
 
             if let gateFailure = model.restorePacketPreviewGateFailureText,
@@ -1617,7 +1617,7 @@ struct ObserverMenuView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text("This build has no production REPROG SET sender and cannot change diversion flags. Packet previews and transaction validations are isolated from HID transport.")
+            Text("This self-test uses simulated device operations and leaves the trackball unchanged. Precision activation and restoration are separate confirmed actions that can change the button setting.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

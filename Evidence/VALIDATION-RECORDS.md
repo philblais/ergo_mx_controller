@@ -812,3 +812,21 @@ device settings or the recovery baseline. This is a review of saved state,
 not a fresh physical observation. No archive, preparation query, activation,
 restore, or recovery was executed by the task in this step. Precision activation
 and functional acceptance remain pending.
+
+### Completed-session archive observed — 2026-09-09
+
+At approximately 15:56 PDT, following the user's request to continue the
+reviewed next step, the app's Archive completed record confirmation was used
+for transaction `2DF3478B-776F-4846-BD39-FF6825B27B77`, revision 6. Before
+confirmation, the active record and five protected files matched their saved
+hashes. After confirmation, the UI reported the completed record archived and
+advanced to Check device support, step 1 of 7; Precision audio remained inactive.
+
+The active `precision-runtime-v3.json` path is now absent. Its exact bytes are
+preserved in Application Support as
+`precision-runtime-v3.completed-2DF3478B-776F-4846-BD39-FF6825B27B77.json`, SHA-256
+`fec5d33366c243242a845595cacae8100dc42e8ba94eb5f0846a6993604e06b3`.
+All five protected files are unchanged. The supported app operation was used;
+no journal bytes were rewritten manually. The Check device support confirmation
+was opened but not executed. No new preparation query, Precision SET, restore,
+or recovery was issued in this step; physical Precision acceptance remains open.

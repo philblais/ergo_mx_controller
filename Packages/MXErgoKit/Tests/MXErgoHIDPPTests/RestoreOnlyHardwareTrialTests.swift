@@ -662,21 +662,25 @@ func restoreOnlyHardwareTrialOperationLeaseRejectsASecondProcess() async throws 
         lockURL.path,
         readyURL.path,
     ]
+    let completion = TestProcessExit.observe(process)
     try process.run()
-    defer {
-        if process.isRunning { process.terminate() }
-        process.waitUntilExit()
-    }
+    var bodyError: (any Error)?
+    do {
+        for _ in 0..<200 where !FileManager.default.fileExists(atPath: readyURL.path) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(FileManager.default.fileExists(atPath: readyURL.path))
 
-    for _ in 0..<200 where !FileManager.default.fileExists(atPath: readyURL.path) {
-        try await Task.sleep(for: .milliseconds(10))
+        let repository = DurableRestoreOnlyHardwareTrialRepository(fileURL: fileURL)
+        await #expect(throws: RestoreOnlyHardwareTrialError.operationLeaseUnavailable) {
+            _ = try await repository.acquireOperationLease()
+        }
+    } catch {
+        bodyError = error
     }
-    #expect(FileManager.default.fileExists(atPath: readyURL.path))
-
-    let repository = DurableRestoreOnlyHardwareTrialRepository(fileURL: fileURL)
-    await #expect(throws: RestoreOnlyHardwareTrialError.operationLeaseUnavailable) {
-        _ = try await repository.acquireOperationLease()
-    }
+    if process.isRunning { process.terminate() }
+    await completion.wait()
+    if let bodyError { throw bodyError }
 }
 
 @Test func restoreOnlyHardwareTrialOperationLeaseRejectsASecondRepositoryInProcess() async throws {

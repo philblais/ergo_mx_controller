@@ -138,8 +138,9 @@ func hardKilledWriterLeavesRecoverableWriteAheadJournalForFreshCoordinator() asy
         baselineURL.path,
         transactionURL.path,
     ]
+    let completion = TestProcessExit.observe(process)
     try process.run()
-    process.waitUntilExit()
+    await completion.wait()
 
     #expect(process.terminationReason == .uncaughtSignal)
     #expect(process.terminationStatus == SIGKILL)
@@ -612,14 +613,18 @@ func hardKilledWriterLeavesRecoverableWriteAheadJournalForFreshCoordinator() asy
 
 @Test func cancellationBeforeAbstractInvocationResolvesCleanOnlyAfterBaselineRead() async throws {
     let setup = try await transactionTestSetup()
-    await setup.transport.setInvocationDelay(nanoseconds: 500_000_000)
+    await setup.transport.pauseInvocation()
     let intended = try intendedState(for: setup.envelope, controlID: 0x0050)
 
     let task = Task {
         try await setup.coordinator.apply(controlID: 0x0050, intended: intended)
     }
-    await Task.yield()
+    await setup.transport.waitForPausedInvocation()
+    let boundarySnapshot = await setup.repository.snapshot()
     task.cancel()
+    await setup.transport.resumeInvocation()
+    let armed = try #require(boundarySnapshot)
+    #expect(try armed.control(0x0050).phase == .applyMayHaveOccurred)
     do {
         _ = try await task.value
         Issue.record("Expected clean apply-not-observed result after cancellation")
@@ -772,16 +777,17 @@ func hardKilledWriterLeavesRecoverableWriteAheadJournalForFreshCoordinator() asy
 
 @Test func reentrantCoordinatorCallIsRejectedWhileMutationIsSuspended() async throws {
     let setup = try await transactionTestSetup()
-    await setup.transport.setInvocationDelay(nanoseconds: 100_000_000)
+    await setup.transport.pauseInvocation()
     let intended = try intendedState(for: setup.envelope, controlID: 0x0050)
 
     let applyTask = Task {
         try await setup.coordinator.apply(controlID: 0x0050, intended: intended)
     }
-    await Task.yield()
+    await setup.transport.waitForPausedInvocation()
     await #expect(throws: DeviceTransactionCoordinatorError.operationAlreadyInProgress) {
         try await setup.coordinator.currentEnvelope()
     }
+    await setup.transport.resumeInvocation()
     _ = try await applyTask.value
 }
 
@@ -913,7 +919,9 @@ private actor ScriptedTransactionTransport: DeviceTransactionEffectTransport {
     private var records: [ScriptedInvocationRecord] = []
     private var readsToFail = 0
     private var successfulReadsBeforeFailure = 0
-    private var invocationDelay: UInt64 = 0
+    private var invocationPaused = false
+    private var invocationRelease: CheckedContinuation<Void, Never>?
+    private var invocationWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(
         repository: any DeviceTransactionJournalRepository,
@@ -968,8 +976,14 @@ private actor ScriptedTransactionTransport: DeviceTransactionEffectTransport {
     ) async throws -> DeviceTransactionInvocationEvidence? {
         let mutation = prepared.mutation
         let expectedSession = prepared.expectedSession
-        if invocationDelay > 0 {
-            try await Task.sleep(nanoseconds: invocationDelay)
+        if invocationPaused {
+            await withCheckedContinuation { continuation in
+                invocationRelease = continuation
+                let waiting = invocationWaiters
+                invocationWaiters.removeAll()
+                for waiter in waiting { waiter.resume() }
+            }
+            try Task.checkCancellation()
         }
         guard session == expectedSession,
               let durable = try await repository.loadValidated(),
@@ -1041,7 +1055,17 @@ private actor ScriptedTransactionTransport: DeviceTransactionEffectTransport {
         readsToFail = count
         successfulReadsBeforeFailure = afterSuccessfulReads
     }
-    func setInvocationDelay(nanoseconds: UInt64) { invocationDelay = nanoseconds }
+    func pauseInvocation() { invocationPaused = true }
+    func waitForPausedInvocation() async {
+        guard invocationRelease == nil else { return }
+        await withCheckedContinuation { invocationWaiters.append($0) }
+    }
+    func resumeInvocation() {
+        invocationPaused = false
+        let release = invocationRelease
+        invocationRelease = nil
+        release?.resume()
+    }
     func setState(_ state: DeviceTransactionWireState) { states[state.controlID] = state }
     func invocationRecords() -> [ScriptedInvocationRecord] { records }
     func abandonmentDispositions() -> [DeviceTransactionPreparationDisposition] {

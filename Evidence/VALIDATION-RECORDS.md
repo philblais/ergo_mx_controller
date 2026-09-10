@@ -902,3 +902,75 @@ and the completed runtime backup match their previous hashes, and the active
 runtime journal is absent. Earlier ordinary-control acceptance belongs to its
 named previous build; fresh Precision preparation/use/restoration remain
 pending. No live Precision SET was run.
+
+### Live validation record — 2026-09-09, Precision acceptance at 23:04 PDT
+
+Following the seven-step preparation and explicit activation/restoration handoff,
+the user reported: “The tests seem to have worked,” with the exception that no
+volume slider/dialog appeared. This is a qualified user report for the requested
+tap-mute, hold-scroll volume, release-to-scroll, and ordinary-control checks;
+individual event traces or separately confirmed per-action results were not
+captured. The supplied `Screenshot 2026-09-09 at 23.04.26.png` shows **Precision
+audio: Inactive · button restored** and says the session still owns the connection.
+Normal quit after restoration has not yet been observed.
+
+The live runtime record is transaction `EDE55625-533B-4DF1-B8E0-73A0E3ACF51A`,
+revision 6, status `completed`, with Precision phase `restoredVerified`.
+It records exactly one apply and one restore attempt, both `verified`, with
+IO return 0 and correlated non-echo responses. Actual retained SET evidence:
+
+```text
+APPLY REQUEST    11 00 0A 3E 00 ED 03 00 00 00 00 00 00 00 00 00 00 00 00 00
+APPLY RESPONSE   11 00 0A 3E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+RESTORE REQUEST  11 00 0A 3E 00 ED 02 00 00 00 00 00 00 00 00 00 00 00 00 00
+RESTORE RESPONSE 11 00 0A 3E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+```
+
+The separately retained applied observation parameters are
+`00 ED 01 00 00 00 00 00 00 00 00 00 00 00 00 00`; restored observation
+parameters are `00 ED 00 00 00 00 00 00 00 00 00 00 00 00 00 00`, matching the
+baseline. Full GET wire frames were not retained in this record and are not
+reconstructed here. SET acknowledgements alone are not treated as proof.
+
+A byte-for-byte copy is preserved in
+`Evidence/2026-09-09-precision-acceptance-EDE55625/precision-runtime-v3.json`,
+SHA-256 `48bfd6be5cfa287a928e5c5be970ba914afc52e4c5188755768931ad8cbd2cbb`.
+The live record was not moved or rewritten. All five protected records and the
+previous `2DF3478B-776F-4846-BD39-FF6825B27B77` completed backup retain their
+previous hashes, including baseline `60ab6149…f77097`. No device operation was
+invoked by the agent while recording these results.
+
+Source inspection confirms the missing popup is an unimplemented presentation
+feature: `SmoothSystemAudioController` changes Core Audio properties and emits
+status updates; the current view displays those as text in Advanced. There is
+no volume overlay. The next UI improvement is transient volume/mute feedback
+with the reported percentage and a level indicator. Hardware acceptance is
+still partial; this session does not establish login, repeated-session, or
+working-week reliability.
+
+### Volume feedback candidate installed — 2026-09-09
+
+The app now has transient volume/mute feedback using the existing audio status
+updates. Final candidate executable SHA-256:
+`44a84c4513c8f2480c613af43b92a40e9a063dce6393f32845ccc69acd2c8a70`.
+All 521 package tests, four signed builds, and audits passed; Release passed
+with Swift warnings treated as errors. Isolated presentation checks and
+rendered light/dark samples passed inspection. This is simulated UI evidence;
+live Precision popup acceptance on this candidate remains pending.
+
+Before replacement, native UI showed Precision inactive and the button
+restored. The app quit normally. Its previous bundle was preserved under
+`build/volume-feedback-44a84c45/Previous MX Ergo Controller.app`. Installed
+files match the retained final candidate and its signature verifies. Relaunch
+was observed at PID 25166 from `/Applications/MX Ergo Controller.app`, with
+the MX Ergo connected, both permissions granted, ordinary remapping active,
+Precision inactive, and **Archive completed session…** available. No reservation
+or activation was requested after relaunch.
+
+All twelve JSON files match the pre-update snapshot retained in
+`build/volume-feedback-44a84c45/mx-ergo-volume-before-install.json`, including
+the five protected records, earlier archives, and the active-path completed
+`EDE55625-533B-4DF1-B8E0-73A0E3ACF51A` record with hash `48bfd6be…cbd2cbb`.
+No journal was archived or rewritten during the update. No explicit live HID
+query or SET was invoked by the agent. Physical checks still require a fresh
+user-led archive/preparation/activation sequence and verified restoration.

@@ -2446,3 +2446,51 @@ No product or dependency edge, HID output path, retry, inverse operation,
 journal authority, event synthesis, or operation deadline changed. The user's
 earlier read-only Root and Precision preflight results are recorded separately;
 Precision activation remains pending. No live Precision SET was run.
+
+## Volume and mute feedback — 2026-09-09
+
+The audio-feedback milestone adds an app-local, nonactivating `NSPanel` that
+shows volume percentage and a level bar after successful audio updates, or
+Muted/Unmuted after a mute change. It uses the existing audio status callback;
+`AudioExecutionStatus` is moved unchanged into its own app source. The panel
+follows the pointer's display, joins Spaces/full-screen contexts, ignores mouse
+events, and cannot become the key or main window. It fades after 1.5 seconds
+without another update. A cancelled dismissal cannot hide a newer update.
+The level bar draws the current reported percentage directly, avoiding native
+progress animation lag observed during visual inspection.
+
+Preparing audio does not display feedback. Disabled audio, failures, and
+termination dismiss it; queued status callbacks cannot reopen it while audio
+is disabled or the app is terminating. Audio writes, Precision activation,
+verification, and restoration retain their existing implementation. There is
+no interactive slider or additional audio output path.
+
+Safety-gate answers: (1) no new productless dependency edge; (2) no new HID
+output call; (3) no ACK-as-verification change; (4) no retry, inverse command,
+or automatic recovery; (5) no automatic ambiguity resolution; (6) no pinned
+journal rewrite; (7) no new event post or suppressing tap; (8) no fail-closed
+input behavior. The generated project adds only the two app presentation
+sources; package products and helper wiring are unchanged.
+
+All 521 package tests passed with no skips, all four signed builds and audits
+passed, and the final Release passed with Swift warnings treated as errors.
+An isolated preview compiled the actual presentation sources without audio or
+HID access. Its checks passed for non-key/non-main status, ignored mouse input,
+unchanged key window, no popup on readiness, renewed dismissal deadlines,
+automatic hiding, and disabled/failure cleanup. Light/dark rendered samples
+cover 0/65/100% and mute/unmute; the inspected final level bars match their
+percentages. These are presentation checks, not new physical-button evidence.
+
+The user's preceding Precision acceptance report and completed session are
+preserved separately in `Evidence/VALIDATION-RECORDS.md`. After the old app
+showed Precision restored and audio inactive, normal Quit succeeded. The final
+signed Release is installed and running, executable SHA-256
+`44a84c4513c8f2480c613af43b92a40e9a063dce6393f32845ccc69acd2c8a70`.
+The installed bundle matches the candidate; the previous app, build logs,
+isolated preview source, and rendered samples are retained under
+`build/volume-feedback-44a84c45/`. All twelve saved JSON records are unchanged
+through quit, installation, and relaunch. Controls shows connected/granted
+permissions, ordinary mappings active, Precision inactive, and an eligible
+completed session available to archive. The next gate is attended popup
+acceptance during Precision tap/hold-scroll, followed by verified restoration.
+No live HID query or SET was invoked during this implementation or preview.

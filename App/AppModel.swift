@@ -254,9 +254,12 @@ final class AppModel: ObservableObject {
     private var applicationActivateObserver: NSObjectProtocol?
     private var didBootstrap = false
     private var pendingObserverRestart = false
+    private let audioFeedback = AudioFeedbackPresenter()
     private lazy var audioController = SmoothSystemAudioController { [weak self] status in
         Task { @MainActor [weak self] in
-            self?.audioStatus = status
+            guard let self, self.audioExecutionEnabled, !self.isTerminating else { return }
+            self.audioStatus = status
+            self.audioFeedback.receive(status)
         }
     }
 
@@ -656,6 +659,7 @@ final class AppModel: ObservableObject {
 
     private func disableAudioForTermination() {
         audioExecutionEnabled = false
+        audioFeedback.hide()
         audioController.cancelPendingVolumeChanges()
         audioStatus = .disabled
     }
@@ -678,6 +682,7 @@ final class AppModel: ObservableObject {
         } else {
             audioController.cancelPendingVolumeChanges()
             audioStatus = .disabled
+            audioFeedback.hide()
         }
     }
 

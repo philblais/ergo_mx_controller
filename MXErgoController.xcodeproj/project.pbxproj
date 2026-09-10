@@ -21,6 +21,8 @@
 		61D415B9DBFF16DA8FF01C00 /* MXErgoControllerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E22D7BEB46F2A0DE6E3471D2 /* MXErgoControllerApp.swift */; };
 		64AF9F568D610E354EC96C4D /* FrontmostApplicationTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D130BB3AD1AAE9AC86150C7D /* FrontmostApplicationTracker.swift */; };
 		6956655B3D1C3B4855A5618B /* MXErgoHIDPP in Frameworks */ = {isa = PBXBuildFile; productRef = 8C307B3CA2E433D32D85ABFC /* MXErgoHIDPP */; };
+		70D2DB66C1C4B2CBAB9358F0 /* AudioExecutionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E9929B60A8F0907133C43F /* AudioExecutionStatus.swift */; };
+		9E8C6BC3C36F2913A2672910 /* AudioFeedbackPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446CF9A93CC4B4B6BBE8BAB8 /* AudioFeedbackPresenter.swift */; };
 		9FDAE12A29269D9E1AD8DF66 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87F68AD7261860C6617DF429 /* AppModel.swift */; };
 		B2258B3000C7BA7D2A5F3E4C /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8594F8F14B3862793C321423 /* AppKit.framework */; };
 		B3954FF14E27817C28344B51 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F96A2D4FFAF3203B1ED5557E /* IOKit.framework */; };
@@ -36,6 +38,8 @@
 /* Begin PBXFileReference section */
 		00BA11000A7AF938BF353FE7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0B9EC81B52D1AF7E7332EBB0 /* MXErgoController.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MXErgoController.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		25E9929B60A8F0907133C43F /* AudioExecutionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioExecutionStatus.swift; sourceTree = "<group>"; };
+		446CF9A93CC4B4B6BBE8BAB8 /* AudioFeedbackPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFeedbackPresenter.swift; sourceTree = "<group>"; };
 		729B08141702C731B22E9165 /* MXErgoPrecisionTrialReconciler.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MXErgoPrecisionTrialReconciler.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		822F1BAD0B238E12E62286BA /* MXErgoKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MXErgoKit; path = Packages/MXErgoKit; sourceTree = SOURCE_ROOT; };
 		8594F8F14B3862793C321423 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
@@ -131,6 +135,8 @@
 			children = (
 				87F68AD7261860C6617DF429 /* AppModel.swift */,
 				00BA11000A7AF938BF353FE7 /* Assets.xcassets */,
+				25E9929B60A8F0907133C43F /* AudioExecutionStatus.swift */,
+				446CF9A93CC4B4B6BBE8BAB8 /* AudioFeedbackPresenter.swift */,
 				9175B8C2EC0DE64EEAF9F58F /* DiagnosticsLog.swift */,
 				D130BB3AD1AAE9AC86150C7D /* FrontmostApplicationTracker.swift */,
 				BE289F4BC281431C5B6857B1 /* LoginItemController.swift */,
@@ -355,6 +361,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				9FDAE12A29269D9E1AD8DF66 /* AppModel.swift in Sources */,
+				70D2DB66C1C4B2CBAB9358F0 /* AudioExecutionStatus.swift in Sources */,
+				9E8C6BC3C36F2913A2672910 /* AudioFeedbackPresenter.swift in Sources */,
 				34F446B155AD03D7A5240923 /* DiagnosticsLog.swift in Sources */,
 				64AF9F568D610E354EC96C4D /* FrontmostApplicationTracker.swift in Sources */,
 				1EFDDE037285759C043F0112 /* LoginItemController.swift in Sources */,

@@ -974,3 +974,30 @@ the five protected records, earlier archives, and the active-path completed
 No journal was archived or rewritten during the update. No explicit live HID
 query or SET was invoked by the agent. Physical checks still require a fresh
 user-led archive/preparation/activation sequence and verified restoration.
+
+### Live validation record — 2026-09-10, preference persistence at 05:40 PDT
+
+The installed executable still matches the volume-feedback candidate
+`44a84c4513c8f2480c613af43b92a40e9a063dce6393f32845ccc69acd2c8a70`
+(source `b0bdf27`). Initial native UI showed remapping On/Active, Precision
+Inactive, both permissions granted, Launch at login On, and **Waiting for
+MX Ergo**. The completed `EDE55625-533B-4DF1-B8E0-73A0E3ACF51A` record
+remained revision 6, completed/restoredVerified.
+
+Using the app's ordinary controls, remapping was switched Off and the app quit
+normally. A read-only process check confirmed the installed process exited.
+Reopening the installed app showed remapping Off. Remapping was then switched
+On, the app quit normally again, and process absence was verified before
+reopening. The final UI showed On/Active without further intervention.
+The original On preference is restored; Launch at login was not changed.
+
+This establishes both saved-preference UI outcomes across normal quit/relaunch.
+The trackball was not connected, so native physical-button behavior while Off,
+ordinary controls while On, and the new popup's physical behavior remain
+unverified on this candidate. It does not establish logout/login or reboot
+behavior. The user's popup-test result has been requested and is not yet known.
+
+All twelve JSON files retain their pre-check hashes, including the five
+protected records and the completed runtime record. No archive, preparation,
+activation, restoration, permission change, live HID query, or SET was invoked.
+No code changed; the existing 521-test verification remains the build evidence.

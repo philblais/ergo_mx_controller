@@ -64,10 +64,15 @@ If a change touches any of these, say so explicitly rather than burying it.
 
 Physical sessions need the user. Never claim a hardware result that did not
 happen — the `Evidence/` directory and `Evidence/VALIDATION-RECORDS.md` are an
-audit trail, not a place for expected outcomes. Follow [RUNBOOK.md](RUNBOOK.md).
+audit trail, not a place for expected outcomes. Follow [ACCEPTANCE.md](ACCEPTANCE.md)
+for the current interface; [RUNBOOK.md](RUNBOOK.md) preserves historical trials.
 
-The Precision runtime has never run against the trackball. Until it has, treat
-everything downstream of it as unvalidated.
+The Precision runtime has run successfully on hardware, including verified
+activation/restoration and the user's qualified September 9 functional report.
+Those results belong to their recorded builds. The volume-feedback candidate
+still needs physical popup, login/reboot, coexistence, and sustained-use
+acceptance. Consult [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) and the validation
+history before claiming a current-build hardware result.
 
 ## Skills
 

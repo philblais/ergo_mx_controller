@@ -2494,3 +2494,26 @@ permissions, ordinary mappings active, Precision inactive, and an eligible
 completed session available to archive. The next gate is attended popup
 acceptance during Precision tap/hold-scroll, followed by verified restoration.
 No live HID query or SET was invoked during this implementation or preview.
+
+## Personal-use documentation and release gates — 2026-09-10
+
+`USER-GUIDE.md` documents the installed Controls flow, ordinary mappings,
+Precision preparation and explicit activation, volume/mute feedback, verified
+restoration, session expiry, and login behavior. `RELEASE-CHECKLIST.md` records
+the exact candidate, build evidence, completed and pending acceptance gates,
+and rollback boundaries. README links both and identifies the current build;
+the obsolete claim in CLAUDE.md that Precision has never run on hardware is
+replaced by evidence-qualified status and the current acceptance entry point.
+
+These documentation changes prepare release materials without declaring
+milestone 4 or personal-v1 acceptance complete. The installed binary is
+unchanged. Markdown links and whitespace checks passed; the existing 521-test,
+four-signed-build verification remains the candidate evidence and was not
+rerun for documentation-only changes.
+
+A read-only inspection observed a newly active Precision session and retained
+its revision-3 snapshot; actual apply evidence, missing popup confirmation, and
+pending restoration are recorded in the validation history. The active app
+was not quit or replaced. The next gate is the user's popup result and verified
+restoration before login/reboot checks. No live HID query or SET was invoked
+by the agent during this documentation milestone.

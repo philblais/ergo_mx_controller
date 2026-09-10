@@ -1001,3 +1001,36 @@ All twelve JSON files retain their pre-check hashes, including the five
 protected records and the completed runtime record. No archive, preparation,
 activation, restoration, permission change, live HID query, or SET was invoked.
 No code changed; the existing 521-test verification remains the build evidence.
+
+### Live validation record — 2026-09-10, active popup-test session at 07:53 PDT
+
+Native UI now shows MX Ergo connected, both permissions granted, ordinary
+remapping On/Active, Precision audio Active, Execute mute and volume On, and
+audio status Volume 47%. The agent did not prepare or activate this session.
+The user's visual popup result has been requested but not yet received;
+displayed audio status alone does not establish that either popup appeared.
+
+The previous completed `EDE55625-533B-4DF1-B8E0-73A0E3ACF51A` record is now
+archived with its original hash `48bfd6be…cbd2cbb`. All five protected records
+still match their recorded hashes. The new runtime transaction is
+`1CF6DBCD-2BAD-4576-A67E-CF25443A0ABC`, revision 3, running, Precision
+`appliedVerified`. It retains one verified apply, IO return 0, with:
+
+```text
+APPLY REQUEST   11 00 0A 3E 00 ED 03 00 00 00 00 00 00 00 00 00 00 00 00 00
+APPLY RESPONSE  11 00 0A 3E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+```
+
+Retained applied observation parameters are
+`00 ED 01 00 00 00 00 00 00 00 00 00 00 00 00 00`. Full verification GET
+frames are not retained in this record and are not reconstructed. No restore
+attempt is present at this observation. The runtime snapshot is preserved at
+`Evidence/2026-09-10-precision-popup-1CF6DBCD/precision-runtime-v3.revision-3.json`,
+SHA-256 `e89a22b1d18ace7db480be2b0430813c3fd4db1d118db340f3b48d601ee5be59`.
+This snapshot is evidence of a running session, not a backup to restore into
+the live location. The live file and app state were left unchanged.
+
+User-led popup confirmation and verified restoration are still pending. Do not
+quit, replace the app, or begin login/reboot acceptance from this active state.
+No HID query, SET, app shutdown, or preference change was invoked by the agent
+during this observation and documentation work.

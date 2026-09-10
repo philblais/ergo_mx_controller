@@ -2,9 +2,10 @@
 
 A small personal macOS menu-bar app for one Logitech MX Ergo trackball.
 
-It speaks HID++ 2.0 to the device over Bluetooth LE, with the long-term goal of
-taking over the thumb buttons, wheel tilt, wheel click and Precision button so
-BetterTouchTool can be retired.
+It remaps the thumb buttons, wheel tilt, and wheel click, and provides explicitly
+enabled Precision tap-to-mute and hold-and-scroll volume over Bluetooth LE.
+Start with the [everyday-use guide](USER-GUIDE.md). Personal-v1 acceptance is
+still in progress; see [release readiness](RELEASE-CHECKLIST.md).
 
 Because a wrong write can leave the trackball in a state its vendor software
 will not repair, the project treats every device write as hazardous. Capabilities
@@ -14,12 +15,16 @@ proved with tests, and promoted only behind an explicit review. Read
 
 ## Where things stand
 
-The September 8 development work adds guarded lifecycle handling, fresh endpoint
-identity verification, Controls/Advanced, guided Precision preparation, session
-cleanup, and quiet routine-login presentation. Automated checks pass; these
-changes still need acceptance on the installed Release build. Use
-[the current acceptance checklist](ACCEPTANCE.md). The dated hardware results
-below describe earlier builds.
+The installed September 9 volume-feedback candidate (`b0bdf27`) includes guarded
+lifecycle handling, fresh endpoint identity verification, Controls/Advanced,
+guided Precision preparation, session cleanup, quiet routine-login presentation,
+and a volume/mute popup. All 521 tests and signed-build checks passed. Both Off
+and On preferences survived normal app restarts in September 10 UI checks.
+Physical popup, login/reboot, coexistence, and sustained-use acceptance remain
+open. Use [the current acceptance checklist](ACCEPTANCE.md); detailed outcomes
+and their build identities are in [the validation history](Evidence/VALIDATION-RECORDS.md).
+
+The dated hardware results below are historical evidence for their named builds.
 
 **Working, and proved on hardware:** device matching and observation, bounded
 read-only HID++ discovery (Root, Device Information, control enumeration,
@@ -104,6 +109,8 @@ Audio execution is disabled after every launch and must be explicitly enabled.
 
 | File | What it holds |
 |---|---|
+| [USER-GUIDE.md](USER-GUIDE.md) | Everyday controls, Precision audio, finishing a session, and troubleshooting |
+| [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) | Exact installed candidate, completed/pending gates, and update/rollback boundaries |
 | [SAFETY.md](SAFETY.md) | The eleven invariants, and the questions to ask before changing anything |
 | [RUNBOOK.md](RUNBOOK.md) | The ordered hardware-validation steps |
 | [ACCEPTANCE.md](ACCEPTANCE.md) | Current installed-build, login, ordinary-control, and guided Precision checks |

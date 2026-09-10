@@ -20,8 +20,10 @@ lifecycle handling, fresh endpoint identity verification, Controls/Advanced,
 guided Precision preparation, session cleanup, quiet routine-login presentation,
 and a volume/mute popup. All 521 tests and signed-build checks passed. Both Off
 and On preferences survived normal app restarts in September 10 UI checks.
-Physical popup, login/reboot, coexistence, and sustained-use acceptance remain
-open. Use [the current acceptance checklist](ACCEPTANCE.md); detailed outcomes
+The user confirmed the volume/mute popups work on September 10, and two
+completed sessions retain verified activation/restoration evidence. Login/reboot,
+coexistence, and sustained-use acceptance remain open. Use
+[the current acceptance checklist](ACCEPTANCE.md); detailed outcomes
 and their build identities are in [the validation history](Evidence/VALIDATION-RECORDS.md).
 
 The dated hardware results below are historical evidence for their named builds.

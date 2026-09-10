@@ -69,9 +69,11 @@ for the current interface; [RUNBOOK.md](RUNBOOK.md) preserves historical trials.
 
 The Precision runtime has run successfully on hardware, including verified
 activation/restoration and the user's qualified September 9 functional report.
-Those results belong to their recorded builds. The volume-feedback candidate
-still needs physical popup, login/reboot, coexistence, and sustained-use
-acceptance. Consult [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) and the validation
+Those results belong to their recorded builds. The volume-feedback candidate's
+popups passed by user report on September 10, with completed verified
+activation/restoration records retained. Login/reboot, coexistence, and
+sustained-use acceptance remain pending. Consult
+[RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) and the validation
 history before claiming a current-build hardware result.
 
 ## Skills

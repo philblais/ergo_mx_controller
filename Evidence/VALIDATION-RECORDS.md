@@ -1034,3 +1034,42 @@ User-led popup confirmation and verified restoration are still pending. Do not
 quit, replace the app, or begin login/reboot acceptance from this active state.
 No HID query, SET, app shutdown, or preference change was invoked by the agent
 during this observation and documentation work.
+
+### Live validation record — 2026-09-10, popup acceptance at 08:48 PDT
+
+The user answered “It's all working” after the volume/mute popup check and
+restoration instructions. Record both popups as passed by user report on the
+installed `b0bdf27` candidate (`44a84c45…d2c8a70`, executable hash rechecked).
+Native UI shows MX Ergo connected, remapping On/Active, both permissions
+granted, Launch at login On, and **Precision audio: Inactive · button restored**.
+The completed session still owns the connection; the agent did not quit it.
+
+The previously observed `1CF6DBCD-2BAD-4576-A67E-CF25443A0ABC` session is now
+archived at revision 6, completed/restoredVerified. A subsequent session,
+`DAB53017-16F6-40FC-BA5B-B2536FF8110D`, occupies the live runtime path, also
+revision 6, completed/restoredVerified. Each records exactly one verified apply
+and one verified restore. Both retain these request/response pairs:
+
+```text
+APPLY REQUEST    11 00 0A 3E 00 ED 03 00 00 00 00 00 00 00 00 00 00 00 00 00
+APPLY RESPONSE   11 00 0A 3E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+RESTORE REQUEST  11 00 0A 3E 00 ED 02 00 00 00 00 00 00 00 00 00 00 00 00 00
+RESTORE RESPONSE 11 00 0A 3E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+```
+
+The current record's restored observation is
+`00 ED 00 00 00 00 00 00 00 00 00 00 00 00 00 00`, matching the baseline.
+Full GET wire frames are not reconstructed from the stored parameters.
+Copies of both completed records are preserved under
+`Evidence/2026-09-10-precision-popup-completed/`:
+
+- `precision-runtime-v3.completed-1CF6DBCD-2BAD-4576-A67E-CF25443A0ABC.json`:
+  `b0cd604517bdcfd870723e745ce4cd9c1e4dad1dc1a6ae7db544a4eab564f1c5`.
+- `precision-runtime-v3.json` (DAB53017):
+  `e88605d773bf6c7bb38337c52d5e83e8feaf1c70ae479e3a174ed02118b5981c`.
+
+All five protected records are unchanged. The agent only inspected and copied
+evidence; no live record was moved or rewritten, and no HID query or SET was
+invoked. These results support popup acceptance and repeated completed-session
+evidence, not login/reboot, every coexistence scenario, or a completed working
+week. Those gates remain pending.

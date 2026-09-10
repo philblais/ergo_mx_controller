@@ -23,12 +23,12 @@ and signature verification are recorded in
 | Area | Evidence and remaining work |
 |---|---|
 | Input scope | Global matching-button mappings accepted by the user. Behavior with another mouse still needs observation. |
-| Ordinary controls | Five actions and normal clicking/scrolling passed by user report on the earlier `d75919d` candidate. Repeat on the current candidate. |
+| Ordinary controls | Five mapped actions passed by user report after the September 10 reboot on the current candidate. Earlier normal clicking/scrolling evidence belongs to `d75919d`; broader current-build coexistence remains pending. |
 | Window close/reopen | Passed by user report on the earlier candidate. Repeat as part of current daily use. |
 | Remapping Off/On persistence | Both UI states survived normal quit/relaunch on `b0bdf27`. Trackball was disconnected during that check; physical behavior remains to check. |
 | Precision activation and restoration | Two completed revision-6 sessions on the volume-feedback candidate retain verified apply/restore evidence; latest UI confirms button restored. Earlier `0ef8bd6` evidence remains separately recorded. |
 | Volume/mute popup | Passed by user report September 10 (“It's all working”), with final restoration independently confirmed by UI and durable record. Isolated rendering and presentation checks also passed. |
-| Quiet login, remapping On and Off | September 10 reboot: installed process already running before agent inspection, connected, remapping On/Active, permissions retained, Precision Inactive. Initial window and five physical actions await user confirmation. Off-at-login scenario remains unrun. |
+| Quiet login, remapping On and Off | September 10 reboot: availability and five mapped actions passed by user report; inspection confirmed connected, remapping On/Active, permissions retained, Precision Inactive. Initial menu-only window behavior remains unconfirmed. Off-at-login scenario remains unrun. |
 | Coexistence and interruption | Trackpad/other-mouse use, browser/natural-scroll variations, and ordinary sleep/wake or reconnect checks pending. Begin interruption checks with Precision inactive. |
 | Repeated sessions and working week | Two completed sessions plus intervening archived record observed on the current candidate. Longer repeated-use acceptance and five normal working days remain pending. |
 | Operating instructions | [Everyday-use guide](USER-GUIDE.md) prepared and checked against current UI labels. |

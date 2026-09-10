@@ -1100,3 +1100,19 @@ No app restart, preference change, archive, HID query, or SET was invoked by the
 agent. This establishes the observed post-reboot process and settings state,
 not full quiet-login/physical-action acceptance. The login test with remapping
 Off remains unrun. No code changed; build verification remains 521 passing tests.
+
+### User confirmation — reboot availability and ordinary controls
+
+The user reports: “The app was available at restart and all the buttons (with
+the exception of precision were working)”. On the current `b0bdf27` candidate,
+record post-reboot app availability and the five ordinary mapped actions as
+passed by user report. The prior UI inspection independently showed remapping
+On and Precision Inactive. Precision requires explicit per-session activation;
+its reported lack of response here is expected for that inactive state, not
+evidence of a failed activated Precision session.
+
+The user did not explicitly confirm that the controller window stayed closed
+at sign-in, so quiet menu-only presentation remains unconfirmed. Login with
+remapping Off, remaining coexistence scenarios, and sustained-use acceptance
+remain pending. No application, preference, or device-record change was made
+while recording this report, and no live HID operation was invoked.

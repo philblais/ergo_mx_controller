@@ -334,7 +334,8 @@ private enum MXErgoPrecisionTrialReconcilerMain {
                 PrecisionRunningApplicationSnapshot(
                     processIdentifier: application.processIdentifier,
                     bundleIdentifier: application.bundleIdentifier,
-                    localizedName: application.localizedName
+                    localizedName: application.localizedName,
+                    executablePath: application.executableURL?.path
                 )
             }
         }

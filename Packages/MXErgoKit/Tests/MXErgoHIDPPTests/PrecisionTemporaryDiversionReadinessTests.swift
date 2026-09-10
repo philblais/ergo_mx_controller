@@ -50,6 +50,62 @@ import Testing
     }
 }
 
+private let systemThemeHelperBundle = "com.apple.appkit.xpc.ThemeWidgetControlViewService"
+private let systemThemeHelperPath = "/System/Library/Frameworks/AppKit.framework/Versions/C/XPCServices/ThemeWidgetControlViewService.xpc/Contents/MacOS/ThemeWidgetControlViewService"
+
+@Test func precisionCompetitorClassifierIgnoresOnlyTheIdentifiedSystemThemeHelper() {
+    let snapshots = ["MX Ergo Controller", "BetterTouchTool", "Logi Options+"].enumerated().map { index, host in
+        readinessProcess(Int32(index + 1), systemThemeHelperBundle,
+            "ThemeWidgetControlViewService (\(host))", executablePath: systemThemeHelperPath)
+    }
+    #expect(PrecisionCompetingProcessClassifier.competitors(
+        in: snapshots, excludingProcessIdentifier: 999).isEmpty)
+}
+
+@Test func precisionCompetitorClassifierDoesNotTrustThemeHelperNamesOrPartialIdentity() {
+    let identities: [(String?, String?)] = [
+        (systemThemeHelperBundle, nil),
+        (nil, systemThemeHelperPath),
+        (nil, nil),
+        (systemThemeHelperBundle, "/tmp/ThemeWidgetControlViewService"),
+        (systemThemeHelperBundle, "/Applications/ThemeWidgetControlViewService.app/Contents/MacOS/ThemeWidgetControlViewService"),
+        (systemThemeHelperBundle, systemThemeHelperPath + "-copy"),
+        (systemThemeHelperBundle, "/System/Library/Other/ThemeWidgetControlViewService"),
+        (systemThemeHelperBundle, systemThemeHelperPath.replacingOccurrences(of: "/Versions/C/", with: "/Versions/Current/")),
+        (systemThemeHelperBundle.uppercased(), systemThemeHelperPath),
+        (systemThemeHelperBundle + ".copy", systemThemeHelperPath),
+        ("com.phib.MXErgoController", systemThemeHelperPath),
+    ]
+    for (bundle, path) in identities {
+        let result = PrecisionCompetingProcessClassifier.competitors(
+            in: [readinessProcess(7, bundle, "ThemeWidgetControlViewService (MX Ergo Controller)", executablePath: path)],
+            excludingProcessIdentifier: 999)
+        #expect(result.map(\.processIdentifier) == [7])
+    }
+}
+
+@Test func precisionCompetitorClassifierKeepsRealCompetitorsBesideSystemHelpers() {
+    let snapshots = [
+        readinessProcess(42, "com.phib.MXErgoController", "MX Ergo Controller"),
+        readinessProcess(43, "com.phib.MXErgoController", "MX Ergo Controller", executablePath: "/Applications/Other Controller.app/Contents/MacOS/MX Ergo Controller"),
+        readinessProcess(44, systemThemeHelperBundle, "ThemeWidgetControlViewService (MX Ergo Controller)", executablePath: systemThemeHelperPath),
+        readinessProcess(45, "com.hegenberg.BetterTouchTool", "BetterTouchTool"),
+        readinessProcess(46, "com.logi.optionsplus.agent", "Logi Options+ Agent"),
+        readinessProcess(47, "com.phib.MXErgoRestoreTrialProbe", "Restore Probe"),
+    ]
+    let result = PrecisionCompetingProcessClassifier.competitors(in: snapshots, excludingProcessIdentifier: 42)
+    #expect(Set(result.map(\.processIdentifier)) == [43, 45, 46, 47])
+}
+
+@Test func precisionCompetitorClassifierRetainsConflictingDuplicateHelperEvidence() {
+    let trusted = readinessProcess(7, systemThemeHelperBundle, "ThemeWidgetControlViewService (MX Ergo Controller)", executablePath: systemThemeHelperPath)
+    let conflicting = readinessProcess(7, systemThemeHelperBundle, "ThemeWidgetControlViewService (MX Ergo Controller)", executablePath: "/tmp/copied-helper")
+    for snapshots in [[trusted, conflicting], [conflicting, trusted]] {
+        #expect(PrecisionCompetingProcessClassifier.competitors(in: snapshots,
+            excludingProcessIdentifier: 999).map(\.processIdentifier) == [7])
+    }
+}
+
 @Test func precisionReadinessBuildsAnImmutableNonAuthorizationWithoutFileIO() throws {
     let journal = try readinessJournal()
     let data = try readinessEncoded(journal)
@@ -335,12 +391,14 @@ import Testing
 private func readinessProcess(
     _ processIdentifier: Int32,
     _ bundleIdentifier: String?,
-    _ localizedName: String?
+    _ localizedName: String?,
+    executablePath: String? = nil
 ) -> PrecisionRunningApplicationSnapshot {
     PrecisionRunningApplicationSnapshot(
         processIdentifier: processIdentifier,
         bundleIdentifier: bundleIdentifier,
-        localizedName: localizedName
+        localizedName: localizedName,
+        executablePath: executablePath
     )
 }
 

@@ -3322,7 +3322,8 @@ final class AppModel: ObservableObject {
             PrecisionRunningApplicationSnapshot(
                 processIdentifier: application.processIdentifier,
                 bundleIdentifier: application.bundleIdentifier,
-                localizedName: application.localizedName
+                localizedName: application.localizedName,
+                executablePath: application.executableURL?.path
             )
         }
         return PrecisionCompetingProcessClassifier.competitors(
@@ -3338,7 +3339,8 @@ final class AppModel: ObservableObject {
                 PrecisionRunningApplicationSnapshot(
                     processIdentifier: application.processIdentifier,
                     bundleIdentifier: application.bundleIdentifier,
-                    localizedName: application.localizedName
+                    localizedName: application.localizedName,
+                    executablePath: application.executableURL?.path
                 )
             }
         }

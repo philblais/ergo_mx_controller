@@ -5,15 +5,18 @@ public struct PrecisionRunningApplicationSnapshot: Sendable, Equatable, Hashable
     public let processIdentifier: Int32
     public let bundleIdentifier: String?
     public let localizedName: String?
+    public let executablePath: String?
 
     public init(
         processIdentifier: Int32,
         bundleIdentifier: String?,
-        localizedName: String?
+        localizedName: String?,
+        executablePath: String? = nil
     ) {
         self.processIdentifier = processIdentifier
         self.bundleIdentifier = bundleIdentifier
         self.localizedName = localizedName
+        self.executablePath = executablePath
     }
 }
 
@@ -78,6 +81,13 @@ public enum PrecisionCompetingProcessClassifier {
     private static func isCompeting(
         _ snapshot: PrecisionRunningApplicationSnapshot
     ) -> Bool {
+        // AppKit appends its host's name to this system UI helper's title.
+        // Require both native snapshot identities exactly; a copied helper,
+        // claimed Apple bundle ID, or similar name must not bypass the scan.
+        if snapshot.bundleIdentifier == "com.apple.appkit.xpc.ThemeWidgetControlViewService",
+           snapshot.executablePath == "/System/Library/Frameworks/AppKit.framework/Versions/C/XPCServices/ThemeWidgetControlViewService.xpc/Contents/MacOS/ThemeWidgetControlViewService" {
+            return false
+        }
         let bundle = normalized(snapshot.bundleIdentifier)
         let name = normalized(snapshot.localizedName)
         let values = [bundle, name]

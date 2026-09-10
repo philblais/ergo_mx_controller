@@ -830,3 +830,75 @@ All five protected files are unchanged. The supported app operation was used;
 no journal bytes were rewritten manually. The Check device support confirmation
 was opened but not executed. No new preparation query, Precision SET, restore,
 or recovery was issued in this step; physical Precision acceptance remains open.
+
+### User preparation blocked by AppKit helper classification — 2026-09-09
+
+After the user reported completing the preparation steps, Controls showed
+readiness locked by `ThemeWidgetControlViewService (MX Ergo Controller)`.
+Advanced showed no runtime owner, Precision inactive, a successful firmware
+fingerprint read (three entities, feature v2), and a live Precision preflight
+matching the saved baseline. Preparation did not reach a bound or activated
+session. The installed executable was still the `d75919d` candidate.
+
+The observed Root request/response displayed in Advanced were:
+
+```text
+REQUEST  11 00 00 0E 1B 04 00 00 00 00 00 00 00 00 00 00 00 00 00
+RESPONSE 11 00 00 0E 0A 00 03 00 00 00 00 00 00 00 00 00 00 00 00
+```
+
+The displayed live Precision GET request/response were:
+
+```text
+REQUEST  11 00 0A 2E 00 ED 00 00 00 00 00 00 00 00 00 00 00 00 00
+RESPONSE 11 00 0A 2E 00 ED 00 00 00 00 00 00 00 00 00 00 00 00 00
+```
+
+The UI reported flags 0000 and map 0000. These values were captured from the
+app's displayed results of the user's preparation, not from a separately
+issued query. Firmware discovery's individual wire frames were not captured,
+so a complete preparation transcript is not claimed. Offline restore previews
+and the isolated self-test shown in Advanced are not evidence of a live SET.
+
+Read-only process inspection identified PID 98322 as bundle
+`com.apple.appkit.xpc.ThemeWidgetControlViewService`, executable
+`/System/Library/Frameworks/AppKit.framework/Versions/C/XPCServices/ThemeWidgetControlViewService.xpc/Contents/MacOS/ThemeWidgetControlViewService`.
+Its signature verified with macOS Software Signing and Apple Root CA. The
+classifier currently matches the host app name embedded in the helper's
+localized title, producing a false competitor. The real controller was PID
+98168 at the installed Applications path. No process was terminated to bypass
+the gate. The five protected files and completed runtime backup remain
+unchanged; no active runtime journal exists. No Precision SET was invoked in
+this investigation. The classifier fix and renewed preparation are pending.
+
+### Corrected helper classification candidate installed — 2026-09-09
+
+At approximately 22:19 PDT, the corrected Release was installed and launched
+after the previous controller quit normally. Immediately before replacement,
+the old UI showed Precision inactive and no runtime owner; earlier preparation
+had also been invalidated by a disconnect. No prepared or admitted session was
+carried into the new app. The new executable SHA-256 is
+`119f6dd069c6b8ee9eeb6b9fddf8d27daabed586c29d37d6e8e5b18358916036`, code-directory
+hash `3b574e4201ebd7770b56c6033324aa9905a8276f`. Its signature verifies, all 521
+tests and the signed-build/audit workflow passed, and Release passed with Swift
+warnings treated as errors.
+
+Exactly one installed controller was running, PID 20188 at
+`/Applications/MX Ergo Controller.app/Contents/MacOS/MX Ergo Controller`.
+Controls displayed the MX Ergo connected, both permissions granted, ordinary
+remapping On/Active, Precision audio Inactive, and Check device support (step
+1 of 7). No new preparation query or activation was invoked after launch.
+
+A read-only probe executing the exact canonical classifier against native
+process snapshots matched the actual reported AppKit helper when executable
+identity was omitted, excluded it with the verified system identity, and found
+no remaining competitors after restart. This verifies the classification
+change, not a completed readiness or activation session in the new app.
+
+All installed bundle files match `build/validation-119f6dd0/MX Ergo Controller.app`.
+The previous installed app remains preserved in
+`build/verification-deterministic-timing-f23c7f79/`. All five protected records
+and the completed runtime backup match their previous hashes, and the active
+runtime journal is absent. Earlier ordinary-control acceptance belongs to its
+named previous build; fresh Precision preparation/use/restoration remain
+pending. No live Precision SET was run.

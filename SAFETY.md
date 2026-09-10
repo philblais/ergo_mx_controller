@@ -124,6 +124,15 @@ ordered shutdown.
 counts as a competitor. Do not hand-roll another rule; three divergent copies
 previously disagreed about whether it was safe to proceed.
 
+AppKit's `ThemeWidgetControlViewService` appends its host app's name to its
+display title. The classifier excludes that UI helper only when the native
+snapshot has both its exact Apple bundle identifier and the exact executable
+path under the system AppKit framework. Neither a helper name nor a claimed
+Apple identifier alone grants an exception. Missing or mismatched executable
+identity uses the ordinary competitor rules. All app/helper scanners supply
+the native executable URL; real competing processes remain independently
+classified, including other MX Ergo controller instances.
+
 ## 8. Review is not permission
 
 Plans and readiness snapshots carry an `authorization` field whose enum has

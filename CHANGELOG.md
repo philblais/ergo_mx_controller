@@ -2401,3 +2401,48 @@ The five protected records and runtime journal match their recorded hashes.
 User confirmation of normal quit, competing-software exit, power cycle, and
 ordinary-remapping scope remains the next gate. All attended acceptance rows
 remain unobserved. No live HID operation was run.
+
+
+The AppKit helper classification fix addresses an attended Precision setup
+block: `ThemeWidgetControlViewService (MX Ergo Controller)` matched the
+controller-family name rule despite being Apple's system UI component. Native
+process metadata identified the exact AppKit executable, and its on-disk
+signature verified with macOS Software Signing and Apple Root CA.
+
+Running-application snapshots now include an optional native executable path.
+The canonical classifier excludes this one helper only when both its exact
+Apple bundle identifier and protected system executable path match. Display
+names, normalized lookalikes, copied executables, missing identity, and other
+system paths do not gain the exception. The two app scanners and both helper
+scanners provide the same native field. Other controller instances, trial
+helpers, BetterTouchTool, and Logitech Options remain independently classified.
+No process is killed or hidden to bypass the readiness check.
+
+Four regression tests cover the identified helper with different host titles,
+eleven incomplete or mismatched identities, genuine competitors alongside the
+helper, and conflicting duplicate PID evidence. All seven classifier/scanner
+tests pass; the full package total is 521, all passing in the standard parallel
+verification with no skips, followed by all four signed builds and audits. A
+read-only execution of the exact classifier code against current native process
+metadata reproduced the match without executable identity and excluded the
+verified helper with it; no other competitor remained in that snapshot.
+
+The main Release build passed with Swift warnings treated as errors and its
+signature verified. After confirming Precision inactive and no runtime owner,
+the previous app quit normally. The corrected candidate was installed and
+launched; its executable SHA-256 is
+`119f6dd069c6b8ee9eeb6b9fddf8d27daabed586c29d37d6e8e5b18358916036`.
+Installed files match the preserved candidate, and the previous app remains
+available for rollback. Controls shows connected/granted permissions, ordinary
+remapping active, Precision inactive, and preparation at step 1. The five
+protected records and completed runtime backup remain unchanged; no active
+runtime journal exists. Fresh preparation and physical activation/use/restore
+acceptance remain required on this build.
+
+The independent advisor was unavailable because of a usage limit. Primary-agent
+review retained exact native identity checks, conservative fallback, canonical
+scanner agreement, and tests for genuine competitors and misleading metadata.
+No product or dependency edge, HID output path, retry, inverse operation,
+journal authority, event synthesis, or operation deadline changed. The user's
+earlier read-only Root and Precision preflight results are recorded separately;
+Precision activation remains pending. No live Precision SET was run.

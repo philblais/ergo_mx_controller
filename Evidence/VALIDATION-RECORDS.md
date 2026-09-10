@@ -1073,3 +1073,30 @@ evidence; no live record was moved or rewritten, and no HID query or SET was
 invoked. These results support popup acceptance and repeated completed-session
 evidence, not login/reboot, every coexistence scenario, or a completed working
 week. Those gates remain pending.
+
+### Live validation record — 2026-09-10, reboot with remapping On
+
+The user reported rebooting the Mac and asked to continue testing. Before any
+native UI selection that could open the controller, a read-only process check
+found PID 898 at `/Applications/MX Ergo Controller.app/Contents/MacOS/MX Ergo Controller`,
+started 16:37:06 PDT. System boot time was 16:35:06 PDT. Thus the installed app
+was already running after reboot before the agent opened its window. The
+process timestamp alone does not distinguish login-item launch from macOS app
+restoration or a prior user launch. The installed executable remains
+`44a84c4513c8f2480c613af43b92a40e9a063dce6393f32845ccc69acd2c8a70`.
+
+Subsequent native UI inspection showed MX Ergo connected, Input Monitoring and
+Accessibility granted, Button remapping On/Active, Launch at login On, and
+Precision audio Inactive. The completed session remains available to archive;
+no new preparation or activation was requested. The inspection may open the
+controller window and cannot establish whether the window appeared at sign-in.
+The user has been asked about the initial window and the five physical actions;
+those results are pending.
+
+At 16:39 PDT, all five protected records match the pinned evidence fixtures,
+and the completed DAB53017 runtime still hashes to
+`e88605d773bf6c7bb38337c52d5e83e8feaf1c70ae479e3a174ed02118b5981c`.
+No app restart, preference change, archive, HID query, or SET was invoked by the
+agent. This establishes the observed post-reboot process and settings state,
+not full quiet-login/physical-action acceptance. The login test with remapping
+Off remains unrun. No code changed; build verification remains 521 passing tests.

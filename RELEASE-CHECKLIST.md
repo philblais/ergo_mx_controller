@@ -28,7 +28,7 @@ and signature verification are recorded in
 | Remapping Off/On persistence | Both UI states survived normal quit/relaunch on `b0bdf27`. Trackball was disconnected during that check; physical behavior remains to check. |
 | Precision activation and restoration | Two completed revision-6 sessions on the volume-feedback candidate retain verified apply/restore evidence; latest UI confirms button restored. Earlier `0ef8bd6` evidence remains separately recorded. |
 | Volume/mute popup | Passed by user report September 10 (“It's all working”), with final restoration independently confirmed by UI and durable record. Isolated rendering and presentation checks also passed. |
-| Quiet login, remapping On and Off | Both login/reboot scenarios pending. Launch-at-login registration alone is not proof of startup behavior. |
+| Quiet login, remapping On and Off | September 10 reboot: installed process already running before agent inspection, connected, remapping On/Active, permissions retained, Precision Inactive. Initial window and five physical actions await user confirmation. Off-at-login scenario remains unrun. |
 | Coexistence and interruption | Trackpad/other-mouse use, browser/natural-scroll variations, and ordinary sleep/wake or reconnect checks pending. Begin interruption checks with Precision inactive. |
 | Repeated sessions and working week | Two completed sessions plus intervening archived record observed on the current candidate. Longer repeated-use acceptance and five normal working days remain pending. |
 | Operating instructions | [Everyday-use guide](USER-GUIDE.md) prepared and checked against current UI labels. |

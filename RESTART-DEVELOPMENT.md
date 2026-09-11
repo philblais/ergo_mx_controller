@@ -73,3 +73,10 @@ those faults belong in the automated fake-transport tests.
 6. Test app restart, login, and Mac reboot on the resulting automatic candidate.
 
 No claim of seamless unattended operation is made by this validation candidate.
+
+## September 11 attended result
+
+The resume check observed exact baseline and completed the saved session without
+a new device-write attempt. See the validation record. Active-state notification
+delivery remains untested. The missing automatic path is now directly observed:
+completed-session release/archive followed by fresh checked activation.

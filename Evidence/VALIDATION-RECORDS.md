@@ -1247,3 +1247,25 @@ The agent did not press Resume. The user's physical tap/hold-scroll/release and
 popup checks remain pending; automatic startup is not enabled. The runtime
 record and all five protected records were byte-for-byte unchanged after quit,
 installation, and relaunch. No live HID++ query or SET was invoked by the agent.
+
+
+### GET-only resume observed baseline — 2026-09-11
+
+The user's 16:06 screenshot shows **Inactive · button restored** and the
+resume result stating that the trackball returned to its original Precision
+setting. A subsequent read-only inspection corroborates that result:
+transaction `30A1D902-8946-4C09-8FE6-1CFAD59F9687` advanced from revision 3
+`running/appliedVerified` to revision 4 `completed/restoredVerified`.
+The full restored observation is `00 ED 00 00 00 00 00 00 00 00 00 00 00 00 00 00`.
+The retained runtime hash is
+`e47ac3addbc706ffdcf4d7c2d73c3c8e169dfcb2f261d13641b6325a0d495510`, copied to
+`Evidence/2026-09-11-precision-resume-baseline/precision-runtime-v3.json`.
+
+Every control's attempt history is exactly unchanged: one earlier verified
+Precision apply, no new apply or restore attempt. All five protected hashes
+still match. This supports the expected GET-only baseline-classification result;
+it does not establish why or when the device reset, successful active-state
+notification delivery, or functional mute/volume after restart. Resume is hidden
+because this session is now completed and the runtime still owns the connection.
+Automatic completed-session rollover and fresh activation remain unimplemented.
+No live HID query or SET was invoked by the agent during this inspection.

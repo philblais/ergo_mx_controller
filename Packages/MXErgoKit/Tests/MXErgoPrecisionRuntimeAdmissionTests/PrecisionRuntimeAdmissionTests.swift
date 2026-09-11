@@ -1555,6 +1555,11 @@ private actor AdmissionFakeRuntime: PrecisionRuntimeControlling {
         return envelope
     }
 
+    func resumeVerified() async throws -> DeviceTransactionEnvelope {
+        events.record("resume")
+        return try await context.source.loadValidatedSnapshot().envelope
+    }
+
     func deactivate() async throws -> DeviceTransactionEnvelope {
         events.record("deactivate")
         if let deactivationGate { await deactivationGate.wait() }
@@ -1777,4 +1782,146 @@ private func sourceText(under directory: URL) throws -> String {
     return try files.map {
         try String(contentsOf: $0, encoding: .utf8)
     }.joined(separator: "\n")
+}
+
+
+@Test func seamlessRestartPolicyDefaultsOffAndBindsConsentToExactEvidence() throws {
+    let fixture = try admissionFixture()
+    defer { fixture.cleanup() }
+    let off = PrecisionSeamlessRestartConsent(readiness: fixture.readiness)
+    #expect(PrecisionSeamlessRestartPolicy.review(consent: nil, readiness: fixture.readiness, runtime: nil) == .disabled)
+    #expect(PrecisionSeamlessRestartPolicy.review(consent: off, readiness: fixture.readiness, runtime: nil) == .disabled)
+    let on = PrecisionSeamlessRestartConsent(enabled: true, readiness: fixture.readiness)
+    let bytes = try JSONEncoder().encode(on)
+    #expect(try JSONDecoder().decode(PrecisionSeamlessRestartConsent.self, from: bytes) == on)
+    #expect(PrecisionSeamlessRestartPolicy.review(consent: on, readiness: fixture.readiness, runtime: nil) == .activateAfterFreshBaseline)
+    for field in ["version", "sourceBaselineSHA256", "sourceBaselineTransactionID", "firmwareIdentity", "deviceID", "serialNumber"] {
+        var object = try #require(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+        switch field {
+        case "version": object[field] = 2
+        case "sourceBaselineSHA256": object[field] = String(repeating: "0", count: 64)
+        case "sourceBaselineTransactionID": object[field] = UUID().uuidString
+        default:
+            var device = try #require(object["device"] as? [String: Any])
+            device[field] = "different"
+            object["device"] = device
+        }
+        let changed = try JSONDecoder().decode(PrecisionSeamlessRestartConsent.self,
+            from: JSONSerialization.data(withJSONObject: object))
+        #expect(PrecisionSeamlessRestartPolicy.review(consent: changed, readiness: fixture.readiness, runtime: nil) == .reviewRequired)
+    }
+}
+
+@Test func seamlessRestartPolicyDistinguishesVerifiedResumeFromEveryUncertainPhase() throws {
+    let fixture = try admissionFixture()
+    defer { fixture.cleanup() }
+    let journal = try JSONDecoder().decode(DeviceStateJournal.self, from: fixture.sourceData)
+    let prepared = try DeviceTransactionEnvelope(baselineJournal: journal)
+    let applyID = UUID()
+    let armed = try DeviceTransactionReducer.reduce(prepared, event: .armApply(
+        controlID: 0x00ED, intended: fixture.readiness.plan.activeState, attemptID: applyID, now: Date()
+    )).envelope
+    let active = try DeviceTransactionReducer.reduce(armed, event: .observeApply(
+        controlID: 0x00ED, state: fixture.readiness.plan.activeState, now: Date()
+    )).envelope
+    let restoreID = UUID()
+    let restoreArmed = try DeviceTransactionReducer.reduce(active, event: .armRestore(
+        controlID: 0x00ED, attemptID: restoreID, now: Date()
+    )).envelope
+    let completed = try #require(try DeviceTransactionReducer.reduceRecoveryObservation(
+        active, controlID: 0x00ED, state: fixture.readiness.plan.baseline
+    )).envelope
+    let unknownApply = try DeviceTransactionReducer.reduce(armed, event: .recordInvocationOutcome(
+        controlID: 0x00ED, attemptID: applyID, outcome: .outcomeUnknown, detail: "lost", now: Date()
+    )).envelope
+    let unknownRestore = try DeviceTransactionReducer.reduce(restoreArmed, event: .recordInvocationOutcome(
+        controlID: 0x00ED, attemptID: restoreID, outcome: .outcomeUnknown, detail: "lost", now: Date()
+    )).envelope
+    let aborted = try DeviceTransactionReducer.reduce(armed, event: .observeApply(
+        controlID: 0x00ED, state: fixture.readiness.plan.baseline, now: Date()
+    )).envelope
+    var unexpected = fixture.readiness.plan.baseline.rawParameters
+    unexpected[15] = 0x80
+    let conflicted = try #require(try DeviceTransactionReducer.reduceRecoveryObservation(
+        active, controlID: 0x00ED, state: try DeviceTransactionWireState(rawParameters: unexpected)
+    )).envelope
+    let cases: [(DeviceTransactionEnvelope, PrecisionSeamlessRestartDecision)] = [
+        (prepared, .activateAfterFreshBaseline), (active, .resumeWithFreshRead),
+        (completed, .archiveCompletedAndRefresh), (armed, .reviewRequired),
+        (restoreArmed, .reviewRequired), (unknownApply, .reviewRequired),
+        (unknownRestore, .reviewRequired), (aborted, .reviewRequired), (conflicted, .reviewRequired)
+    ]
+    let consent = PrecisionSeamlessRestartConsent(enabled: true, readiness: fixture.readiness)
+    for (envelope, expected) in cases {
+        #expect(PrecisionSeamlessRestartPolicy.review(
+            consent: consent, readiness: fixture.readiness, runtime: admissionSnapshot(envelope)
+        ) == expected)
+        if expected == .resumeWithFreshRead {
+            try validateAction(.resume, snapshot: admissionSnapshot(envelope), permitsDeactivate: false)
+        } else {
+            #expect(throws: PrecisionRuntimeAdmissionError.actionNotPermitted) {
+                try validateAction(.resume, snapshot: admissionSnapshot(envelope), permitsDeactivate: false)
+            }
+        }
+    }
+}
+
+@Test func resumeAdmissionOnNewLaunchAndEpochDoesNotCallActivateOrRecover() async throws {
+    let fixture = try admissionFixture()
+    defer { fixture.cleanup() }
+    let journal = try JSONDecoder().decode(DeviceStateJournal.self, from: fixture.sourceData)
+    let prepared = try DeviceTransactionEnvelope(baselineJournal: journal)
+    let armed = try DeviceTransactionReducer.reduce(prepared, event: .armApply(
+        controlID: 0x00ED, intended: fixture.readiness.plan.activeState, attemptID: UUID(), now: Date()
+    )).envelope
+    let active = try DeviceTransactionReducer.reduce(armed, event: .observeApply(
+        controlID: 0x00ED, state: fixture.readiness.plan.activeState, now: Date()
+    )).envelope
+    try admissionEncoded(active).write(to: fixture.runtimeURL)
+    let before = try Data(contentsOf: fixture.runtimeURL)
+    let original = fixture.session
+    let session = DeviceTransactionSession(device: original.device, featureID: original.featureID,
+        featureVersion: original.featureVersion, featureIndex: original.featureIndex,
+        connectionEpoch: original.connectionEpoch + 1)
+    let readiness = PrecisionTemporaryDiversionReadinessSnapshot(
+        plan: fixture.readiness.plan, sourceJournalSHA256: fixture.readiness.sourceJournalSHA256,
+        sourceBaselineTransactionID: fixture.readiness.sourceBaselineTransactionID,
+        connectionGeneration: fixture.rootGeneration + 1, connectionEpoch: session.connectionEpoch,
+        authorization: .notAuthorizedForExecution)
+    let intent = try PrecisionRuntimeAdmissionReview.makeIntent(
+        launchID: UUID(), observerRunID: UUID(), operation: .resume, readiness: readiness,
+        session: session, rootGeneration: fixture.rootGeneration + 1,
+        sourceBaselineURL: fixture.sourceURL, runtimeJournalURL: fixture.runtimeURL,
+        expiresAtUptimeNanoseconds: 400)
+    let authorization = try PrecisionRuntimeAdmissionAuthorizationFactory.issue(
+        for: intent, explicitlyConfirmed: true, nowUptimeNanoseconds: 300)
+    let events = AdmissionEventRecorder()
+    let configuration = admissionConfiguration(intent: intent, authorization: authorization,
+        handoff: ExactAdmissionHandoff(intent: intent, events: events), events: events,
+        nowProvider: { 300 })
+    let resumed = try await PrecisionRuntimeAdmissionFactory.admit(
+        configuration: configuration,
+        inspect: { try PrecisionRuntimeJournalBootstrap.inspect($0) },
+        acquireLease: { try MXErgoDeviceOperationLease.acquire(beside: $0) },
+        bootstrap: { request, lease in
+            try await PrecisionRuntimeJournalBootstrap.prepare(request, operationLease: lease)
+        },
+        makeRuntime: { configuration in
+            AdmissionFakeRuntime(context: configuration.journalContext, events: events)
+        })
+    #expect(await resumed.state == .active)
+    #expect(events.count("resume") == 1)
+    #expect(events.count("activate") == 0)
+    #expect(events.count("recover") == 0)
+    #expect(events.count("deactivate") == 0)
+    #expect(try Data(contentsOf: fixture.runtimeURL) == before)
+    _ = await resumed.shutdown()
+    await expectAdmissionFailure(stage: .authorization) {
+        _ = try await PrecisionRuntimeAdmissionFactory.admit(
+            configuration: configuration,
+            inspect: { _ in throw AdmissionTestError.unused },
+            acquireLease: { _ in throw AdmissionTestError.unused },
+            bootstrap: { _, _ in throw AdmissionTestError.unused },
+            makeRuntime: { _ in throw AdmissionTestError.unused })
+    }
 }

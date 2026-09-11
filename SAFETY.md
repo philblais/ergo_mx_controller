@@ -171,6 +171,15 @@ its baseline, deactivate it explicitly first. A physical disconnect while
 diverted is classified `recovery-required` and never triggers an automatic
 re-admit or re-SET on reconnect.
 
+The September 11 restart-validation candidate adds a distinct, user-confirmed
+GET-only resume. On a fresh launch, only a `running/appliedVerified` journal with
+no uncertain attempt, conflict, or unrelated dirty control can enter this path.
+Fresh endpoint identity and a full reporting GET must match the intended state
+before audio is enabled. An exact baseline GET can record `restoredVerified`
+without a new attempt. Unexpected state is a conflict. None of these outcomes
+can branch to activate, restore, or recover. This is not unattended startup;
+persisted restart preference/policy types remain non-authorizing and unwired.
+
 ## 11. The event layer fails open
 
 Suppressing input carries a hazard unlike a device write: it is fully

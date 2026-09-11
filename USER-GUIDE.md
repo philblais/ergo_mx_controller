@@ -1,7 +1,7 @@
 # MX Ergo Controller — everyday use
 
 This guide describes the personal development build with volume feedback
-(`b0bdf27`). Everyday reliability testing is still in progress; see the
+and the September 11 read-only restart-validation action. Everyday reliability testing is still in progress; see the
 [release checklist](RELEASE-CHECKLIST.md) for the remaining checks.
 
 ## Open the app
@@ -41,6 +41,17 @@ ordinary button remapping. Precision audio has its own controls.
 
 Precision audio starts inactive each time the app launches. Ordinary remapping
 can be active while Precision remains inactive.
+
+If the previous session was verified active, **Resume previous Precision session**
+appears in Controls. Once the trackball is connected, click it to run the checks
+and reconnect audio. It changes no button settings. If the device has returned
+to its original setting, the app leaves audio off and explains the next action.
+Uncertain or conflicted saved sessions remain blocked for review.
+
+This candidate still requires that one click after restart. Fully automatic
+resumption is pending a hardware check that the new connection receives
+Precision press/release events. The seven steps below remain the way to begin
+a fresh activation.
 
 1. If **Archive completed session…** is offered, review it and confirm
    **Archive completed record**. This keeps the finished record as a backup.

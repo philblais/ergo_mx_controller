@@ -1,5 +1,18 @@
 # Personal v1 release readiness
 
+## September 11 restart-validation candidate
+
+The new read-only Resume action is built and verified: 534 tests, no skips,
+four signed builds/audits, and Release with warnings treated as errors. Release
+executable SHA-256:
+`dcf8667100fcd169fe82da7e380a3fddf93788569b8f0584766fe5ce8fe852f5`.
+Retained build and logs: `build/precision-resume-dcf86671/`.
+Hardware acceptance of notification delivery after reconnect is pending.
+Fully automatic Precision startup remains unimplemented; see
+[restart development](RESTART-DEVELOPMENT.md).
+
+## Previous volume-feedback candidate and acceptance
+
 Updated September 10, 2026. **Release acceptance is incomplete.** This is a
 development candidate, not a claim of completed everyday reliability testing.
 

@@ -72,6 +72,7 @@ public enum DeviceTransactionCoordinatorError: Error, Sendable, Equatable {
     case readBackUnresolved(UInt16, String)
     case conflicted(UInt16)
     case ambiguousRestoreSET(UInt16)
+    case resumeNotPermitted(UInt16)
 }
 
 public struct DeviceTransactionRecoveryReport: Sendable, Equatable {
@@ -284,6 +285,46 @@ public actor DeviceTransactionCoordinator {
             throw DeviceTransactionCoordinatorError.restoreNotObserved(controlID)
         }
         return result
+    }
+
+    /// Reattaches only to a previously verified apply. This deliberately has no
+    /// preparation or invocation branch: an exact GET either preserves active
+    /// evidence, records a return to baseline, or records a conflict. Uncertain
+    /// transactions must continue through the separately reviewed recovery path.
+    public func resumeVerified(
+        controlID: UInt16,
+        now: Date = Date()
+    ) async throws -> DeviceTransactionEnvelope {
+        let token = try beginOperation()
+        defer { endOperation(token) }
+        var (envelope, session) = try await loadBoundEnvelope(token: token)
+        let control = try envelope.control(controlID)
+        guard envelope.status == .running,
+              control.phase == .appliedVerified,
+              envelope.dirtyControlIDs == [controlID],
+              !envelope.controls.contains(where: { $0.phase == .conflicted }),
+              !envelope.controls.contains(where: {
+                  $0.attempts.contains(where: { $0.outcome == .outcomeUnknown })
+              }) else {
+            throw DeviceTransactionCoordinatorError.resumeNotPermitted(controlID)
+        }
+        try Task.checkCancellation()
+        let observation = try await transport.readReporting(
+            controlID: controlID,
+            expectedSession: session
+        )
+        try requireActive(token)
+        try Task.checkCancellation()
+        try await requireSameSession(session, token: token)
+        if let reduction = try DeviceTransactionReducer.reduceRecoveryObservation(
+            envelope, controlID: controlID, state: observation, now: now
+        ) {
+            envelope = try await commit(reduction, token: token).envelope
+        }
+        if try envelope.control(controlID).phase == .conflicted {
+            throw DeviceTransactionCoordinatorError.conflicted(controlID)
+        }
+        return envelope
     }
 
     /// Reads only controls that were already dirty in the durable journal. It

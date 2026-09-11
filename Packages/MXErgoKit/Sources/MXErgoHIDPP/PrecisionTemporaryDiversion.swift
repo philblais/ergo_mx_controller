@@ -188,6 +188,7 @@ public enum PrecisionTemporaryDiversionOperation: String, Sendable, Equatable {
     case activate
     case deactivate
     case recover
+    case resume
 }
 
 public enum PrecisionTemporaryDiversionSafetyGateError: Error, Sendable, Equatable {
@@ -332,6 +333,22 @@ public actor PrecisionTemporaryDiversionLifecycle {
             throw PrecisionTemporaryDiversionError.unexpectedLifecyclePhase(control.phase)
         }
         let result = try await coordinator.restore(
+            controlID: PrecisionTemporaryDiversionPlan.controlID
+        )
+        try safetyLease.validate()
+        return result
+    }
+
+    public func resumeVerified() async throws -> DeviceTransactionEnvelope {
+        let safetyLease = try await safetyGate.acquire(for: .resume)
+        try safetyLease.validate()
+        defer { withExtendedLifetime(safetyLease) {} }
+        let envelope = try await requiredEnvelope()
+        guard try envelope.control(PrecisionTemporaryDiversionPlan.controlID).intended
+                == plan.activeState else {
+            throw PrecisionTemporaryDiversionError.featureMismatch
+        }
+        let result = try await coordinator.resumeVerified(
             controlID: PrecisionTemporaryDiversionPlan.controlID
         )
         try safetyLease.validate()

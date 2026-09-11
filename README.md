@@ -15,7 +15,15 @@ proved with tests, and promoted only behind an explicit review. Read
 
 ## Where things stand
 
-The installed September 9 volume-feedback candidate (`b0bdf27`) includes guarded
+The September 11 restart-validation source adds **Resume previous Precision
+session**. It sequences fresh checks and performs GET-only resumption through
+the existing owner facade; it cannot fall back to an activate or restore SET.
+A device returning to baseline is recorded and left inactive. Hardware acceptance
+of the new notification connection is pending. The persistent preference and
+restart decision policy are implemented as non-authorizing package types; no
+unattended Precision startup is enabled yet. See [restart development](RESTART-DEVELOPMENT.md).
+
+The previous September 9 volume-feedback candidate (`b0bdf27`) includes guarded
 lifecycle handling, fresh endpoint identity verification, Controls/Advanced,
 guided Precision preparation, session cleanup, quiet routine-login presentation,
 and a volume/mute popup. All 521 tests and signed-build checks passed. Both Off

@@ -2539,3 +2539,46 @@ unchanged binary; tests were not rerun for packaging. This is a local candidate,
 not a final release or public distribution. The installed app was not replaced,
 launched, or interrupted. Remaining acceptance gates, including multi-day use,
 remain open. No live HID operation was invoked.
+
+
+## Read-only Precision restart validation — 2026-09-11
+
+The restart-validation candidate adds a distinct `.resume` operation through
+transaction, lifecycle, composition, admission, and the existing owner facade.
+It requires a verified-active journal without uncertain attempts or unrelated
+dirty controls and performs one reporting GET after fresh endpoint verification.
+It has no prepare/invoke branch. Exact active state preserves durable bytes;
+exact baseline records restored state with no new attempt; mismatch records
+conflict. No outcome branches to activate, restore, or recover.
+
+Controls offers **Resume previous Precision session** for eligible saved state.
+One user action sequences the existing bounded connection, firmware, offline,
+and readiness checks. Duplicate work, changed connection generation, permission
+loss, cancellation, or failed preparation prevents later steps. Audio and the
+wheel observer start only after verified active admission. Revalidating a
+reconnect readiness snapshot now preserves exact active-state evidence instead
+of incorrectly requiring baseline during an app-activation refresh.
+
+Versioned consent data and the restart decision table are package-only,
+non-authorizing, and unwired from startup. No new dependency edge, library
+product, output-report site, event-post site, or suppressing tap was added.
+The safety architecture and owner-facade promotion received read-only advisor
+review. The stored preference is separate from non-serializable one-use
+execution authorization.
+
+Thirteen new tests raise the package total to 534, with no skips. They cover
+GET-only active/baseline/conflict classification, timeout, cancellation,
+disconnect, forbidden phases, early/late competitors and lease retention,
+all durable commit fault boundaries, consent identity/version drift, restart
+admission replay, concurrent preparation, interrupted generation, failed steps,
+and owner operation/confirmation mismatch. Repeated intermediate runs exposed two existing cancellation-test polling races
+under suite load. Those tests now wait on sticky entry signals and use a five-
+second test-only operation budget; the production deadlines and separate timeout
+test remain unchanged. Final verification passes with 534 tests, no skips, four
+signed builds and audits. The Release build treats Swift warnings as errors and
+passes strict signature verification.
+
+The next gate is attended validation that a newly acquired endpoint receives
+Precision notifications. Fully automatic startup, consent persistence/revocation,
+and completed-to-fresh-activation chaining remain unimplemented. No live HID
+query or SET was invoked by the agent during development or automated tests.

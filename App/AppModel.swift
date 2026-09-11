@@ -10,6 +10,10 @@ import MXErgoPrecisionRuntimeOwner
 
 @MainActor
 final class AppModel: ObservableObject {
+    @Published private(set) var precisionResumeAvailable = false
+    @Published private(set) var precisionResumeInProgress = false
+    @Published private(set) var precisionResumeStatusText: String?
+    private let precisionResumeFlow = PrecisionResumePreparationFlow()
     @Published private(set) var isTerminating = false
     @Published private(set) var terminationStatusText: String?
     private var firmwareMigrationTask: Task<Void, Never>?
@@ -686,9 +690,8 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func performOneShotRootQuery() {
-        guard !isTerminating else { return }
-        guard rootQueryGateFailureText == nil else { return }
+    func performOneShotRootQuery(completion: (@MainActor @Sendable () -> Void)? = nil) {
+        guard !isTerminating, rootQueryGateFailureText == nil else { completion?(); return }
 
         reprogFeatureDescriptor = nil
         rootEvidenceGeneration = nil
@@ -702,13 +705,13 @@ final class AppModel: ObservableObject {
         observer.performOneShotRootQuery { [weak self] result in
             Task { @MainActor [weak self] in
                 self?.receive(rootQueryResult: result)
+                completion?()
             }
         }
     }
 
-    func performReadOnlyFirmwareFingerprint() {
-        guard !isTerminating else { return }
-        guard firmwareFingerprintGateFailureText == nil else { return }
+    func performReadOnlyFirmwareFingerprint(completion: (@MainActor @Sendable () -> Void)? = nil) {
+        guard !isTerminating, firmwareFingerprintGateFailureText == nil else { completion?(); return }
 
         invalidateRestorePacketPreview(reason: "Rebuild after fresh firmware discovery")
         firmwareFingerprintAttempted = true
@@ -719,6 +722,7 @@ final class AppModel: ObservableObject {
         observer.performReadOnlyFirmwareFingerprint { [weak self] result in
             Task { @MainActor [weak self] in
                 self?.receive(firmwareFingerprintResult: result)
+                completion?()
             }
         }
     }
@@ -971,10 +975,9 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func performRestoreOnlyHardwareTrialSimulation() {
-        guard !isTerminating else { return }
-        guard restoreTrialSimulationGateFailureText == nil,
-              let currentFeature = reprogFeatureDescriptor else { return }
+    func performRestoreOnlyHardwareTrialSimulation(completion: (@MainActor @Sendable () -> Void)? = nil) {
+        guard !isTerminating, restoreTrialSimulationGateFailureText == nil,
+              let currentFeature = reprogFeatureDescriptor else { completion?(); return }
 
         restoreTrialSimulationAttempted = true
         restoreTrialSimulationInProgress = true
@@ -983,8 +986,8 @@ final class AppModel: ObservableObject {
             "Running the dormant one-control trial against isolated transport…"
 
         Task { @MainActor [weak self] in
-            guard let self else { return }
-            defer { restoreTrialSimulationInProgress = false }
+            guard let self else { completion?(); return }
+            defer { restoreTrialSimulationInProgress = false; completion?() }
             do {
                 let validatedGeneration = connectionGeneration
                 let before = try Data(contentsOf: Self.journalFileURL)
@@ -1022,10 +1025,9 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func performReadOnlyPrecisionPreflight() {
-        guard !isTerminating else { return }
-        guard precisionPreflightGateFailureText == nil,
-              let currentFeature = reprogFeatureDescriptor else { return }
+    func performReadOnlyPrecisionPreflight(completion: (@MainActor @Sendable () -> Void)? = nil) {
+        guard !isTerminating, precisionPreflightGateFailureText == nil,
+              let currentFeature = reprogFeatureDescriptor else { completion?(); return }
 
         precisionPreflightAttempted = true
         precisionPreflightInProgress = true
@@ -1081,11 +1083,13 @@ final class AppModel: ObservableObject {
                         expectedJournal: journal,
                         expectedConnectionGeneration: validatedGeneration
                     )
+                    completion?()
                 }
             }
         } catch {
             precisionPreflightInProgress = false
             precisionPreflightStatusText = precisionPreflightFailureText(error)
+            completion?()
         }
     }
 
@@ -1296,7 +1300,109 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func bindDormantRuntimeOwner() async {
+    /// User-initiated validation of the GET-only restart path. No activation
+    /// fallback is permitted here, including when the device returned to baseline.
+    func resumePreviousPrecisionSession() async {
+        guard precisionResumeAvailable, !precisionResumeInProgress,
+              runtimeOwner == nil, !isTerminating, status == .observing,
+              devices.count == 1, rootQueryGateFailureText == nil,
+              inputMonitoringGranted, accessibilityGranted, !audioExecutionEnabled else { return }
+        precisionResumeInProgress = true
+        defer { precisionResumeInProgress = false }
+        let generation = connectionGeneration
+        let outcome = await precisionResumeFlow.perform(
+            isCurrent: { [self] in
+                !isTerminating && connectionGeneration == generation
+                    && inputMonitoringGranted && accessibilityGranted
+            },
+            step: { [self] step in
+                switch step {
+                case .connection:
+                    precisionResumeStatusText = "Checking the connection…"
+                    guard rootQueryGateFailureText == nil else { return false }
+                    await withCheckedContinuation { continuation in
+                        performOneShotRootQuery { continuation.resume() }
+                    }
+                    return rootQuerySucceeded && rootEvidenceGeneration == generation
+                case .software:
+                    precisionResumeStatusText = "Checking device software…"
+                    guard firmwareFingerprintGateFailureText == nil else { return false }
+                    await withCheckedContinuation { continuation in
+                        performReadOnlyFirmwareFingerprint { continuation.resume() }
+                    }
+                    return firmwareFingerprint != nil && firmwareEvidenceGeneration == generation
+                case .preview:
+                    precisionResumeStatusText = "Checking saved settings…"
+                    performRestoreOnlyPacketPreview()
+                    return !restorePacketPlans.isEmpty
+                case .selfTest:
+                    precisionResumeStatusText = "Checking the connection setup…"
+                    guard restoreTrialSimulationGateFailureText == nil else { return false }
+                    await withCheckedContinuation { continuation in
+                        performRestoreOnlyHardwareTrialSimulation { continuation.resume() }
+                    }
+                    return restoreTrialSimulationReport != nil
+                case .reporting:
+                    precisionResumeStatusText = "Reading the Precision setting…"
+                    guard precisionPreflightGateFailureText == nil else { return false }
+                    await withCheckedContinuation { continuation in
+                        performReadOnlyPrecisionPreflight { continuation.resume() }
+                    }
+                    return precisionPreflightSnapshot != nil && precisionPreflightEvidenceGeneration == generation
+                case .readiness:
+                    precisionResumeStatusText = "Checking readiness…"
+                    performPrecisionLifecycleReadinessReview()
+                    return precisionReadinessSnapshot != nil
+                case .bind:
+                    precisionResumeStatusText = "Preparing to reconnect Precision…"
+                    await bindDormantRuntimeOwner(resumeVerifiedSession: true)
+                    guard let owner = runtimeOwner else { return false }
+                    return await owner.boundOperation == .resume
+                case .resume:
+                    precisionResumeStatusText = "Reconnecting Precision audio…"
+                    guard let owner = runtimeOwner,
+                          let session = runtimeOwnerSession,
+                          let rootGeneration = runtimeOwnerRootGeneration else { return false }
+                    runtimeOwnerOperationInProgress = true
+                    defer { runtimeOwnerOperationInProgress = false }
+                    do {
+                        try await owner.confirmVerifiedResume(
+                            explicitlyConfirmed: true,
+                            competitorProbe: { Self.precisionCompetitorDisplayNames() },
+                            sessionProvider: { session },
+                            rootGenerationProvider: { rootGeneration }
+                        )
+                        await refreshRuntimeOwnerFlags()
+                        return runtimeOwnerControlIsDiverted && !runtimeOwnerNeedsRecovery
+                            && !runtimeOwnerDeviceDisconnected
+                    } catch {
+                        runtimeOwnerStatusText = "Resume stopped: \(error)"
+                        await refreshRuntimeOwnerFlags()
+                        return false
+                    }
+                }
+            }
+        )
+        precisionResumeAvailable = false
+        if outcome == .resumed, let owner = runtimeOwner,
+           runtimeOwnerControlIsDiverted, !runtimeOwnerNeedsRecovery,
+           !runtimeOwnerDeviceDisconnected, !isTerminating,
+           connectionGeneration == generation {
+            startWheelObserver(owner: owner)
+            setAudioExecutionEnabled(true)
+            precisionResumeStatusText = "Precision audio resumed. Button settings were unchanged."
+            runtimeOwnerStatusText = precisionResumeStatusText ?? "Precision audio resumed"
+            diagnosticsLog.append("Precision GET-only resume verified active; audio enabled")
+        } else if runtimeOwnerIsAdmitted && !runtimeOwnerControlIsDiverted && !runtimeOwnerNeedsRecovery {
+            precisionResumeStatusText = "The trackball returned to its original Precision setting. No button setting was changed. Quit and reopen before preparing a new session."
+            diagnosticsLog.append("Precision GET-only resume observed baseline; audio remains off")
+        } else {
+            precisionResumeStatusText = "Precision could not resume. Audio remains off. Open Advanced for the check results; quit and reopen before another attempt."
+            diagnosticsLog.append("Precision GET-only resume stopped: \(outcome)")
+        }
+    }
+
+    func bindDormantRuntimeOwner(resumeVerifiedSession: Bool = false) async {
         guard !isTerminating else { return }
         guard !runtimeOwnerBindInProgress,
               runtimeOwner == nil,
@@ -1334,6 +1440,7 @@ final class AppModel: ObservableObject {
                 rootGeneration: rootGeneration,
                 sourceBaselineURL: Self.journalFileURL,
                 runtimeJournalURL: Self.runtimeJournalFileURL,
+                resumeVerifiedSession: resumeVerifiedSession,
                 evidenceProvider: {
                     PrecisionRuntimeOwnerEvidence(
                         session: session,
@@ -1357,7 +1464,9 @@ final class AppModel: ObservableObject {
                 }
             }
             await refreshRuntimeOwnerFlags()
-            if await owner.boundOperation == .recover {
+            if await owner.boundOperation == .resume {
+                runtimeOwnerStatusText = "Prepared to check and resume the previous Precision session without changing button settings."
+            } else if await owner.boundOperation == .recover {
                 runtimeOwnerStatusText =
                     "Dormant owner bound for reconnect recovery; confirm Recover to send one restore SET. This does not re-admit or retry automatically."
             } else {
@@ -1399,6 +1508,16 @@ final class AppModel: ObservableObject {
     /// any time, so it runs whenever the runtime owner is idle.
     func refreshJournalRotationReview() {
         guard runtimeOwner == nil, !journalRotationInProgress else { return }
+        precisionResumeAvailable = false
+        if let data = try? Data(contentsOf: Self.runtimeJournalFileURL),
+           let envelope = try? JSONDecoder().decode(DeviceTransactionEnvelope.self, from: data),
+           (try? envelope.validate()) != nil,
+           envelope.status == .running,
+           let control = try? envelope.control(0x00ED), control.phase == .appliedVerified,
+           envelope.dirtyControlIDs == [0x00ED],
+           !envelope.controls.contains(where: { $0.attempts.contains(where: { $0.outcome == .outcomeUnknown }) }) {
+            precisionResumeAvailable = true
+        }
         do {
             guard let review = try PrecisionRuntimeJournalRotator.review(
                 runtimeJournalURL: Self.runtimeJournalFileURL
@@ -3300,6 +3419,12 @@ final class AppModel: ObservableObject {
         guard let snapshot = precisionReadinessSnapshot else { return }
         do {
             let journalData = try Data(contentsOf: Self.journalFileURL)
+            // Reconnect review accepts the exact active state as well as the
+            // baseline. A permission refresh must preserve that read-only
+            // review; admission still revalidates the operation and journal.
+            let reportingMatches = precisionPreflightSnapshot?.state == snapshot.plan.baseline
+                || (guidedReadinessDisposition == .recover
+                    && precisionPreflightSnapshot?.state == snapshot.plan.activeState)
             guard PrecisionTemporaryDiversionReadinessAudit
                     .sourceJournalSHA256(journalData)
                     == snapshot.sourceJournalSHA256,
@@ -3308,7 +3433,7 @@ final class AppModel: ObservableObject {
                   precisionPreflightEvidenceGeneration == connectionGeneration,
                   reprogFeatureDescriptor?.index == snapshot.plan.featureIndex,
                   reprogFeatureDescriptor?.version == snapshot.plan.featureVersion,
-                  precisionPreflightSnapshot?.state == snapshot.plan.baseline else {
+                  reportingMatches else {
                 invalidatePrecisionLifecycleReadiness(
                     reason: "Readiness invalidated: journal or connection evidence changed"
                 )
@@ -3824,6 +3949,7 @@ extension AppModel {
     }
 
     var precisionSummary: String {
+        if precisionResumeInProgress { return "Resuming…" }
         if runtimeOwnerNeedsRecovery { return "Recovery required" }
         if runtimeOwnerOperationInProgress || runtimeOwnerBindInProgress { return "Working…" }
         if runtimeOwnerDeviceDisconnected { return "Disconnected" }
@@ -3834,10 +3960,14 @@ extension AppModel {
         if runtimeOwnerIsAdmitted { return "Inactive · button restored" }
         if runtimeOwnerAuthorizationExpired { return "Preparation expired" }
         if runtimeOwnerCanAdmit { return "Ready for confirmation" }
+        if precisionResumeAvailable && !runtimeOwnerIsBound { return "Ready to resume" }
         return "Inactive"
     }
 
     var precisionSummaryDetail: String {
+        if precisionResumeInProgress {
+            return "Checking the connection and previous Precision session."
+        }
         if runtimeOwnerNeedsRecovery {
             return "Precision needs a recovery review. Open the recovery controls before trying to enable it again."
         }
@@ -3855,6 +3985,9 @@ extension AppModel {
         }
         if runtimeOwnerAuthorizationExpired {
             return "The previous confirmation window expired. Release the expired preparation below, then review setup again."
+        }
+        if precisionResumeAvailable && !runtimeOwnerIsBound {
+            return "A previous active session was saved. Resume it below to check the device and reconnect mute and volume controls."
         }
         return "Tap to mute and hold-and-scroll for volume. Setup and explicit confirmation are required each session."
     }

@@ -140,6 +140,23 @@ struct ObserverMenuView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if model.precisionResumeAvailable && !model.runtimeOwnerIsBound {
+                Button("Resume previous Precision session") {
+                    Task { await model.resumePreviousPrecisionSession() }
+                }
+                .disabled(model.precisionResumeInProgress || model.rootQueryGateFailureText != nil
+                    || !model.inputMonitoringGranted || !model.accessibilityGranted)
+                Text("Checks the device and reconnects audio if Precision is still active. This does not change its button settings.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let resumeStatus = model.precisionResumeStatusText {
+                Text(resumeStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if model.runtimeOwnerControlIsDiverted && !model.runtimeOwnerNeedsRecovery {
                 audioTestSection
             }
@@ -150,6 +167,7 @@ struct ObserverMenuView: View {
                 DisclosureGroup("Prepare Precision audio", isExpanded: $showingPrecisionSetup) {
                     guidedPrecisionSetup.padding(.top, 6)
                 }
+                .disabled(model.precisionResumeInProgress)
             }
             Button(model.runtimeOwnerNeedsRecovery ? "Open recovery controls…" : "Advanced setup and diagnostics…") {
                 showingAdvanced = true

@@ -428,6 +428,7 @@ extension PrecisionRuntimeControlling {
 package protocol PrecisionRuntimeControlling: AnyObject, Sendable {
     func lifecycleState() async throws -> PrecisionTemporaryDiversionLifecycleState
     func activate() async throws -> DeviceTransactionEnvelope
+    func resumeVerified() async throws -> DeviceTransactionEnvelope
     func deactivate() async throws -> DeviceTransactionEnvelope
     func recoverExplicitly() async throws -> DeviceTransactionRecoveryReport
     func shutdown() async -> PrecisionRuntimeShutdownReport
@@ -481,6 +482,12 @@ package actor PrecisionRuntimeComposition: PrecisionRuntimeControlling {
         let token = try beginOperation()
         defer { endOperation(token) }
         return try await lifecycle.activate()
+    }
+
+    package func resumeVerified() async throws -> DeviceTransactionEnvelope {
+        let token = try beginOperation()
+        defer { endOperation(token) }
+        return try await lifecycle.resumeVerified()
     }
 
     package func deactivate() async throws -> DeviceTransactionEnvelope {

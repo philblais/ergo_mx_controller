@@ -760,6 +760,8 @@ package actor PrecisionRuntimeAdmission {
             _ = try await runtime.deactivate()
         case .recover:
             _ = try await runtime.recoverExplicitly()
+        case .resume:
+            _ = try await runtime.resumeVerified()
         }
         try requireCommandOperational()
         let snapshot = try await journalContext.source.loadValidatedSnapshot()
@@ -831,6 +833,12 @@ private func validateIntent(
                 .deletingLastPathComponent else {
         throw PrecisionRuntimeAdmissionError.invalidAuthorizationBinding
     }
+    if intent.operation == .resume {
+        guard let snapshot = intent.expectedRuntimeSnapshot else {
+            throw PrecisionRuntimeAdmissionError.actionNotPermitted
+        }
+        try validateAction(.resume, snapshot: snapshot, permitsDeactivate: false)
+    }
     if let snapshot = intent.expectedRuntimeSnapshot {
         try snapshot.envelope.validate()
         guard snapshot.sha256.count == 64,
@@ -844,6 +852,13 @@ private func validateIntent(
                   PrecisionTemporaryDiversionPlan.controlID
               ).baseline == readiness.plan.baseline else {
             throw PrecisionRuntimeAdmissionError.invalidAuthorizationBinding
+        }
+        if intent.operation == .resume {
+            guard try snapshot.envelope.control(
+                PrecisionTemporaryDiversionPlan.controlID
+            ).intended == readiness.plan.activeState else {
+                throw PrecisionRuntimeAdmissionError.invalidAuthorizationBinding
+            }
         }
     }
 }
@@ -968,6 +983,13 @@ func validateAction(
     ).phase
     switch (operation, envelope.status, phase) {
     case (.activate, .prepared, .baselineVerified):
+        return
+    case (.resume, .running, .appliedVerified):
+        guard !envelope.controls.contains(where: {
+            $0.attempts.contains(where: { $0.outcome == .outcomeUnknown })
+        }) else {
+            throw PrecisionRuntimeAdmissionError.actionNotPermitted
+        }
         return
     case (.recover, .running, .appliedVerified),
          (.recover, .recoveryRequired, .applyMayHaveOccurred),

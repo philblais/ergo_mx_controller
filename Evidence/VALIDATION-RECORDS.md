@@ -1202,3 +1202,25 @@ No code, installed app, preference, or live device record was changed by the
 agent, and no HID query or SET was invoked while recording the result. The
 packaged candidate's test-status document remains a historical snapshot of
 acceptance when the archive was created; this validation record is newer.
+
+
+### Read-only restart-candidate preparation — 2026-09-11
+
+Before candidate installation, the existing app reported **MX Ergo disconnected**
+and **Precision audio: Recovery required**, with ordinary remapping and launch
+at login On and both permissions granted. The live runtime record was inspected
+without modification: transaction `30A1D902-8946-4C09-8FE6-1CFAD59F9687`, revision 3,
+`running`, Precision `appliedVerified`, one verified apply and no restore attempt.
+SHA-256 `391338f46211934d5ea1c0aa6c0cc954dd3c6b105e7ee0634640d3b7410412b1`.
+
+That state differs from the previously recorded completed DAB session. DAB now
+appears in its completed archive with its previously recorded unchanged hash.
+The agent did not perform those intervening hardware sessions and makes no
+functional claim about them. The five protected records still match their
+pinned hashes. Copies of the current runtime and protected hash list are in
+`Evidence/2026-09-11-precision-resume-start/`.
+
+Saved verified state is not proof of the present device state. The new candidate
+requires fresh identity and reporting GETs on the new connection and has no SET
+fallback. Physical button notification delivery after reacquisition is pending.
+No live HID query or SET was invoked by the agent during this inspection.

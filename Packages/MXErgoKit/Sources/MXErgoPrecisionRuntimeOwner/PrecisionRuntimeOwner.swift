@@ -79,6 +79,7 @@ public actor PrecisionRuntimeOwner {
         rootGeneration: UInt64,
         sourceBaselineURL: URL,
         runtimeJournalURL: URL,
+        resumeVerifiedSession: Bool = false,
         evidenceProvider: @escaping @Sendable () async throws
             -> PrecisionRuntimeOwnerEvidence
     ) throws -> PrecisionRuntimeOwner {
@@ -93,7 +94,7 @@ public actor PrecisionRuntimeOwner {
             intent = try PrecisionRuntimeAdmissionReview.makeIntent(
                 launchID: launchID,
                 observerRunID: capturedRun.runID,
-                operation: nil,
+                operation: resumeVerifiedSession ? .resume : nil,
                 readiness: readiness,
                 session: session,
                 rootGeneration: rootGeneration,
@@ -242,6 +243,26 @@ public actor PrecisionRuntimeOwner {
             sessionProvider: sessionProvider,
             rootGenerationProvider: rootGenerationProvider,
             nowUptimeNanoseconds: nowUptimeNanoseconds
+        )
+    }
+
+    /// Reattaches with a fresh GET only. Baseline or conflict results never
+    /// enable Precision and never fall back to activate or recover.
+    public func confirmVerifiedResume(
+        explicitlyConfirmed: Bool,
+        competitorProbe: @escaping @Sendable () throws -> [String],
+        sessionProvider: @escaping @Sendable () async throws -> DeviceTransactionSession,
+        rootGenerationProvider: @escaping @Sendable () async throws -> UInt64
+    ) async throws {
+        guard intent.operation == .resume else {
+            throw PrecisionRuntimeOwnerError.invalidIntent
+        }
+        try await confirmBoundAdmission(
+            explicitlyConfirmed: explicitlyConfirmed,
+            competitorProbe: competitorProbe,
+            sessionProvider: sessionProvider,
+            rootGenerationProvider: rootGenerationProvider,
+            nowUptimeNanoseconds: DispatchTime.now().uptimeNanoseconds
         )
     }
 

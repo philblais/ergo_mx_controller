@@ -85,6 +85,14 @@ still match these. `scripts/verify.sh` checks them.
 
 ## Current authorization state
 
+- **September 11 restart validation:** a user-requested GET-only `.resume` is
+  promoted through the existing owner facade. It requires exact verified-active
+  durable evidence, fresh endpoint verification, and one reporting GET. Active
+  evidence remains unchanged; baseline can be recorded as restored without a
+  new attempt; conflict or failure stops. There is no SET, automatic fallback,
+  or automatic startup hook in this action. Persistent consent/policy data alone
+  grants no execution authority. Hardware notification delivery remains pending.
+
 Keep this accurate; it is the thing most likely to drift.
 
 - **Precision CID `00ED`** — full runtime exists, is wired to the menu app

@@ -554,6 +554,8 @@ import Testing
     for required in [
         "public static func bind(",
         "confirmAdmission(",
+        "confirmVerifiedResume(",
+        "resumeVerifiedSession: Bool = false",
         "confirmRecovery(",
         "confirmDeactivation(",
         "explicitlyConfirmed",
@@ -603,6 +605,7 @@ import Testing
     #expect(appText.contains("prepareForQuit"))
     #expect(appText.contains("completeSessionRollover"))
     #expect(appText.contains("confirmAdmission"))
+    #expect(appText.contains("confirmVerifiedResume"))
     #expect(appText.contains("confirmRecovery"))
     #expect(appText.contains("confirmDeactivation"))
     #expect(appText.contains("setControlEventHandler"))
@@ -902,4 +905,33 @@ private final class LockedOwnerEvents: @unchecked Sendable {
 @Test func terminationWaitForAnUnstartedObserverCompletesWithoutHardware() async {
     let observer = MXErgoObserver()
     #expect(await observer.stopAndWaitForTermination())
+}
+
+
+@Test func verifiedResumeCannotUseAnActivationOrRecoveryBoundOwner() async throws {
+    for operation in [PrecisionTemporaryDiversionOperation.activate, .recover, .resume] {
+        let runID = UUID()
+        let intent = ownerLifecycleIntent(observerRunID: runID, operation: operation)
+        let events = LockedOwnerEvents()
+        let owner = PrecisionRuntimeOwner(
+            launchID: intent.launchID, observerRunID: runID, intent: intent,
+            lifecycle: PrecisionRuntimeLifecycle(
+                intent: intent,
+                fence: MXErgoObserverRestartFence(fenceID: UUID(), capturedRunID: runID, observerID: UUID()),
+                hostHandoff: OwnerStubHandoff(events: events), releaseFence: { _ in true }
+            )
+        )
+        let expected: PrecisionRuntimeOwnerError = operation == .resume
+            ? .explicitConfirmationRequired : .invalidIntent
+        await #expect(throws: expected) {
+            try await owner.confirmVerifiedResume(
+                explicitlyConfirmed: false,
+                competitorProbe: { Issue.record("No scan before consent and matching operation"); return [] },
+                sessionProvider: { ownerSession() }, rootGenerationProvider: { 1 }
+            )
+        }
+        #expect(events.values.isEmpty)
+        #expect(await owner.phase == .bound)
+        await owner.prepareForQuit()
+    }
 }

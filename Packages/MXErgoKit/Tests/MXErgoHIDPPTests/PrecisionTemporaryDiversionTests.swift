@@ -489,3 +489,222 @@ private func precisionPacket(header: [UInt8], parameters: [UInt8]) -> [UInt8] {
     let prefix = header + parameters
     return prefix + Array(repeating: 0, count: HIDPP20LongMessage.byteCount - prefix.count)
 }
+
+
+@Test(arguments: [ResumeReadScenario.active, .baseline, .unexpected, .timeout, .cancelled, .disconnected])
+func precisionResumeClassifiesOneFreshReadWithoutPreparingOrInvokingSET(
+    scenario: ResumeReadScenario
+) async throws {
+    let fixture = try await precisionResumeFixture()
+    defer { try? FileManager.default.removeItem(at: fixture.directory) }
+    let before = try Data(contentsOf: fixture.url)
+    let spy = ResumeReadOnlyTransport(plan: fixture.plan, scenario: scenario)
+    let lifecycle = PrecisionTemporaryDiversionLifecycle(
+        coordinator: DeviceTransactionCoordinator(repository: fixture.repository, transport: spy),
+        plan: fixture.plan, safetyGate: AlwaysAllowingPrecisionSafetyGate()
+    )
+    do {
+        let result = try await lifecycle.resumeVerified()
+        #expect(scenario == .active || scenario == .baseline)
+        #expect(try result.control(0x00ED).phase == (scenario == .active ? .appliedVerified : .restoredVerified))
+        #expect(try result.control(0x00ED).attempts == fixture.applied.control(0x00ED).attempts)
+        #expect(result.status == (scenario == .active ? .running : .completed))
+    } catch {
+        #expect(scenario != .active && scenario != .baseline)
+        if scenario == .unexpected {
+            #expect(error as? DeviceTransactionCoordinatorError == .conflicted(0x00ED))
+            #expect(try await fixture.repository.loadValidated()?.status == .conflicted)
+        }
+    }
+    #expect(await spy.readCount == 1)
+    #expect(await spy.prepareCount == 0)
+    #expect(await spy.invokeCount == 0)
+    if scenario != .baseline && scenario != .unexpected {
+        #expect(try Data(contentsOf: fixture.url) == before)
+    }
+}
+
+@Test func precisionResumeRejectsEveryUnverifiedPhaseBeforeReading() async throws {
+    let fixture = try await precisionResumeFixture()
+    defer { try? FileManager.default.removeItem(at: fixture.directory) }
+    let restoreArmed = try DeviceTransactionReducer.reduce(
+        fixture.applied,
+        event: .armRestore(controlID: 0x00ED, attemptID: UUID(), now: Date())
+    ).envelope
+    let restored = try DeviceTransactionReducer.reduce(
+        restoreArmed,
+        event: .observeRestore(controlID: 0x00ED, state: fixture.plan.baseline, now: Date())
+    ).envelope
+    for envelope in [fixture.prepared, fixture.applyArmed, restoreArmed, restored] {
+        // Each input is a validated serialized restart fixture, never live data.
+        try JSONEncoder().encode(envelope).write(to: fixture.url, options: .atomic)
+        let before = try Data(contentsOf: fixture.url)
+        let spy = ResumeReadOnlyTransport(plan: fixture.plan, scenario: .active)
+        let coordinator = DeviceTransactionCoordinator(repository: fixture.repository, transport: spy)
+        await #expect(throws: DeviceTransactionCoordinatorError.resumeNotPermitted(0x00ED)) {
+            try await coordinator.resumeVerified(controlID: 0x00ED)
+        }
+        #expect(await spy.readCount == 0)
+        #expect(await spy.prepareCount == 0)
+        #expect(await spy.invokeCount == 0)
+        #expect(try Data(contentsOf: fixture.url) == before)
+    }
+}
+
+@Test func precisionResumeRejectsCompetingSoftwareBeforeReading() async throws {
+    let fixture = try await precisionResumeFixture()
+    defer { try? FileManager.default.removeItem(at: fixture.directory) }
+    let spy = ResumeReadOnlyTransport(plan: fixture.plan, scenario: .active)
+    let lifecycle = PrecisionTemporaryDiversionLifecycle(
+        coordinator: DeviceTransactionCoordinator(repository: fixture.repository, transport: spy),
+        plan: fixture.plan,
+        safetyGate: PrecisionTemporaryDiversionDeviceSafetyGate(
+            journalURL: fixture.url, competitorProbe: { ["Logi Options+"] }
+        )
+    )
+    await #expect(throws: PrecisionTemporaryDiversionSafetyGateError.competingProcesses(["Logi Options+"])) {
+        try await lifecycle.resumeVerified()
+    }
+    #expect(await spy.readCount == 0)
+    #expect(await spy.prepareCount == 0)
+    #expect(await spy.invokeCount == 0)
+}
+
+@Test func precisionResumeHoldsCanonicalLeaseAndRejectsLateCompetitor() async throws {
+    let fixture = try await precisionResumeFixture()
+    defer { try? FileManager.default.removeItem(at: fixture.directory) }
+    let competitor = ResumeCompetitorState()
+    let spy = ResumeReadOnlyTransport(
+        plan: fixture.plan, scenario: .active, duringRead: {
+            #expect(throws: MXErgoDeviceOperationLeaseError.unavailable) {
+                _ = try MXErgoDeviceOperationLease.acquire(beside: fixture.url)
+            }
+            competitor.setPresent()
+        }
+    )
+    let lifecycle = PrecisionTemporaryDiversionLifecycle(
+        coordinator: DeviceTransactionCoordinator(repository: fixture.repository, transport: spy),
+        plan: fixture.plan,
+        safetyGate: PrecisionTemporaryDiversionDeviceSafetyGate(
+            journalURL: fixture.url, competitorProbe: { competitor.names }
+        )
+    )
+    await #expect(throws: PrecisionTemporaryDiversionSafetyGateError.competingProcesses(["Logi Options+"])) {
+        try await lifecycle.resumeVerified()
+    }
+    #expect(await spy.readCount == 1)
+    #expect(await spy.prepareCount == 0)
+    #expect(await spy.invokeCount == 0)
+    let released = try MXErgoDeviceOperationLease.acquire(beside: fixture.url)
+    withExtendedLifetime(released) {}
+}
+
+@Test func precisionResumeDurableCommitFailureNeverSendsACommand() async throws {
+    for boundary in DeviceTransactionCommitBoundary.allCases {
+        let fixture = try await precisionResumeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.directory) }
+        let repository = DurableDeviceTransactionFileRepository(fileURL: fixture.url) { reached in
+            if boundary == reached { throw ResumeTestError.commit }
+        }
+        let spy = ResumeReadOnlyTransport(plan: fixture.plan, scenario: .baseline)
+        let coordinator = DeviceTransactionCoordinator(repository: repository, transport: spy)
+        await #expect(throws: ResumeTestError.commit) {
+            try await coordinator.resumeVerified(controlID: 0x00ED)
+        }
+        let durable = try #require(try await fixture.repository.loadValidated())
+        #expect(durable.status == .running || durable.status == .completed)
+        #expect(try durable.control(0x00ED).attempts == fixture.applied.control(0x00ED).attempts)
+        #expect(await spy.prepareCount == 0)
+        #expect(await spy.invokeCount == 0)
+    }
+}
+
+enum ResumeReadScenario: Sendable { case active, baseline, unexpected, timeout, cancelled, disconnected }
+private enum ResumeTestError: Error { case timeout, unexpectedMutation, commit }
+private actor ResumeReadOnlyTransport: DeviceTransactionEffectTransport {
+    let plan: PrecisionTemporaryDiversionPlan
+    let scenario: ResumeReadScenario
+    let duringRead: @Sendable () -> Void
+    var readCount = 0
+    var prepareCount = 0
+    var invokeCount = 0
+    init(plan: PrecisionTemporaryDiversionPlan, scenario: ResumeReadScenario,
+         duringRead: @escaping @Sendable () -> Void = {}) {
+        self.plan = plan
+        self.scenario = scenario
+        self.duringRead = duringRead
+    }
+    func currentSession() -> DeviceTransactionSession {
+        let original = precisionSession()
+        return DeviceTransactionSession(
+            device: original.device, featureID: original.featureID,
+            featureVersion: original.featureVersion, featureIndex: original.featureIndex,
+            connectionEpoch: scenario == .disconnected && readCount > 0 ? 100 : 99
+        )
+    }
+    func prepare(_ proposed: DeviceTransactionMutation, expectedSession: DeviceTransactionSession,
+                 expectedCommittedRevision: UInt64) throws -> DeviceTransactionPreparedInvocation {
+        prepareCount += 1
+        throw ResumeTestError.unexpectedMutation
+    }
+    func invoke(_ prepared: DeviceTransactionPreparedInvocation,
+                authorization: DeviceTransactionDurableCommitReceipt) throws -> DeviceTransactionInvocationEvidence? {
+        invokeCount += 1
+        throw ResumeTestError.unexpectedMutation
+    }
+    func abandon(_ prepared: DeviceTransactionPreparedInvocation,
+                 disposition: DeviceTransactionPreparationDisposition) {}
+    func readReporting(controlID: UInt16, expectedSession: DeviceTransactionSession) throws -> DeviceTransactionWireState {
+        readCount += 1
+        duringRead()
+        switch scenario {
+        case .active, .disconnected: return plan.activeState
+        case .baseline: return plan.baseline
+        case .unexpected:
+            var raw = plan.baseline.rawParameters
+            raw[15] = 0x80
+            return try DeviceTransactionWireState(rawParameters: raw)
+        case .timeout: throw ResumeTestError.timeout
+        case .cancelled: throw CancellationError()
+        }
+    }
+}
+
+private final class ResumeCompetitorState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var present = false
+    func setPresent() { lock.withLock { present = true } }
+    var names: [String] { lock.withLock { present ? ["Logi Options+"] : [] } }
+}
+
+private struct PrecisionResumeFixture: Sendable {
+    let directory: URL
+    let url: URL
+    let repository: DurableDeviceTransactionFileRepository
+    let plan: PrecisionTemporaryDiversionPlan
+    let prepared: DeviceTransactionEnvelope
+    let applyArmed: DeviceTransactionEnvelope
+    let applied: DeviceTransactionEnvelope
+}
+
+private func precisionResumeFixture() async throws -> PrecisionResumeFixture {
+    let journal = try precisionJournal()
+    let plan = try PrecisionTemporaryDiversionPlan.make(
+        journal: journal, currentFeature: journal.feature, deviceIndex: 0, softwareID: 0x0E
+    )
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let url = directory.appendingPathComponent("precision-runtime-v3.json")
+    let repository = DurableDeviceTransactionFileRepository(fileURL: url)
+    let prepared = try DeviceTransactionEnvelope(baselineJournal: journal)
+    let applyArmed = try DeviceTransactionReducer.reduce(prepared, event: .armApply(
+        controlID: 0x00ED, intended: plan.activeState, attemptID: UUID(), now: Date()
+    )).envelope
+    let applied = try DeviceTransactionReducer.reduce(applyArmed, event: .observeApply(
+        controlID: 0x00ED, state: plan.activeState, now: Date()
+    )).envelope
+    _ = try await repository.commit(prepared, expectedRevision: nil)
+    _ = try await repository.commit(applyArmed, expectedRevision: prepared.revision)
+    _ = try await repository.commit(applied, expectedRevision: applyArmed.revision)
+    return PrecisionResumeFixture(directory: directory, url: url, repository: repository,
+                                  plan: plan, prepared: prepared, applyArmed: applyArmed, applied: applied)
+}

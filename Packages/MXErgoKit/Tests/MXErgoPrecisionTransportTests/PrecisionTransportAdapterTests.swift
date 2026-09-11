@@ -232,17 +232,19 @@ import Testing
         fixture: fixture,
         writer: writer,
         reader: reader,
-        operationTimeoutNanoseconds: 1_000_000_000
+        // This tests cancellation after entry, not the deadline. Leave time
+        // for parallel durability tests to occupy the executor.
+        operationTimeoutNanoseconds: 5_000_000_000
     )
     let task = Task {
-        try await harness.adapter.readReporting(
+        defer { reader.pendingReadEntry.finish() }
+        return try await harness.adapter.readReporting(
             controlID: 0x00ED,
             expectedSession: fixture.session
         )
     }
-    try await waitUntil(nanoseconds: 1_000_000_000) {
-        reader.hasPendingRead
-    }
+    defer { task.cancel() }
+    try await reader.pendingReadEntry.wait()
 
     task.cancel()
 
@@ -319,24 +321,31 @@ import Testing
 
 @Test func cancellationBeforeReaderWaiterInstallationIsStickyAndBounded() async throws {
     let fixture = try precisionFixture()
-    let gate = TestSuspensionGate()
+    let entry = TestEntrySignal()
+    let gate = TestSuspensionGate(entry: entry)
     let reader = GatedEntryPrecisionReader(gate: gate)
     let writer = ScriptedPrecisionWriter(steps: [.returnCode(0)])
     let harness = try await makeHarness(
         fixture: fixture,
         writer: writer,
         reader: reader,
-        operationTimeoutNanoseconds: 1_000_000_000
+        operationTimeoutNanoseconds: 5_000_000_000
     )
     await gate.arm()
     let task = Task {
-        try await harness.adapter.readReporting(
+        defer { entry.finish() }
+        return try await harness.adapter.readReporting(
             controlID: 0x00ED,
             expectedSession: fixture.session
         )
     }
-    try await waitUntil(nanoseconds: 1_000_000_000) {
-        await gate.isWaiting
+    do {
+        try await entry.wait()
+    } catch {
+        task.cancel()
+        await gate.release()
+        _ = try? await task.value
+        throw error
     }
 
     task.cancel()
@@ -1075,6 +1084,8 @@ private struct TestEntrySignal: Sendable {
 }
 
 private actor TestSuspensionGate {
+    private let entry: TestEntrySignal?
+    init(entry: TestEntrySignal? = nil) { self.entry = entry }
     private var armed = false
     private var continuation: CheckedContinuation<Void, Never>?
 
@@ -1089,6 +1100,7 @@ private actor TestSuspensionGate {
         guard armed else { return }
         await withCheckedContinuation { continuation in
             self.continuation = continuation
+            entry?.signal()
         }
     }
 
@@ -1480,6 +1492,7 @@ private final class NonCooperativePrecisionReader:
     private var closed: [UUID: PrecisionTransportReportIOError] = [:]
     private var cancelCountStorage = 0
     private let lock = NSLock()
+    let pendingReadEntry = TestEntrySignal()
 
     var hasPendingRead: Bool { lock.withLock { continuation != nil } }
     var cancelCount: Int { lock.withLock { cancelCountStorage } }
@@ -1496,6 +1509,7 @@ private final class NonCooperativePrecisionReader:
     func read(for requestID: UUID) async throws -> PrecisionTransportInputFrame {
         try await withCheckedThrowingContinuation { continuation in
             var immediate: (any Error)?
+            var entered = false
             lock.withLock {
                 if let reason = closed.removeValue(forKey: requestID) {
                     immediate = reason
@@ -1503,8 +1517,10 @@ private final class NonCooperativePrecisionReader:
                     immediate = PrecisionCallbackChannelError.requestNotActive
                 } else {
                     self.continuation = continuation
+                    entered = true
                 }
             }
+            if entered { pendingReadEntry.signal() }
             if let immediate { continuation.resume(throwing: immediate) }
         }
     }

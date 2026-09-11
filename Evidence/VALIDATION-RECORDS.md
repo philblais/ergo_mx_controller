@@ -1185,3 +1185,20 @@ Raw counters are retained in
 No code or installed bundle changed, no live device record was written, and no
 HID query or SET was invoked. No additional test suite run was needed for this
 read-only measurement. Active-use and working-week acceptance remain open.
+
+### User confirmation — trackball off/on reconnection
+
+Before the test, native UI showed MX Ergo connected, ordinary remapping On/Active,
+both permissions granted, and Precision audio Inactive. The user was instructed
+to switch the trackball off and on, confirm reconnection without restarting the
+app, and test wheel click, both thumb buttons, and both wheel tilts.
+
+The user reports “everything resumes correctly”. Record this bounded power-cycle
+and ordinary-control sequence as passed by user report on the current candidate.
+No live disconnect/reconnect trace, per-action event trace, or fresh device-record
+hash was captured in this exchange. This does not establish interruptions while
+Precision is active or complete remaining coexistence and working-week checks.
+No code, installed app, preference, or live device record was changed by the
+agent, and no HID query or SET was invoked while recording the result. The
+packaged candidate's test-status document remains a historical snapshot of
+acceptance when the archive was created; this validation record is newer.

@@ -2,7 +2,7 @@
 
 ## September 11 restart-validation candidate
 
-The new read-only Resume action is built and verified: 534 tests, no skips,
+Installed source `5a1054e` adds the new read-only Resume action. Verified: 534 tests, no skips,
 four signed builds/audits, and Release with warnings treated as errors. Release
 executable SHA-256:
 `dcf8667100fcd169fe82da7e380a3fddf93788569b8f0584766fe5ce8fe852f5`.

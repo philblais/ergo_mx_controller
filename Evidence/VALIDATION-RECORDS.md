@@ -1224,3 +1224,26 @@ Saved verified state is not proof of the present device state. The new candidate
 requires fresh identity and reporting GETs on the new connection and has no SET
 fallback. Physical button notification delivery after reacquisition is pending.
 No live HID query or SET was invoked by the agent during this inspection.
+
+
+### Restart-validation candidate installed — 2026-09-11
+
+Source commit `5a1054ef686a051a05fc53a401d944d0dfd10db3` was built in Release
+with Swift warnings treated as errors. All 534 tests passed, no skips, and
+four signed builds plus signature/isolation audits passed. The executable
+SHA-256 is `dcf8667100fcd169fe82da7e380a3fddf93788569b8f0584766fe5ce8fe852f5`.
+The complete app, prior signed app, and logs are retained in
+`build/precision-resume-dcf86671/`. Advisor review approved this user-initiated
+candidate while withholding unattended startup pending notification acceptance.
+
+The disconnected old app was quit normally through its Quit button. Process
+absence was verified before replacement. Every installed bundle file matches
+the retained candidate and strict signature verification passes. The new app
+was reopened and observed: **MX Ergo connected**, both permissions granted,
+remapping On/Active, launch at login On, **Precision audio: Ready to resume**,
+and enabled **Resume previous Precision session** button.
+
+The agent did not press Resume. The user's physical tap/hold-scroll/release and
+popup checks remain pending; automatic startup is not enabled. The runtime
+record and all five protected records were byte-for-byte unchanged after quit,
+installation, and relaunch. No live HID++ query or SET was invoked by the agent.

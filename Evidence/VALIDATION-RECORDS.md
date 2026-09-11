@@ -1116,3 +1116,23 @@ at sign-in, so quiet menu-only presentation remains unconfirmed. Login with
 remapping Off, remaining coexistence scenarios, and sustained-use acceptance
 remain pending. No application, preference, or device-record change was made
 while recording this report, and no live HID operation was invoked.
+
+### User confirmation — login with remapping Off
+
+After the initial logout/login availability report, the user clarified that
+remapping had been left On. That report was not counted as an Off-setting test.
+The user was then instructed to turn Button remapping Off, leave Launch at
+login On, log out and back in, and check the saved setting before restoring On.
+
+The user reports: “Remapping button is still OFF, I just reenabled it to be ON”.
+Record Off-setting persistence through logout/login as passed by user report,
+and the final On preference as restored by the user. Together with the preceding
+On-setting reboot results, both saved-setting login outcomes are now covered.
+This report confirms the switch state, not independent physical native-button
+behavior while Off or quiet menu-only presentation at sign-in.
+
+The accepted candidate remains the documented `b0bdf27` build; no new binary was
+installed in this exchange. Sleep/wake, remaining coexistence scenarios, quiet
+presentation, and sustained-use acceptance remain pending. No code or live
+device record was changed by the agent, and no HID operation was invoked while
+recording the user's report. Device hashes were not remeasured in this exchange.

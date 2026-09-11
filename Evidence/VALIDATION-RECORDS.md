@@ -1150,3 +1150,38 @@ power cycle, every trackpad/other-mouse or browser variation, quiet login-window
 behavior, or a completed working week. Those remaining scenarios retain their
 status. No code, installed app, preference, or live device record was changed
 by the agent, and no HID operation was invoked while recording this result.
+
+### Resource baseline — 2026-09-10, 18:29–18:30 PDT
+
+The installed `b0bdf27` candidate was sampled without opening its window,
+restarting it, changing settings, or generating input. Four process snapshots
+20 seconds apart covered 60.126 seconds at PID 5765. The executable hash
+remains `44a84c4513c8f2480c613af43b92a40e9a063dce6393f32845ccc69acd2c8a70`.
+
+| Measure | Observed result |
+|---|---|
+| CPU time consumed | 0.03 seconds over 60.126 seconds |
+| Average CPU, one core = 100% | Approximately 0.05% |
+| Resident memory | 120,240 KiB (117.42 MiB) at all four snapshots |
+| Diagnostic file size | 95,988 bytes at all four snapshots |
+| Process restart | None during the sample |
+
+This was a quiet/idle interval, not an imposed workload. No memory or file-size
+growth was observed during it. This does not establish absence of memory leaks,
+active-input or active-Precision performance, log rotation under load, or
+multi-day stability. Before this interval a single process snapshot reported
+5.7% CPU; it was not a sustained-load measurement and is not combined with the
+sample average.
+
+Source review confirms the existing diagnostic file cap of 512 KiB and pending
+payload/entry limits of 512 KiB and 1,024 entries. Overflow handling and file
+wrapping already have automated coverage in the verified 521-test candidate.
+The live sample did not reach those limits. Ordinary non-vendor reports without
+button transitions are throttled to 0.1-second UI emissions; button transitions
+and vendor replies retain their existing separate handling.
+
+Raw counters are retained in
+`Evidence/2026-09-10-resource-sample/mx-ergo-resource-sample.json`.
+No code or installed bundle changed, no live device record was written, and no
+HID query or SET was invoked. No additional test suite run was needed for this
+read-only measurement. Active-use and working-week acceptance remain open.

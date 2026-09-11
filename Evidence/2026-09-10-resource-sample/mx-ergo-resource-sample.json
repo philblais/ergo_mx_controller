@@ -1,0 +1,46 @@
+{
+  "executable_sha256": "44a84c4513c8f2480c613af43b92a40e9a063dce6393f32845ccc69acd2c8a70",
+  "samples": [
+    {
+      "at": "2026-09-10T18:29:58.607310-07:00",
+      "monotonic": 6899.339229708,
+      "pid": 5765,
+      "reported_cpu_percent": 0.0,
+      "rss_kib": 120240,
+      "cpu_seconds": 38.37,
+      "log_bytes": 95988
+    },
+    {
+      "at": "2026-09-10T18:30:18.649821-07:00",
+      "monotonic": 6919.381675833,
+      "pid": 5765,
+      "reported_cpu_percent": 0.0,
+      "rss_kib": 120240,
+      "cpu_seconds": 38.38,
+      "log_bytes": 95988
+    },
+    {
+      "at": "2026-09-10T18:30:38.690713-07:00",
+      "monotonic": 6939.422476,
+      "pid": 5765,
+      "reported_cpu_percent": 0.0,
+      "rss_kib": 120240,
+      "cpu_seconds": 38.39,
+      "log_bytes": 95988
+    },
+    {
+      "at": "2026-09-10T18:30:58.733129-07:00",
+      "monotonic": 6959.464820708,
+      "pid": 5765,
+      "reported_cpu_percent": 0.0,
+      "rss_kib": 120240,
+      "cpu_seconds": 38.4,
+      "log_bytes": 95988
+    }
+  ],
+  "elapsed_seconds": 60.125590999999986,
+  "average_cpu_percent_one_core": 0.04989555944656102,
+  "rss_delta_kib": 0,
+  "min_rss_kib": 120240,
+  "max_rss_kib": 120240
+}

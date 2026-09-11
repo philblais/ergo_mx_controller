@@ -32,6 +32,7 @@ and signature verification are recorded in
 | Coexistence and interruption | Sleep/wake with Precision inactive, reconnection, and five ordinary controls passed by user report. Trackpad/other-mouse use, browser/natural-scroll variations, and a separate device power-cycle check on this candidate remain pending. Begin interruption checks with Precision inactive. |
 | Repeated sessions and working week | Two completed sessions plus intervening archived record observed on the current candidate. Longer repeated-use acceptance and five normal working days remain pending. |
 | Operating instructions | [Everyday-use guide](USER-GUIDE.md) prepared and checked against current UI labels. |
+| Resource use | One-minute idle sample: approximately 0.05% of one CPU core, 117.42 MiB resident memory unchanged, diagnostic file unchanged at 95,988 bytes. Existing log file/backlog limits reviewed. Active-load and multi-day resource behavior remain unverified. |
 
 Use [ACCEPTANCE.md](ACCEPTANCE.md) for the ordered attended tests. Record the
 actual build, starting state, result, and evidence for each scenario. Do not

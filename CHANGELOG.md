@@ -2517,3 +2517,25 @@ pending restoration are recorded in the validation history. The active app
 was not quit or replaced. The next gate is the user's popup result and verified
 restoration before login/reboot checks. No live HID query or SET was invoked
 by the agent during this documentation milestone.
+
+## Local release-candidate package — 2026-09-10
+
+The unchanged `b0bdf27` application is packaged with the everyday-use guide,
+installation/rollback instructions, a standalone test-status snapshot, build
+metadata, and per-file checksums. Production source and build configuration
+still match that application commit. The installed and retained app bundles
+match before packaging; no signing, executable, or device setting is changed.
+
+The local ZIP is 4,890,511 bytes, SHA-256
+`6a96fbd02f9ae3d068534e76df58ce73722bd27e0a6a0c6eb770dc64a07e14ff`, retained at
+`/Users/phib/Documents/ChatGPT/Logitech Trackball/Releases/MX Ergo Controller Candidate 44a84c45.zip`.
+Archive integrity, safe member paths, standalone documentation links, and all
+ten manifested files were checked. A fresh extraction matches the source
+package exactly, and the extracted app passes strict signature verification.
+No live device records, diagnostics logs, or personal evidence are bundled.
+
+The existing 521-test and four-signed-build verification applies to this exact
+unchanged binary; tests were not rerun for packaging. This is a local candidate,
+not a final release or public distribution. The installed app was not replaced,
+launched, or interrupted. Remaining acceptance gates, including multi-day use,
+remain open. No live HID operation was invoked.

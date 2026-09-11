@@ -20,6 +20,16 @@ and signature verification are recorded in
 
 ## Acceptance gates
 
+Local packaging is complete. The archive is
+`/Users/phib/Documents/ChatGPT/Logitech Trackball/Releases/MX Ergo Controller Candidate 44a84c45.zip`
+(4,890,511 bytes), SHA-256
+`6a96fbd02f9ae3d068534e76df58ce73722bd27e0a6a0c6eb770dc64a07e14ff`.
+It contains the unchanged signed app, an everyday-use guide, installation and
+rollback notes, a standalone test-status snapshot, build identity, and per-file
+checksums. All ten manifested files match after extraction and the extracted
+app's signature verifies. The package excludes live device records and remains
+a personal release candidate. The existing installation was not replaced.
+
 | Area | Evidence and remaining work |
 |---|---|
 | Input scope | Global matching-button mappings accepted by the user. Behavior with another mouse still needs observation. |

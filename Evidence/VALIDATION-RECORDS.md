@@ -1136,3 +1136,17 @@ installed in this exchange. Sleep/wake, remaining coexistence scenarios, quiet
 presentation, and sustained-use acceptance remain pending. No code or live
 device record was changed by the agent, and no HID operation was invoked while
 recording the user's report. Device hashes were not remeasured in this exchange.
+
+### User confirmation — ordinary sleep/wake
+
+Following the instruction to leave Precision inactive, sleep and wake the Mac,
+and check reconnection plus the five ordinary mapped controls, the user replied
+“All good”. Record that bounded sleep/wake sequence as passed by user report
+on the current documented candidate. Sleep duration, individual event traces,
+and live device-record hashes were not captured in this exchange.
+
+This does not establish sleep/wake while Precision is active, a separate device
+power cycle, every trackpad/other-mouse or browser variation, quiet login-window
+behavior, or a completed working week. Those remaining scenarios retain their
+status. No code, installed app, preference, or live device record was changed
+by the agent, and no HID operation was invoked while recording this result.

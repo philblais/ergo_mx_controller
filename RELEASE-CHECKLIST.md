@@ -29,7 +29,7 @@ and signature verification are recorded in
 | Precision activation and restoration | Two completed revision-6 sessions on the volume-feedback candidate retain verified apply/restore evidence; latest UI confirms button restored. Earlier `0ef8bd6` evidence remains separately recorded. |
 | Volume/mute popup | Passed by user report September 10 (“It's all working”), with final restoration independently confirmed by UI and durable record. Isolated rendering and presentation checks also passed. |
 | Quiet login, remapping On and Off | Reboot availability and five mapped actions passed by user report with On. A subsequent logout/login retained Off by user report; the user then restored On. Both saved-setting login outcomes pass. Initial menu-only window behavior remains unconfirmed. |
-| Coexistence and interruption | Trackpad/other-mouse use, browser/natural-scroll variations, and ordinary sleep/wake or reconnect checks pending. Begin interruption checks with Precision inactive. |
+| Coexistence and interruption | Sleep/wake with Precision inactive, reconnection, and five ordinary controls passed by user report. Trackpad/other-mouse use, browser/natural-scroll variations, and a separate device power-cycle check on this candidate remain pending. Begin interruption checks with Precision inactive. |
 | Repeated sessions and working week | Two completed sessions plus intervening archived record observed on the current candidate. Longer repeated-use acceptance and five normal working days remain pending. |
 | Operating instructions | [Everyday-use guide](USER-GUIDE.md) prepared and checked against current UI labels. |
 

@@ -14,12 +14,14 @@ package struct PrecisionTransportOutputFrame: Sendable, Equatable {
     package let device: JournalDeviceIdentity
     package let connectionEpoch: UInt64
     package let rootGeneration: UInt64
+    package let automaticPermit: PrecisionAutomaticRunPermit?
     package let connectionVerification: PrecisionConnectionVerificationRequest?
 
     package init(requestID: UUID, reportType: PrecisionTransportReportType,
                  reportID: UInt8, bytes: [UInt8], device: JournalDeviceIdentity,
                  connectionEpoch: UInt64, rootGeneration: UInt64,
-                 connectionVerification: PrecisionConnectionVerificationRequest? = nil) {
+                 connectionVerification: PrecisionConnectionVerificationRequest? = nil,
+                 automaticPermit: PrecisionAutomaticRunPermit? = nil) {
         self.requestID = requestID
         self.reportType = reportType
         self.reportID = reportID
@@ -28,6 +30,7 @@ package struct PrecisionTransportOutputFrame: Sendable, Equatable {
         self.connectionEpoch = connectionEpoch
         self.rootGeneration = rootGeneration
         self.connectionVerification = connectionVerification
+        self.automaticPermit = automaticPermit
     }
 }
 
@@ -152,7 +155,8 @@ package enum PrecisionTransportFactory {
         competitorProbe: @escaping CompetitorProbe,
         durableSnapshotLoader: @escaping DurableSnapshotLoader,
         connectionValidator: @escaping @Sendable () throws -> Void,
-        operationTimeoutNanoseconds: UInt64 = 5_000_000_000
+        operationTimeoutNanoseconds: UInt64 = 5_000_000_000,
+        automaticPermit: PrecisionAutomaticRunPermit? = nil
     ) throws -> any PrecisionTransportSession {
         try PrecisionTransportAdapter(
             plan: plan,
@@ -164,7 +168,8 @@ package enum PrecisionTransportFactory {
             competitorProbe: competitorProbe,
             durableSnapshotLoader: durableSnapshotLoader,
             connectionValidator: connectionValidator,
-            operationTimeoutNanoseconds: operationTimeoutNanoseconds
+            operationTimeoutNanoseconds: operationTimeoutNanoseconds,
+            automaticPermit: automaticPermit
         )
     }
 }
@@ -231,6 +236,7 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
     private let durableSnapshotLoader: DurableSnapshotLoader
     private let connectionValidator: @Sendable () throws -> Void
     private let operationTimeoutNanoseconds: UInt64
+    private let automaticPermit: PrecisionAutomaticRunPermit?
     private let timing: PrecisionTransportTiming
     private var correlator: HIDPP20RequestCorrelator
     private var state: State = .idle
@@ -247,7 +253,8 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
         durableSnapshotLoader: @escaping DurableSnapshotLoader,
         connectionValidator: @escaping @Sendable () throws -> Void = {},
         operationTimeoutNanoseconds: UInt64 = 5_000_000_000,
-        timing: PrecisionTransportTiming = .continuous
+        timing: PrecisionTransportTiming = .continuous,
+        automaticPermit: PrecisionAutomaticRunPermit? = nil
     ) throws {
         guard plan.device == binding.session.device,
               binding.session.featureID == ReprogControlsV4.featureID,
@@ -268,6 +275,7 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
         self.connectionValidator = connectionValidator
         self.operationTimeoutNanoseconds = operationTimeoutNanoseconds
         self.timing = timing
+        self.automaticPermit = automaticPermit
         correlator = HIDPP20RequestCorrelator(
             connectionEpoch: binding.session.connectionEpoch
         )
@@ -552,12 +560,15 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
                 connectionEpoch: expectedSession.connectionEpoch,
                 id: requestID
             )
-            let output = outputFrame(requestID: requestID, request: request)
+            let output = outputFrame(requestID: requestID, request: request, automaticPermit: mutation.kind == .apply ? automaticPermit : nil)
             try reader.beginRequest(output)
             try requireStateToken(.opening(requestID))
             state = .pending(requestID: requestID, kind: .set(mutation.kind))
             ioReturn = try await writeWithDeadline(output)
             try requirePending(requestID, kind: .set(mutation.kind))
+        } catch PrecisionAutomaticRunError.rejectedBeforeDispatch {
+            poisonRequest(requestID, expectedSession: expectedSession, cause: PrecisionAutomaticRunError.rejectedBeforeDispatch)
+            throw DeviceTransactionTransportInvocationError.rejectedBeforeDispatch("Automatic Precision was revoked before physical dispatch")
         } catch {
             poisonRequest(
                 requestID,
@@ -876,7 +887,8 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
 
     private func outputFrame(
         requestID: UUID,
-        request: HIDPP20LongMessage
+        request: HIDPP20LongMessage,
+        automaticPermit: PrecisionAutomaticRunPermit? = nil
     ) -> PrecisionTransportOutputFrame {
         PrecisionTransportOutputFrame(
             requestID: requestID,
@@ -885,7 +897,8 @@ actor PrecisionTransportAdapter: PrecisionTransportSession {
             bytes: request.bytes,
             device: binding.session.device,
             connectionEpoch: binding.session.connectionEpoch,
-            rootGeneration: binding.rootGeneration
+            rootGeneration: binding.rootGeneration,
+            automaticPermit: automaticPermit
         )
     }
 

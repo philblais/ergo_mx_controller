@@ -27,6 +27,7 @@ package struct PrecisionReviewedOutputRecord: Sendable, Equatable {
     package let device: JournalDeviceIdentity
     package let connectionEpoch: UInt64
     package let rootGeneration: UInt64
+    package let automaticPermit: PrecisionAutomaticRunPermit?
 
     // Deliberately module-internal. Sibling targets may inspect records handed
     // to the reviewed blocking seam but cannot manufacture one and bypass the
@@ -37,7 +38,8 @@ package struct PrecisionReviewedOutputRecord: Sendable, Equatable {
         bytes: [UInt8],
         device: JournalDeviceIdentity,
         connectionEpoch: UInt64,
-        rootGeneration: UInt64
+        rootGeneration: UInt64,
+        automaticPermit: PrecisionAutomaticRunPermit? = nil
     ) {
         self.requestID = requestID
         self.kind = kind
@@ -45,6 +47,7 @@ package struct PrecisionReviewedOutputRecord: Sendable, Equatable {
         self.device = device
         self.connectionEpoch = connectionEpoch
         self.rootGeneration = rootGeneration
+        self.automaticPermit = automaticPermit
     }
 }
 
@@ -424,7 +427,8 @@ final class PrecisionBlockingWriteLifecycle:
             bytes: frame.bytes,
             device: frame.device,
             connectionEpoch: frame.connectionEpoch,
-            rootGeneration: frame.rootGeneration
+            rootGeneration: frame.rootGeneration,
+            automaticPermit: frame.automaticPermit
         )
     }
 
@@ -435,6 +439,20 @@ final class PrecisionBlockingWriteLifecycle:
               pending.record.requestID == requestID,
               lifecycleState == .accepting else {
             condition.unlock()
+            return
+        }
+        do {
+            if pending.record.kind == .applyTemporaryDiversion {
+                try pending.record.automaticPermit?.claimMutation()
+            }
+        } catch {
+            let continuation = pending.continuation
+            pending.continuation = nil
+            requestState = .none
+            _ = rememberTombstoneLocked(.completed, requestID: requestID)
+            resumeCountStorage += continuation == nil ? 0 : 1
+            condition.unlock()
+            continuation?.resume(throwing: PrecisionAutomaticRunError.rejectedBeforeDispatch)
             return
         }
         requestState = .entered(pending)

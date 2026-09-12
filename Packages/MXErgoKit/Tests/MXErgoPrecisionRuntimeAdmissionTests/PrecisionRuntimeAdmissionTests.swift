@@ -1925,3 +1925,187 @@ private func sourceText(under directory: URL) throws -> String {
             makeRuntime: { _ in throw AdmissionTestError.unused })
     }
 }
+
+@Test func automaticAuthorizationRequiresBoundConsentAndBurnsEachOperationOnce() throws {
+    let fixture = try admissionFixture()
+    defer { fixture.cleanup() }
+    let intent = try fixture.intent(operation: .activate, deadline: 400)
+    let permit = PrecisionAutomaticRunPermit(consent: PrecisionSeamlessRestartConsent(enabled: true,
+        readiness: fixture.readiness), consentIsCurrent: { true })
+    _ = try PrecisionRuntimeAdmissionAuthorizationFactory.issueAutomatically(for: intent, permit: permit, nowUptimeNanoseconds: 300)
+    #expect(throws: PrecisionAutomaticRunError.operationAlreadyUsed) {
+        _ = try PrecisionRuntimeAdmissionAuthorizationFactory.issueAutomatically(for: intent, permit: permit, nowUptimeNanoseconds: 300)
+    }
+    try permit.claimMutation()
+    #expect(permit.revoke())
+    // Let an entered write finish its classification; never permit a second.
+    try permit.validateInitialOperation()
+    #expect(throws: PrecisionAutomaticRunError.rejectedBeforeDispatch) { try permit.claimMutation() }
+    #expect(throws: PrecisionAutomaticRunError.revoked) { try permit.validate() }
+}
+
+@Test func automaticPermitCannotAuthorizeDisabledChangedOrRevokedConsent() throws {
+    let fixture = try admissionFixture()
+    defer { fixture.cleanup() }
+    let intent = try fixture.intent(operation: .activate, deadline: 400)
+    for mode in 0...2 {
+        let permit = PrecisionAutomaticRunPermit(consent: PrecisionSeamlessRestartConsent(enabled: mode != 0,
+            readiness: fixture.readiness), consentIsCurrent: { mode != 1 })
+        if mode == 2 { #expect(!permit.revoke()) }
+        #expect(throws: (any Error).self) {
+            _ = try PrecisionRuntimeAdmissionAuthorizationFactory.issueAutomatically(for: intent, permit: permit, nowUptimeNanoseconds: 300)
+        }
+    }
+}
+
+@Test func automaticPermitNeverAuthorizesRecoveryOrDeactivation() throws {
+    let fixture = try admissionFixture()
+    defer { fixture.cleanup() }
+    let permit = PrecisionAutomaticRunPermit(consent: PrecisionSeamlessRestartConsent(enabled: true,
+        readiness: fixture.readiness), consentIsCurrent: { true })
+    for operation in [PrecisionTemporaryDiversionOperation.recover, .deactivate] {
+        #expect(throws: PrecisionAutomaticRunError.invalidConsent) {
+            try permit.reserve(operation, readiness: fixture.readiness)
+        }
+    }
+}
+
+@Test func automaticRevocationAfterAuthorizationPreventsAnyHandoff() async throws {
+    let fixture = try admissionFixture()
+    defer { fixture.cleanup() }
+    let intent = try fixture.intent(operation: .activate, deadline: 400)
+    let permit = PrecisionAutomaticRunPermit(consent: PrecisionSeamlessRestartConsent(enabled: true,
+        readiness: fixture.readiness), consentIsCurrent: { true })
+    let authorization = try PrecisionRuntimeAdmissionAuthorizationFactory.issueAutomatically(for: intent,
+        permit: permit, nowUptimeNanoseconds: 300)
+    permit.revoke()
+    let configuration = admissionConfiguration(intent: intent, authorization: authorization,
+        handoff: ExactAdmissionHandoff(intent: intent), nowProvider: { 300 })
+    await expectAdmissionFailure(stage: .authorization) {
+        _ = try await PrecisionRuntimeAdmissionFactory.admit(configuration: configuration,
+            inspect: { _ in Issue.record("Inspection entered after revoked authority"); throw AdmissionTestError.unused },
+            acquireLease: { _ in Issue.record("Lease entered"); throw AdmissionTestError.unused },
+            bootstrap: { _, _ in Issue.record("Bootstrap entered"); throw AdmissionTestError.unused },
+            makeRuntime: { _ in Issue.record("Runtime entered"); throw AdmissionTestError.unused })
+    }
+}
+
+@Test func automaticResumeOnNewLaunchAndEpochNeverActivatesOrRecovers() async throws {
+    let fixture = try admissionFixture()
+    defer { fixture.cleanup() }
+    let journal = try JSONDecoder().decode(DeviceStateJournal.self, from: fixture.sourceData)
+    let prepared = try DeviceTransactionEnvelope(baselineJournal: journal)
+    let armed = try DeviceTransactionReducer.reduce(prepared, event: .armApply(
+        controlID: 0x00ED, intended: fixture.readiness.plan.activeState, attemptID: UUID(), now: Date()
+    )).envelope
+    let active = try DeviceTransactionReducer.reduce(armed, event: .observeApply(
+        controlID: 0x00ED, state: fixture.readiness.plan.activeState, now: Date()
+    )).envelope
+    try admissionEncoded(active).write(to: fixture.runtimeURL)
+    let before = try Data(contentsOf: fixture.runtimeURL)
+    let original = fixture.session
+    let session = DeviceTransactionSession(device: original.device, featureID: original.featureID,
+        featureVersion: original.featureVersion, featureIndex: original.featureIndex,
+        connectionEpoch: original.connectionEpoch + 1)
+    let readiness = PrecisionTemporaryDiversionReadinessSnapshot(
+        plan: fixture.readiness.plan, sourceJournalSHA256: fixture.readiness.sourceJournalSHA256,
+        sourceBaselineTransactionID: fixture.readiness.sourceBaselineTransactionID,
+        connectionGeneration: fixture.rootGeneration + 1, connectionEpoch: session.connectionEpoch,
+        authorization: .notAuthorizedForExecution)
+    let intent = try PrecisionRuntimeAdmissionReview.makeIntent(
+        launchID: UUID(), observerRunID: UUID(), operation: .resume, readiness: readiness,
+        session: session, rootGeneration: fixture.rootGeneration + 1,
+        sourceBaselineURL: fixture.sourceURL, runtimeJournalURL: fixture.runtimeURL,
+        expiresAtUptimeNanoseconds: 400)
+    let permit = PrecisionAutomaticRunPermit(consent: PrecisionSeamlessRestartConsent(enabled: true, readiness: readiness), consentIsCurrent: { true })
+    let authorization = try PrecisionRuntimeAdmissionAuthorizationFactory.issueAutomatically(
+        for: intent, permit: permit, nowUptimeNanoseconds: 300)
+    let events = AdmissionEventRecorder()
+    let configuration = admissionConfiguration(intent: intent, authorization: authorization,
+        handoff: ExactAdmissionHandoff(intent: intent, events: events), events: events,
+        nowProvider: { 300 })
+    let resumed = try await PrecisionRuntimeAdmissionFactory.admit(
+        configuration: configuration,
+        inspect: { try PrecisionRuntimeJournalBootstrap.inspect($0) },
+        acquireLease: { try MXErgoDeviceOperationLease.acquire(beside: $0) },
+        bootstrap: { request, lease in
+            try await PrecisionRuntimeJournalBootstrap.prepare(request, operationLease: lease)
+        },
+        makeRuntime: { configuration in
+            AdmissionFakeRuntime(context: configuration.journalContext, events: events)
+        })
+    #expect(await resumed.state == .active)
+    #expect(events.count("resume") == 1)
+    #expect(events.count("activate") == 0)
+    #expect(events.count("recover") == 0)
+    #expect(events.count("deactivate") == 0)
+    #expect(try Data(contentsOf: fixture.runtimeURL) == before)
+    _ = await resumed.shutdown()
+    await expectAdmissionFailure(stage: .authorization) {
+        _ = try await PrecisionRuntimeAdmissionFactory.admit(
+            configuration: configuration,
+            inspect: { _ in throw AdmissionTestError.unused },
+            acquireLease: { _ in throw AdmissionTestError.unused },
+            bootstrap: { _, _ in throw AdmissionTestError.unused },
+            makeRuntime: { _ in throw AdmissionTestError.unused })
+    }
+}
+
+
+private struct AutomaticRevokingHandoff: PrecisionRuntimeHostHandoff {
+    let permit: PrecisionAutomaticRunPermit
+    func stopAndWait(launchID: UUID, expectedSession: DeviceTransactionSession,
+        expectedRootGeneration: UInt64, expectedObserverRunID: UUID,
+        timeoutNanoseconds: UInt64) async throws -> PrecisionRuntimeHostHandoffReceipt {
+        permit.revoke()
+        return PrecisionRuntimeHostHandoffReceipt(launchID: launchID, session: expectedSession,
+            rootGeneration: expectedRootGeneration, observerRunID: expectedObserverRunID,
+            pendingRequestCount: 0, observerWasUnscheduled: true, observerDeviceWasClosed: true)
+    }
+}
+
+@Test func automaticRevocationDuringHandoffPreventsBootstrapAndAcquisition() async throws {
+    let fixture = try admissionFixture()
+    defer { fixture.cleanup() }
+    let intent = try fixture.intent(operation: .activate, deadline: 400)
+    let permit = PrecisionAutomaticRunPermit(consent: PrecisionSeamlessRestartConsent(enabled: true,
+        readiness: fixture.readiness), consentIsCurrent: { true })
+    let authorization = try PrecisionRuntimeAdmissionAuthorizationFactory.issueAutomatically(for: intent,
+        permit: permit, nowUptimeNanoseconds: 300)
+    let configuration = admissionConfiguration(intent: intent, authorization: authorization,
+        handoff: AutomaticRevokingHandoff(permit: permit), nowProvider: { 300 })
+    await expectAdmissionFailure(stage: .competitorScan) {
+        _ = try await PrecisionRuntimeAdmissionFactory.admit(configuration: configuration,
+            inspect: { try PrecisionRuntimeJournalBootstrap.inspect($0) },
+            acquireLease: { try MXErgoDeviceOperationLease.acquire(beside: $0) },
+            bootstrap: { _, _ in Issue.record("Bootstrap after opt-out"); throw AdmissionTestError.unused },
+            makeRuntime: { _ in Issue.record("Acquisition after opt-out"); throw AdmissionTestError.unused })
+    }
+}
+
+@Test func automaticRevocationAfterAcquisitionShutsDownWithoutActivation() async throws {
+    let fixture = try admissionFixture()
+    defer { fixture.cleanup() }
+    let intent = try fixture.intent(operation: .activate, deadline: 400)
+    let permit = PrecisionAutomaticRunPermit(consent: PrecisionSeamlessRestartConsent(enabled: true,
+        readiness: fixture.readiness), consentIsCurrent: { true })
+    let authorization = try PrecisionRuntimeAdmissionAuthorizationFactory.issueAutomatically(for: intent,
+        permit: permit, nowUptimeNanoseconds: 300)
+    let events = AdmissionEventRecorder()
+    let configuration = admissionConfiguration(intent: intent, authorization: authorization,
+        handoff: ExactAdmissionHandoff(intent: intent), nowProvider: { 300 })
+    await #expect(throws: PrecisionAutomaticRunError.revoked) {
+        _ = try await PrecisionRuntimeAdmissionFactory.admit(configuration: configuration,
+            inspect: { try PrecisionRuntimeJournalBootstrap.inspect($0) },
+            acquireLease: { try MXErgoDeviceOperationLease.acquire(beside: $0) },
+            bootstrap: { request, lease in try await PrecisionRuntimeJournalBootstrap.prepare(request, operationLease: lease) },
+            makeRuntime: { configuration in
+                permit.revoke()
+                return AdmissionFakeRuntime(context: configuration.journalContext, events: events)
+            })
+    }
+    #expect(events.count("activate") == 0)
+    #expect(events.count("resume") == 0)
+    #expect(events.count("recover") == 0)
+    #expect(events.count("shutdown") == 1)
+}

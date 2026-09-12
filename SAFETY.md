@@ -171,14 +171,17 @@ its baseline, deactivate it explicitly first. A physical disconnect while
 diverted is classified `recovery-required` and never triggers an automatic
 re-admit or re-SET on reconnect.
 
-The September 11 restart-validation candidate adds a distinct, user-confirmed
-GET-only resume. On a fresh launch, only a `running/appliedVerified` journal with
-no uncertain attempt, conflict, or unrelated dirty control can enter this path.
-Fresh endpoint identity and a full reporting GET must match the intended state
-before audio is enabled. An exact baseline GET can record `restoredVerified`
-without a new attempt. Unexpected state is a conflict. None of these outcomes
-can branch to activate, restore, or recover. This is not unattended startup;
-persisted restart preference/policy types remain non-authorizing and unwired.
+The September 11 automatic restart candidate adds a visible device/baseline-bound
+opt-in. Each launch mints a fresh non-serializable one-use capability from that
+preference; it never reuses a manual-confirmation Boolean. A clean verified
+saved session may enter GET-only `.resume`; fresh endpoint identity and a full
+reporting GET must match before audio is enabled. Exact baseline can be recorded
+as restored without a new attempt. Only after verified clean drain/close/fence
+release, CAS archival, a new observer run and new evidence may the launch perform
+one clean activation. Automatic recover, inverse commands, and uncertain-state
+retries remain prohibited. Revocation and physical dispatch share a lock; if
+revocation wins, no physical SET occurs. If entry wins, durable classification
+finishes and final consent still gates audio. The setting defaults off.
 
 ## 11. The event layer fails open
 

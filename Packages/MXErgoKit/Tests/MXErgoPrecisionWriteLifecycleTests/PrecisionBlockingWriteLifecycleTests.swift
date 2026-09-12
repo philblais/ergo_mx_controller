@@ -988,3 +988,56 @@ private func sourceText(under directory: URL) throws -> String {
     #expect(writer.isStopped)
     #expect(writer.entryCount == 1)
 }
+
+private func automaticWritePermit(_ fixture: WriteFixture) throws -> PrecisionAutomaticRunPermit {
+    let readiness = PrecisionTemporaryDiversionReadinessSnapshot(plan: fixture.plan,
+        sourceJournalSHA256: String(repeating: "a", count: 64), sourceBaselineTransactionID: fixture.journal.transactionID,
+        connectionGeneration: fixture.binding.rootGeneration, connectionEpoch: fixture.binding.session.connectionEpoch,
+        authorization: .notAuthorizedForExecution)
+    let permit = PrecisionAutomaticRunPermit(consent: PrecisionSeamlessRestartConsent(enabled: true, readiness: readiness),
+        consentIsCurrent: { true })
+    try permit.reserve(.activate, readiness: readiness)
+    return permit
+}
+
+private func automaticWriteFrame(_ fixture: WriteFixture, _ permit: PrecisionAutomaticRunPermit) -> PrecisionTransportOutputFrame {
+    PrecisionTransportOutputFrame(requestID: UUID(), reportType: .output, reportID: 0x11,
+        bytes: fixture.plan.applySetRequest.bytes, device: fixture.binding.session.device,
+        connectionEpoch: fixture.binding.session.connectionEpoch, rootGeneration: fixture.binding.rootGeneration,
+        automaticPermit: permit)
+}
+
+@Test func revokingAutomaticPrecisionWhileQueuedPreventsPhysicalDispatch() async throws {
+    let fixture = try writeFixture()
+    let permit = try automaticWritePermit(fixture)
+    let scheduler = ManualScheduler()
+    let calls = LockedCounter()
+    let writer = try makeWriter(fixture: fixture, scheduler: scheduler) { _ in calls.increment(); return 0 }
+    let frame = automaticWriteFrame(fixture, permit)
+    let task = Task { try await writer.write(frame) }
+    try await waitUntil { scheduler.count == 1 }
+    #expect(!permit.revoke())
+    scheduler.runNext()
+    await #expect(throws: PrecisionAutomaticRunError.rejectedBeforeDispatch) { try await task.value }
+    #expect(writer.entryCount == 0)
+    #expect(calls.value == 0)
+    await writer.shutdownAndDrain()
+    #expect(writer.isStopped)
+}
+
+@Test func revokingAutomaticPrecisionAfterEntryPreservesDrainAndPreventsAnotherSet() async throws {
+    let fixture = try writeFixture()
+    let permit = try automaticWritePermit(fixture)
+    let gate = BlockingCallGate(returnCode: 0)
+    let writer = try makeWriter(fixture: fixture, blockingCall: gate.invoke)
+    let task = Task { try await writer.write(automaticWriteFrame(fixture, permit)) }
+    try await waitUntil { gate.entryCount == 1 }
+    #expect(permit.revoke())
+    gate.release()
+    #expect(try await task.value == 0)
+    await #expect(throws: PrecisionAutomaticRunError.rejectedBeforeDispatch) {
+        try await writer.write(automaticWriteFrame(fixture, permit))
+    }
+    await writer.shutdownAndDrain()
+    #expect(writer.entryCount == 1)
+}

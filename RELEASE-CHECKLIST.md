@@ -1,6 +1,14 @@
 # Personal v1 release readiness
 
-## September 11 restart-validation candidate
+## September 11 automatic-start candidate
+
+The automatic-start setting and guarded startup flow are implemented. The
+candidate defaults off and needs attended first enablement and app/login/reboot
+acceptance. Automated verification: 554 tests, no skips. Full build identities
+and installation evidence will be recorded below after the signed Release build.
+See [restart development](RESTART-DEVELOPMENT.md) for bounded behavior and gates.
+
+## Previous September 11 restart-validation candidate
 
 Installed source `5a1054e` adds the new read-only Resume action. Verified: 534 tests, no skips,
 four signed builds/audits, and Release with warnings treated as errors. Release
@@ -8,7 +16,7 @@ executable SHA-256:
 `dcf8667100fcd169fe82da7e380a3fddf93788569b8f0584766fe5ce8fe852f5`.
 Retained build and logs: `build/precision-resume-dcf86671/`.
 Hardware acceptance of notification delivery after reconnect is pending.
-Fully automatic Precision startup remains unimplemented; see
+That earlier candidate did not implement automatic startup; see
 [restart development](RESTART-DEVELOPMENT.md).
 
 ## Previous volume-feedback candidate and acceptance

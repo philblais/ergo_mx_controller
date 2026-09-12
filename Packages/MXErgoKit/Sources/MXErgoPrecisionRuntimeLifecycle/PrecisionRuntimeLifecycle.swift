@@ -319,7 +319,7 @@ package actor PrecisionRuntimeLifecycle {
             break
         }
         let released = releaseFence(fence)
-        phaseStorage = .released
+        if released { phaseStorage = .released }
         return released
     }
 

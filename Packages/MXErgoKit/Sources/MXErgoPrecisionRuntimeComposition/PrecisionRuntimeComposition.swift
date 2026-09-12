@@ -55,6 +55,7 @@ package struct PrecisionRuntimeShutdownReport: Sendable, Equatable {
 package struct PrecisionRuntimeCompositionConfiguration: Sendable {
     package typealias CompetitorProbe = @Sendable () throws -> [String]
 
+    package let automaticPermit: PrecisionAutomaticRunPermit?
     package let journalContext: PrecisionRuntimeJournalContext
     package let operationLease: MXErgoDeviceOperationLease
     package let sessionProvider: PrecisionTransportFactory.SessionProvider
@@ -85,9 +86,11 @@ package struct PrecisionRuntimeCompositionConfiguration: Sendable {
         competitorProbe: @escaping CompetitorProbe,
         operationTimeoutNanoseconds: UInt64 = 5_000_000_000,
         unsolicitedHIDPPHandler: (@Sendable ([UInt8]) -> Void)? = nil,
-        deviceDisconnectHandler: (@Sendable () -> Void)? = nil
+        deviceDisconnectHandler: (@Sendable () -> Void)? = nil,
+        automaticPermit: PrecisionAutomaticRunPermit? = nil
     ) {
         self.journalContext = journalContext
+        self.automaticPermit = automaticPermit
         self.operationLease = operationLease
         self.sessionProvider = sessionProvider
         self.rootGenerationProvider = rootGenerationProvider
@@ -258,7 +261,8 @@ package enum PrecisionRuntimeCompositionFactory {
                     },
                     connectionValidator: { try endpoint.validateActiveConnection() },
                     operationTimeoutNanoseconds:
-                        configuration.operationTimeoutNanoseconds
+                        configuration.operationTimeoutNanoseconds,
+                    automaticPermit: configuration.automaticPermit
                 )
             }
         )

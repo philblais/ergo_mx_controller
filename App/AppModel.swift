@@ -14,6 +14,20 @@ final class AppModel: ObservableObject {
     @Published private(set) var precisionResumeInProgress = false
     @Published private(set) var precisionResumeStatusText: String?
     private let precisionResumeFlow = PrecisionResumePreparationFlow()
+    @Published private(set) var automaticPrecisionEnabled = false
+    @Published private(set) var automaticPrecisionStatus = "Off"
+    @Published private(set) var automaticPrecisionNeedsAttention = false
+    private let automaticStartupFlow = PrecisionAutomaticStartupFlow()
+    private var automaticPrecisionAttempted = false
+    private var automaticPrecisionTask: Task<Void, Never>?
+    private var automaticPrecisionRun: PrecisionAutomaticRestartRun?
+    private var freshObserverWaiter: CheckedContinuation<Bool, Never>?
+    private var freshObserverDeadline: Task<Void, Never>?
+    private static var automaticPrecisionPreference: PrecisionAutomaticRestartPreference {
+        PrecisionAutomaticRestartPreference(fileURL: journalFileURL.deletingLastPathComponent()
+            .appendingPathComponent("precision-automatic-restart-v1.json"))
+    }
+
     @Published private(set) var isTerminating = false
     @Published private(set) var terminationStatusText: String?
     private var firmwareMigrationTask: Task<Void, Never>?
@@ -24,6 +38,9 @@ final class AppModel: ObservableObject {
             closeAdmission: { [weak self] in
                 guard let self else { return }
                 isTerminating = true
+                automaticPrecisionRun?.revoke()
+                automaticPrecisionTask?.cancel()
+                finishFreshObserverWait(false)
                 pendingObserverRestart = false
                 disableAudioForTermination()
                 setEventLayerEnabled(false, remembering: false)
@@ -301,14 +318,17 @@ final class AppModel: ObservableObject {
         guard !isTerminating else { return }
         guard !didBootstrap else { return }
         didBootstrap = true
+        automaticPrecisionEnabled = Self.automaticPrecisionPreference.isEnabled
+        automaticPrecisionStatus = automaticPrecisionEnabled ? "Waiting for your trackball…" : "Off"
         requestInputMonitoringIfNeeded()
         refreshJournalRotationReview()
         start()
     }
 
     var savedPrecisionNeedsReview: Bool {
-        recoveryJournalNeedsAttention || runtimeOwnerNeedsRecovery
-            || (runtimeOwner == nil && runtimeJournalNeedsReview)
+        recoveryJournalNeedsAttention || runtimeOwnerNeedsRecovery || automaticPrecisionNeedsAttention
+            || (runtimeOwner == nil && runtimeJournalNeedsReview
+                && !(automaticPrecisionEnabled && precisionResumeAvailable && !automaticPrecisionNeedsAttention))
     }
 
     /// Read after bootstrap has refreshed the journal review. A disconnected
@@ -373,6 +393,7 @@ final class AppModel: ObservableObject {
     }
 
     func refreshPermissionStatus() {
+        defer { continueAutomaticPrecisionWhenReady() }
         let wasGranted = inputMonitoringGranted
         inputMonitoringGranted = CGPreflightListenEventAccess()
         accessibilityGranted = AXIsProcessTrusted()
@@ -1300,10 +1321,142 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func setAutomaticPrecisionEnabled(_ enabled: Bool) {
+        guard !isTerminating else { return }
+        if !enabled {
+            // Revocation wins synchronously against a not-yet-entered SET.
+            let dispatchClaimed = automaticPrecisionRun?.revoke() ?? false
+            if !dispatchClaimed { automaticPrecisionTask?.cancel() }
+            finishFreshObserverWait(false)
+        }
+        do {
+            if enabled { try Self.automaticPrecisionPreference.enable(sourceBaselineURL: Self.journalFileURL) }
+            else { try Self.automaticPrecisionPreference.disable() }
+            automaticPrecisionEnabled = enabled
+            automaticPrecisionNeedsAttention = false
+            automaticPrecisionStatus = enabled ? "Waiting for your trackball…" : "Automatic startup is off. Current audio controls are unchanged."
+            if enabled {
+                if runtimeOwner != nil || rootQueryAttempted {
+                    automaticPrecisionAttempted = true
+                    automaticPrecisionStatus = "Remembered. Precision will start automatically when you next open the app."
+                } else { continueAutomaticPrecisionWhenReady() }
+            }
+        } catch {
+            automaticPrecisionEnabled = Self.automaticPrecisionPreference.isEnabled
+            automaticPrecisionStatus = "Could not save automatic Precision: \(error.localizedDescription)"
+        }
+    }
+
+    private var automaticPrecisionPrerequisitesReady: Bool {
+        status == .observing && devices.count == 1 && inputMonitoringGranted && accessibilityGranted
+            && rootQueryGateFailureText == nil && !isTerminating
+    }
+
+    private func continueAutomaticPrecisionWhenReady() {
+        if freshObserverWaiter != nil, automaticPrecisionPrerequisitesReady {
+            finishFreshObserverWait(true)
+        }
+        guard automaticPrecisionEnabled, !automaticPrecisionAttempted,
+              automaticPrecisionTask == nil, runtimeOwner == nil,
+              automaticPrecisionPrerequisitesReady else { return }
+        automaticPrecisionAttempted = true
+        automaticPrecisionTask = Task { [weak self] in
+            guard let self else { return }
+            defer { automaticPrecisionTask = nil }
+            do {
+                let run = try Self.automaticPrecisionPreference.beginRun()
+                automaticPrecisionRun = run
+                automaticPrecisionStatus = "Preparing Precision audio…"
+                _ = try run.archiveCompletedRuntimeIfPresent(runtimeJournalURL: Self.runtimeJournalFileURL,
+                    sourceBaselineURL: Self.journalFileURL)
+                refreshJournalRotationReview()
+                let wasResume = precisionResumeAvailable
+                var previousRunID: UUID?
+                _ = await automaticStartupFlow.perform(
+                    isCurrent: { !self.isTerminating && self.automaticPrecisionEnabled && (try? run.validate()) != nil },
+                    prepare: { afterRollover in
+                        await self.preparePrecisionSession(resume: wasResume && !afterRollover,
+                            automaticRun: run, previousObserverRunID: previousRunID)
+                        if self.audioExecutionEnabled { return .active }
+                        if wasResume, !afterRollover, let owner = self.runtimeOwner,
+                           await owner.diversionStatus == .restored { return .restored }
+                        return .stopped
+                    },
+                    releaseAndRefresh: { [self] in
+                        guard let owner = runtimeOwner else { throw CancellationError() }
+                        previousRunID = await owner.observerRunID
+                        try await owner.releaseVerifiedRestoredSession()
+                        try run.validate()
+                        runtimeOwner = nil
+                        runtimeOwnerBindingID = nil
+                        runtimeOwnerSession = nil
+                        runtimeOwnerRootGeneration = nil
+                        await refreshRuntimeOwnerFlags()
+                        guard try run.archiveCompletedRuntimeIfPresent(runtimeJournalURL: Self.runtimeJournalFileURL,
+                            sourceBaselineURL: Self.journalFileURL) else { throw CancellationError() }
+                        // This reset exists only after proved baseline, drain, close,
+                        // fence release and CAS retirement. It is not a retry path.
+                        stop()
+                        connectionGeneration &+= 1
+                        rootQueryAttempted = false
+                        rootQuerySucceeded = false
+                        firmwareFingerprintAttempted = false
+                        restoreTrialSimulationAttempted = false
+                        precisionPreflightAttempted = false
+                        precisionReadinessAttempted = false
+                        refreshJournalRotationReview()
+                        start()
+                        guard await waitForFreshObserver() else { throw CancellationError() }
+                        try run.validate()
+                })
+                try run.validate()
+                automaticPrecisionNeedsAttention = !audioExecutionEnabled
+                automaticPrecisionStatus = audioExecutionEnabled
+                    ? "Precision starts automatically when this app opens."
+                    : "Automatic setup stopped. Open Advanced to review the result before trying again."
+            } catch {
+                automaticPrecisionNeedsAttention = automaticPrecisionEnabled
+                diagnosticsLog.append("Automatic Precision stopped: \(error)")
+                automaticPrecisionStatus = automaticPrecisionEnabled
+                    ? "Automatic setup stopped. Open Advanced to review the result before trying again."
+                    : "Automatic startup is off."
+            }
+        }
+    }
+
+    private func waitForFreshObserver() async -> Bool {
+        if automaticPrecisionPrerequisitesReady { return true }
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                guard !Task.isCancelled, !isTerminating else { continuation.resume(returning: false); return }
+                freshObserverWaiter = continuation
+                freshObserverDeadline = Task { [weak self] in
+                    do { try await Task.sleep(for: .seconds(10)) } catch { return }
+                    self?.finishFreshObserverWait(false)
+                }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.finishFreshObserverWait(false) }
+        }
+    }
+
+    private func finishFreshObserverWait(_ ready: Bool) {
+        let waiter = freshObserverWaiter
+        freshObserverWaiter = nil
+        freshObserverDeadline?.cancel()
+        freshObserverDeadline = nil
+        waiter?.resume(returning: ready)
+    }
+
     /// User-initiated validation of the GET-only restart path. No activation
     /// fallback is permitted here, including when the device returned to baseline.
     func resumePreviousPrecisionSession() async {
-        guard precisionResumeAvailable, !precisionResumeInProgress,
+        guard !automaticPrecisionEnabled else { return }
+        await preparePrecisionSession(resume: true, automaticRun: nil)
+    }
+
+    private func preparePrecisionSession(resume: Bool, automaticRun: PrecisionAutomaticRestartRun?, previousObserverRunID: UUID? = nil) async {
+        guard (automaticRun != nil || precisionResumeAvailable), !precisionResumeInProgress,
               runtimeOwner == nil, !isTerminating, status == .observing,
               devices.count == 1, rootQueryGateFailureText == nil,
               inputMonitoringGranted, accessibilityGranted, !audioExecutionEnabled else { return }
@@ -1314,6 +1467,7 @@ final class AppModel: ObservableObject {
             isCurrent: { [self] in
                 !isTerminating && connectionGeneration == generation
                     && inputMonitoringGranted && accessibilityGranted
+                    && (automaticRun == nil || (try? automaticRun?.validate()) != nil)
             },
             step: { [self] step in
                 switch step {
@@ -1354,29 +1508,34 @@ final class AppModel: ObservableObject {
                     performPrecisionLifecycleReadinessReview()
                     return precisionReadinessSnapshot != nil
                 case .bind:
-                    precisionResumeStatusText = "Preparing to reconnect Precision…"
-                    await bindDormantRuntimeOwner(resumeVerifiedSession: true)
-                    guard let owner = runtimeOwner else { return false }
-                    return await owner.boundOperation == .resume
+                    precisionResumeStatusText = resume ? "Preparing to reconnect Precision…" : "Preparing Precision audio…"
+                    await bindDormantRuntimeOwner(resumeVerifiedSession: resume)
+                    guard let owner = runtimeOwner, await owner.observerRunID != previousObserverRunID else { return false }
+                    return await owner.boundOperation == (resume ? .resume : .activate)
                 case .resume:
-                    precisionResumeStatusText = "Reconnecting Precision audio…"
+                    precisionResumeStatusText = resume ? "Reconnecting Precision audio…" : "Enabling Precision audio…"
                     guard let owner = runtimeOwner,
                           let session = runtimeOwnerSession,
                           let rootGeneration = runtimeOwnerRootGeneration else { return false }
                     runtimeOwnerOperationInProgress = true
                     defer { runtimeOwnerOperationInProgress = false }
                     do {
-                        try await owner.confirmVerifiedResume(
-                            explicitlyConfirmed: true,
-                            competitorProbe: { Self.precisionCompetitorDisplayNames() },
-                            sessionProvider: { session },
-                            rootGenerationProvider: { rootGeneration }
-                        )
+                        if let automaticRun {
+                            try automaticRun.validate()
+                            try await owner.admitAutomatically(run: automaticRun,
+                                competitorProbe: { Self.precisionCompetitorDisplayNames() },
+                                sessionProvider: { session }, rootGenerationProvider: { rootGeneration })
+                        } else {
+                            try await owner.confirmVerifiedResume(
+                                explicitlyConfirmed: true,
+                                competitorProbe: { Self.precisionCompetitorDisplayNames() },
+                                sessionProvider: { session }, rootGenerationProvider: { rootGeneration })
+                        }
                         await refreshRuntimeOwnerFlags()
                         return runtimeOwnerControlIsDiverted && !runtimeOwnerNeedsRecovery
                             && !runtimeOwnerDeviceDisconnected
                     } catch {
-                        runtimeOwnerStatusText = "Resume stopped: \(error)"
+                        runtimeOwnerStatusText = "Precision setup stopped: \(error)"
                         await refreshRuntimeOwnerFlags()
                         return false
                     }
@@ -1387,18 +1546,25 @@ final class AppModel: ObservableObject {
         if outcome == .resumed, let owner = runtimeOwner,
            runtimeOwnerControlIsDiverted, !runtimeOwnerNeedsRecovery,
            !runtimeOwnerDeviceDisconnected, !isTerminating,
-           connectionGeneration == generation {
+           connectionGeneration == generation,
+           (automaticRun == nil || (try? automaticRun?.validate()) != nil) {
             startWheelObserver(owner: owner)
             setAudioExecutionEnabled(true)
-            precisionResumeStatusText = "Precision audio resumed. Button settings were unchanged."
+            precisionResumeStatusText = automaticRun == nil
+                ? "Precision audio resumed. Button settings were unchanged."
+                : "Precision audio is ready. Tap to mute; hold and scroll to adjust volume."
             runtimeOwnerStatusText = precisionResumeStatusText ?? "Precision audio resumed"
-            diagnosticsLog.append("Precision GET-only resume verified active; audio enabled")
+            diagnosticsLog.append(resume
+                ? "Precision GET-only resume verified active; audio enabled"
+                : "Precision automatic activation verified active after fresh baseline; audio enabled")
         } else if runtimeOwnerIsAdmitted && !runtimeOwnerControlIsDiverted && !runtimeOwnerNeedsRecovery {
-            precisionResumeStatusText = "The trackball returned to its original Precision setting. No button setting was changed. Quit and reopen before preparing a new session."
+            precisionResumeStatusText = automaticRun == nil
+                ? "The trackball returned to its original Precision setting. No button setting was changed. Quit and reopen before preparing a new session."
+                : "The original Precision setting was verified. Preparing a fresh session…"
             diagnosticsLog.append("Precision GET-only resume observed baseline; audio remains off")
         } else {
-            precisionResumeStatusText = "Precision could not resume. Audio remains off. Open Advanced for the check results; quit and reopen before another attempt."
-            diagnosticsLog.append("Precision GET-only resume stopped: \(outcome)")
+            precisionResumeStatusText = "Precision setup stopped. Audio remains off. Open Advanced for the check results before another attempt."
+            diagnosticsLog.append("Precision \(resume ? "GET-only resume" : "automatic activation") stopped: \(outcome)")
         }
     }
 
@@ -1449,17 +1615,20 @@ final class AppModel: ObservableObject {
                 }
             )
             runtimeOwner = owner
-            runtimeOwnerBindingID = UUID()
+            let bindingID = UUID()
+            runtimeOwnerBindingID = bindingID
             guidedEnableAttempt = PrecisionSetupGuide.EnableAttempt()
             runtimeOwnerSession = session
             runtimeOwnerRootGeneration = rootGeneration
             await owner.setControlEventHandler { [weak self] intent in
                 Task { @MainActor in
+                    guard self?.runtimeOwnerBindingID == bindingID else { return }
                     self?.record([intent])
                 }
             }
             await owner.setDiversionStatusHandler { [weak self] status in
                 Task { @MainActor in
+                    guard self?.runtimeOwnerBindingID == bindingID else { return }
                     self?.applyRuntimeOwnerDiversionStatus(status)
                 }
             }
@@ -1768,6 +1937,7 @@ final class AppModel: ObservableObject {
     }
 
     var menuBarIcon: String {
+        if automaticPrecisionNeedsAttention { return "exclamationmark.triangle.fill" }
         if !devices.isEmpty { return "computermouse.fill" }
         if case .failed = status { return "exclamationmark.triangle.fill" }
         return "computermouse"
@@ -2460,7 +2630,10 @@ final class AppModel: ObservableObject {
         let disconnected = await owner.deviceWasDisconnected
         let operation = await owner.boundOperation
         let recoverLocked = await owner.isRecoverLockedAfterAmbiguousSET
-        runtimeOwnerBlocksRestart = await owner.blocksObserverRestart
+        let blocksRestart = await owner.blocksObserverRestart
+        let diagnostics = await owner.inputDiagnostics()
+        guard runtimeOwner === owner else { return }
+        runtimeOwnerBlocksRestart = blocksRestart
         runtimeOwnerIsBound = true
         runtimeOwnerIsAdmitted = phase == .admitted
         // The runtime stays admitted after a verified restore, so read the
@@ -2481,7 +2654,7 @@ final class AppModel: ObservableObject {
             && runtimeOwnerControlIsDiverted
         runtimeOwnerCanRollover = phase == .bound || phase == .shutDown
         runtimeOwnerDeviceDisconnected = disconnected
-        if let diagnostics = await owner.inputDiagnostics() {
+        if let diagnostics {
             inputDiagnosticsSummary = diagnostics.summary
             inputDiagnosticsInterpretation = diagnostics.interpretation
             inputDiagnosticsLastFrame = diagnostics.lastObservedFrameHex
@@ -2563,6 +2736,7 @@ final class AppModel: ObservableObject {
     }
 
     private func receive(_ observation: MXErgoObservation) {
+        defer { continueAutomaticPrecisionWhenReady() }
         guard !isTerminating else { return }
         switch observation {
         case let .status(newStatus):
@@ -3978,7 +4152,7 @@ extension AppModel {
             return "Reconnect the MX Ergo, then review its state in Precision setup. Activation will not restart automatically."
         }
         if runtimeOwnerControlIsDiverted {
-            return "The Precision button is assigned to this app. Deactivate it in Precision setup to restore its usual behavior before quitting; switching audio off only pauses mute and volume."
+            return "The Precision button is assigned to mute and volume. Switching audio off pauses those actions; Restore Precision button returns its usual behavior."
         }
         if runtimeOwnerIsAdmitted {
             return "The button is restored. This session still owns the connection; quit and reopen the app before preparing another session."
@@ -3986,10 +4160,11 @@ extension AppModel {
         if runtimeOwnerAuthorizationExpired {
             return "The previous confirmation window expired. Release the expired preparation below, then review setup again."
         }
+        if automaticPrecisionEnabled { return automaticPrecisionStatus }
         if precisionResumeAvailable && !runtimeOwnerIsBound {
             return "A previous active session was saved. Resume it below to check the device and reconnect mute and volume controls."
         }
-        return "Tap to mute and hold-and-scroll for volume. Setup and explicit confirmation are required each session."
+        return "Tap to mute and hold-and-scroll for volume. Turn on automatic startup, or prepare a session below."
     }
 }
 

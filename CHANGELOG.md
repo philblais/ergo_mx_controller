@@ -2582,3 +2582,30 @@ The next gate is attended validation that a newly acquired endpoint receives
 Precision notifications. Fully automatic startup, consent persistence/revocation,
 and completed-to-fresh-activation chaining remain unimplemented. No live HID
 query or SET was invoked by the agent during development or automated tests.
+
+
+### September 11 — remembered automatic Precision startup
+
+The automatic-start milestone promotes device-bound restart consent through the
+existing Precision runtime owner facade. A separate preference file defaults
+off, records a unique enrollment, and never serializes executable authorization.
+An event-driven, one-launch flow resumes verified active state or performs one
+activation after fresh baseline checks. A resumed baseline must drain, close,
+release its fence and CAS-retire the completed journal before a new observer and
+fresh evidence can prepare activation. Failed release preserves the fence.
+
+Automatic admission uses a distinct one-use capability. Opt-out and the physical
+SET entry share a lock; revocation before entry rejects without dispatch, while
+an entered operation retains its durable classification. Final consent gates
+audio, and later explicit restoration does not require automatic startup to stay
+on. Owner callbacks and asynchronous status reads cannot overwrite a later owner.
+There is no new library product, dependency edge, output site, event-post site,
+suppressing tap, automatic recovery, uncertain-state retry or inverse command.
+
+Twenty new tests raise the package total from 534 to 554 with no skips. Coverage
+includes persistent consent/re-enrollment and identity changes, CAS archival,
+one-launch fallback and revocation at suspension points, automatic GET-only
+resume, both sides of the physical-write boundary, and clean shutdown/close/
+fence-release requirements. The next gate is attended opt-in, app restart,
+login and reboot with Precision tap, hold-scroll, release and volume feedback.
+No live HID query or SET was invoked by the agent in development or automated tests.

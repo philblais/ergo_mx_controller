@@ -1,8 +1,32 @@
 # MX Ergo Controller — everyday use
 
 This guide describes the personal development build with volume feedback
-and the September 11 read-only restart-validation action. Everyday reliability testing is still in progress; see the
+and the September 11 automatic Precision startup setting. Everyday reliability testing is still in progress; see the
 [release checklist](RELEASE-CHECKLIST.md) for the remaining checks.
+
+## Remember Precision across restarts
+
+In **Controls**, turn on **Start Precision automatically** once. It remembers
+this trackball and its saved setup. On a fresh launch, the app checks the
+connection and device software, then reconnects mute and volume or enables them
+from a verified original button setting. Wait for **Precision audio: Active**.
+If you already prepared a session manually, the setting takes effect next launch.
+
+Keep **Launch at login** on to start the app after logging in or rebooting the
+Mac. Test an app quit/reopen first: tap Precision to mute/unmute, hold it while
+scrolling for volume, release for normal scrolling, and check the volume popup.
+Then repeat after login and reboot. These hardware checks remain to be accepted
+for the new candidate.
+
+Turning automatic startup off cancels activation that has not yet started and
+prevents future automatic starts. An already-started operation finishes its
+checks; the app does not send an undo command. Current active audio has its own
+**Execute mute and volume** switch. **Restore Precision button…** returns the
+button to its original behavior.
+
+If automatic setup stops, open **Advanced** for the result. Unexpected or
+uncertain saved state requires review; repeatedly toggling automatic startup will
+not retry it. Disconnection during an active session still stops that session.
 
 ## Open the app
 
@@ -37,10 +61,10 @@ the same mappings; this version does not restrict them to the MX Ergo.
 The switch is remembered across normal app restarts. Turning it off stops the
 ordinary button remapping. Precision audio has its own controls.
 
-## Precision audio
+## Manual Precision setup
 
-Precision audio starts inactive each time the app launches. Ordinary remapping
-can be active while Precision remains inactive.
+When automatic startup is off, Precision audio starts inactive each launch.
+Ordinary remapping can be active while Precision remains inactive.
 
 If the previous session was verified active, **Resume previous Precision session**
 appears in Controls. Once the trackball is connected, click it to run the checks
@@ -48,10 +72,8 @@ and reconnect audio. It changes no button settings. If the device has returned
 to its original setting, the app leaves audio off and explains the next action.
 Uncertain or conflicted saved sessions remain blocked for review.
 
-This candidate still requires that one click after restart. Fully automatic
-resumption is pending a hardware check that the new connection receives
-Precision press/release events. The seven steps below remain the way to begin
-a fresh activation.
+The steps below are the manual alternative to **Start Precision automatically**.
+Use them when you prefer to confirm every new session yourself.
 
 1. If **Archive completed session…** is offered, review it and confirm
    **Archive completed record**. This keeps the finished record as a backup.
@@ -80,9 +102,10 @@ and stop audio**. This changes the device setting back and checks the result.
 Wait for **Inactive · button restored**. The app may still own the connection;
 quit normally and reopen before preparing another session.
 
-**Quitting alone does not restore the Precision button.** For the current
-acceptance tests, restore it successfully before quitting, logging out, or
-restarting the Mac.
+**Quitting alone does not restore the Precision button.** With automatic startup
+on, the next launch checks the saved session and current device before enabling
+audio. The automatic restart acceptance test deliberately uses normal quit while
+active; do not deliberately interrupt a device-setting operation.
 
 ## If the app needs attention
 

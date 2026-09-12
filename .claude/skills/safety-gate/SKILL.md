@@ -85,13 +85,14 @@ still match these. `scripts/verify.sh` checks them.
 
 ## Current authorization state
 
-- **September 11 restart validation:** a user-requested GET-only `.resume` is
-  promoted through the existing owner facade. It requires exact verified-active
-  durable evidence, fresh endpoint verification, and one reporting GET. Active
-  evidence remains unchanged; baseline can be recorded as restored without a
-  new attempt; conflict or failure stops. There is no SET, automatic fallback,
-  or automatic startup hook in this action. Persistent consent/policy data alone
-  grants no execution authority. Hardware notification delivery remains pending.
+- **September 11 automatic restart:** the user authorized a visible persistent
+  opt-in through the existing owner facade. Fresh one-use automatic capabilities
+  permit GET-only resume or one checked clean activation per launch. A baseline
+  resume result requires successful drain/close/fence release, CAS archival and
+  a fresh observer/evidence sequence before activation. Revocation is checked
+  through admission and at physical write entry; uncertainty never triggers a
+  retry, inverse command or automatic recovery. Pinned files are untouched. The
+  setting defaults off; attended automatic-start hardware acceptance is pending.
 
 Keep this accurate; it is the thing most likely to drift.
 

@@ -308,6 +308,32 @@ public actor PrecisionRuntimeOwner {
         )
     }
 
+    /// Fresh one-use automatic admission from a revocable, bound preference.
+    public func admitAutomatically(
+        run: PrecisionAutomaticRestartRun,
+        competitorProbe: @escaping @Sendable () throws -> [String],
+        sessionProvider: @escaping @Sendable () async throws -> DeviceTransactionSession,
+        rootGenerationProvider: @escaping @Sendable () async throws -> UInt64
+    ) async throws {
+        guard !quitRequested, await lifecycle.phase == .bound else { throw PrecisionRuntimeOwnerError.notBound }
+        let authorization = try PrecisionRuntimeAdmissionAuthorizationFactory.issueAutomatically(for: intent, permit: run.permit)
+        try await admitBoundAuthorization(authorization, competitorProbe: competitorProbe,
+            sessionProvider: sessionProvider, rootGenerationProvider: rootGenerationProvider)
+    }
+
+    /// Only a verified baseline can release an admitted owner for fresh setup.
+    public func releaseVerifiedRestoredSession() async throws {
+        guard !quitRequested, !deviceDisconnected, await lifecycle.phase == .admitted,
+              await lifecycle.admissionState == .restored else { throw PrecisionRuntimeOwnerError.stillOwningRuntime }
+        precisionHeld.set(false)
+        guard let report = await lifecycle.shutdown(), report.disposition == .clean(.restored),
+              report.deviceCloseReturn == 0 else { throw PrecisionRuntimeOwnerError.stillOwningRuntime }
+        guard try await lifecycle.releaseObserverRestartFence() else {
+            throw PrecisionRuntimeOwnerError.restartFenceUnavailable
+        }
+        await publishDiversionStatus()
+    }
+
     private func confirmBoundAdmission(
         explicitlyConfirmed: Bool,
         competitorProbe: @escaping @Sendable () throws -> [String],
@@ -341,6 +367,16 @@ public actor PrecisionRuntimeOwner {
         } catch let error as PrecisionRuntimeAdmissionError {
             throw mappedAdmission(error)
         }
+        try await admitBoundAuthorization(authorization, competitorProbe: competitorProbe,
+            sessionProvider: sessionProvider, rootGenerationProvider: rootGenerationProvider)
+    }
+
+    private func admitBoundAuthorization(
+        _ authorization: PrecisionRuntimeAdmissionAuthorization,
+        competitorProbe: @escaping @Sendable () throws -> [String],
+        sessionProvider: @escaping @Sendable () async throws -> DeviceTransactionSession,
+        rootGenerationProvider: @escaping @Sendable () async throws -> UInt64
+    ) async throws {
         do {
             try await lifecycle.admit(
                 authorization: authorization,

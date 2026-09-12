@@ -1,82 +1,87 @@
-# Precision restart development — September 11, 2026
+# Automatic Precision restarts — September 11, 2026
 
-The user requested seamless mute and hold-scroll volume across app and Mac
-restarts. That replaces the earlier product boundary requiring seven manual
-preparation steps for every session. It does not authorize retries of uncertain
-device writes or changes to the immutable recovery baseline.
+The user authorized automatic Precision mute and hold-scroll volume across app
+and Mac restarts. **Start Precision automatically** is a visible, persistent
+opt-in in Controls. It defaults off. Enabling it on a fresh observer starts one
+checked flow; enabling it after manual preparation remembers it for the next
+app launch. Ordinary button remapping and Launch at login retain their existing
+preferences.
 
-## Implemented validation candidate
+## Implemented behavior
 
-**Resume previous Precision session** is a single, user-initiated action in
-Controls, offered for a validated saved `running/appliedVerified` transaction.
-It waits for a connected device and permissions, then sequences existing bounded
-Root and firmware discovery, offline preview and self-test, a reporting GET,
-readiness review, and a freshly bound owner. It enables audio only after a
-separate reporting GET from the acquired endpoint verifies the intended state.
-Duplicate requests, cancellation, changed connection generation, and failed
-checks stop the sequence. The button is not an unattended startup hook.
+The preference is saved separately as `precision-automatic-restart-v1.json`.
+It binds to device/firmware identity, immutable baseline transaction and SHA-256,
+and a unique enrollment UUID. Turning it off revokes the current in-memory run
+before changing the file. Re-enrollment cannot revive an older captured consent.
+The JSON is input to review, never a serialized execution capability.
 
-The new `.resume` operation is separate from `.recover`. Its coordinator has
-no prepare/invoke branch and cannot send a SET. Exact active state preserves
-the journal bytes and attempt history. Exact baseline records `restoredVerified`
-with the existing reducer and durable CAS repository, without inventing a
-restore attempt. Other bytes record conflict. Timeout, cancellation, disconnect,
-identity mismatch, and uncertain phases cannot trigger activation or recovery.
+The app waits for a connected supported trackball, output capabilities, and both
+permissions. One event-driven launch flow sequences bounded Root and firmware
+queries, offline preview/self-test, reporting GET, readiness review, owner bind,
+and automatic admission. Duplicate callbacks cannot start another flow.
 
-The separate versioned, device/firmware/baseline-bound consent data and restart
-decision table exist at package scope. They default off and are non-authorizing.
-They are not persisted or consumed by the app in this candidate.
+* A saved verified-active transaction selects GET-only `.resume`. Fresh endpoint
+  identity and full reporting state must match before mute/volume are enabled.
+* Exact baseline after resume is recorded as restored with no new attempt. The
+  owner must drain, close successfully, and release its observer fence. A matching
+  completed journal is then CAS-archived. A new observer run collects all evidence
+  again before one new activation. The newly bound observer run must differ.
+* An already completed matching journal can be archived before initial fresh
+  preparation. A clean baseline can authorize one activation through the existing
+  write-ahead, SET, and independent verification GET path.
+* Unknown, conflicted, recovery-required and unrelated-dirty states remain blocked.
+  There is no automatic `.recover`, restore, write retry, or inverse command.
 
-## Review of the safety gate
+A launch-scoped, non-Codable permit creates a distinct fresh one-use automatic
+admission authorization; no `explicitlyConfirmed: true` shortcut is used. It
+checks the captured consent before and after preparation and admission handoffs.
+The final mutation claim occurs at the existing blocking writer's queued-to-
+entered boundary under a lock shared with opt-out. Revocation before entry
+rejects without physical dispatch. After entry, the call may finish and its
+journal outcome is classified; no second SET is allowed. The final consent check
+still prevents audio activation after opt-out. Explicit later restoration does
+not depend on keeping the automatic preference on.
 
-A read-only advisor reviewed the architecture before implementation. For this
-candidate the eight questions are: (1) no new dependency edge or product;
-(2) no additional device-output call site; (3) a GET remains the only proof;
-(4) no retry, inverse command, or automatic recovery; (5) no automatic resolution
-of durable ambiguity; (6) no rewrite of the pinned baseline or forensic records;
-(7) no additional event-posting site or suppressing tap; (8) event failure remains
-pass-through. Promotion is through a narrowly extended existing owner facade.
-The stored consent data does not weaken one-use authorization or make executable
-authorization serializable.
+The baseline fallback is bounded to one fresh activation in the same launch.
+Physical disconnection of an already admitted active session still shuts it down
+for review; this change does not add a same-process reconnect loop. Relaunching
+can check a clean verified saved state, but cannot clear durable uncertainty.
 
-## Attended acceptance
+## Review and verification
 
-The current saved session was inspected, not replayed: transaction
-`30A1D902-8946-4C09-8FE6-1CFAD59F9687`, revision 3, `running/appliedVerified`,
-with one verified apply. SHA-256:
-`391338f46211934d5ea1c0aa6c0cc954dd3c6b105e7ee0634640d3b7410412b1`.
-The old app reported disconnected/recovery required in memory. This is saved
-state, not proof of the device's current setting. The five protected hashes
-still matched. No live HID query or SET was invoked by the agent.
+The read-only advisor reviewed the architecture and implementation. Its findings
+about failed fence release and baseline identity validation were fixed and tested.
+Old-owner callbacks are bound to their owner identity so a late restored/released
+callback cannot overwrite a fresh session's state.
 
-After installing the candidate and reconnecting the trackball, use **Resume
-previous Precision session**. If active is confirmed, test a Precision tap
-(mute/unmute), hold-and-scroll volume, release back to ordinary scrolling, and
-volume feedback. Capture the result and runtime record. If the app says the
-device returned to baseline, record that outcome; this action must not activate
-it automatically. Do not deliberately interrupt a real SET to test crash cases;
-those faults belong in the automated fake-transport tests.
+The eight safety questions are all no: no new package dependency edge or product;
+no extra physical output site; no ACK accepted as proof; no retry/inverse/automatic
+recovery; no automated ambiguity resolution; no rewrite of pinned recovery files;
+no extra event-posting site or suppressing tap; no fail-closed input path.
+The existing owner facade is narrowly extended under the user's authorization.
 
-## Remaining work for fully automatic restarts
+Automated verification: 554 tests, no skips. New coverage includes persistent
+opt-in/disable/re-enrollment, changed consent and baseline identity, completed
+journal archival, one-launch sequencing and non-looping fallback, revocation
+across preparation/handoff/acquisition, both sides of physical dispatch, automatic
+GET-only resume, and restored/clean/close/fence-release requirements. Existing
+CAS/crash durability, endpoint identity and ambiguity tests remain enabled.
+Signed build and installation identities are recorded in RELEASE-CHECKLIST.md.
+No live HID query or SET was invoked by the agent for these tests.
 
-1. Confirm that a newly acquired endpoint receives diverted Precision events.
-2. Add a visible persistent opt-in, with revocation checked throughout admission.
-   Mint a fresh one-use capability each launch; never pass an old confirmation
-   Boolean as though it were a new user action.
-3. Wire one startup attempt per launch/connection/journal snapshot. Valid active
-   evidence selects GET-only resume. Verified clean baseline selects one fresh
-   activation, with the existing write-ahead and independent GET verification.
-4. For verified baseline after resume, shut down/release, CAS-archive the completed
-   journal, repeat fresh evidence collection, and create one new transaction.
-5. Preserve all uncertain, conflicted, unrelated-dirty, and recovery-required
-   journals for review. Add revocation, duplication, and crash-boundary tests.
-6. Test app restart, login, and Mac reboot on the resulting automatic candidate.
+## Attended acceptance still required
 
-No claim of seamless unattended operation is made by this validation candidate.
+Enable **Start Precision automatically** in the installed candidate, then test
+Precision tap mute/unmute, hold-and-scroll volume, release back to normal scroll,
+and the volume popup. Quit and reopen the app, then repeat. With Launch at login
+on, repeat after log out/in and Mac reboot. Record exact observed outcomes against
+this candidate; automated tests do not establish physical notification delivery.
+Turning automatic startup off stops future activation. The separate audio toggle
+pauses current audio actions; Restore Precision button explicitly restores the
+normal button setting.
 
-## September 11 attended result
-
-The resume check observed exact baseline and completed the saved session without
-a new device-write attempt. See the validation record. Active-state notification
-delivery remains untested. The missing automatic path is now directly observed:
-completed-session release/archive followed by fresh checked activation.
+The previous read-only candidate (source `5a1054e`, executable `dcf86671…852f5`)
+observed exact baseline on September 11 and completed transaction
+`30A1D902-8946-4C09-8FE6-1CFAD59F9687` without a new SET attempt. A subsequent user
+report said all was good; the installed app was later observed active with audio
+on. Those facts belong to that earlier build, not automatic-start acceptance.

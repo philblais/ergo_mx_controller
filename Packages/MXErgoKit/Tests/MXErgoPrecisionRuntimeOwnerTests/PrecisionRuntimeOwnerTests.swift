@@ -555,6 +555,8 @@ import Testing
         "public static func bind(",
         "confirmAdmission(",
         "confirmVerifiedResume(",
+        "admitAutomatically(",
+        "releaseVerifiedRestoredSession()",
         "resumeVerifiedSession: Bool = false",
         "confirmRecovery(",
         "confirmDeactivation(",
@@ -789,12 +791,17 @@ private struct OwnerStubHandoff: PrecisionRuntimeHostHandoff {
 private actor OwnerFakeSession: PrecisionRuntimeLifecycleSession {
     private let events: LockedOwnerEvents
 
-    init(events: LockedOwnerEvents) {
+    private let admissionState: PrecisionRuntimeAdmissionState
+    private let shutdownReport: PrecisionRuntimeShutdownReport
+    init(events: LockedOwnerEvents, state: PrecisionRuntimeAdmissionState = .active,
+         report: PrecisionRuntimeShutdownReport = .init(disposition: .stateUnavailable("test"), deviceCloseReturn: 0)) {
+        admissionState = state
+        shutdownReport = report
         self.events = events
         events.append("admit")
     }
 
-    var state: PrecisionRuntimeAdmissionState { .active }
+    var state: PrecisionRuntimeAdmissionState { admissionState }
 
     func reviewIntent(
         for operation: PrecisionTemporaryDiversionOperation,
@@ -816,10 +823,7 @@ private actor OwnerFakeSession: PrecisionRuntimeLifecycleSession {
 
     func shutdown() async -> PrecisionRuntimeShutdownReport {
         events.append("shutdown")
-        return PrecisionRuntimeShutdownReport(
-            disposition: .stateUnavailable("test"),
-            deviceCloseReturn: 0
-        )
+        return shutdownReport
     }
 }
 
@@ -932,6 +936,41 @@ private final class LockedOwnerEvents: @unchecked Sendable {
         }
         #expect(events.values.isEmpty)
         #expect(await owner.phase == .bound)
+        await owner.prepareForQuit()
+    }
+}
+
+@Test func automaticRolloverRequiresRestoredStateCleanShutdownAndSuccessfulClose() async throws {
+    for mode in 0...4 {
+        let coordinator = MXErgoObserverHandoffCoordinator()
+        let runID = try #require(coordinator.beginRun())
+        #expect(coordinator.markRunning(runID: runID))
+        let fenceID = try #require(coordinator.installRestartFence(capturedRunID: runID))
+        let events = LockedOwnerEvents()
+        let intent = ownerLifecycleIntent(observerRunID: runID)
+        let lifecycle = PrecisionRuntimeLifecycle(intent: intent,
+            fence: MXErgoObserverRestartFence(fenceID: fenceID, capturedRunID: runID, observerID: UUID()),
+            hostHandoff: OwnerStubHandoff(events: events), releaseFence: { token in
+                if mode == 4 { return false }
+                events.append("release")
+                return coordinator.releaseRestartFence(fenceID: token.fenceID)
+            })
+        let report = PrecisionRuntimeShutdownReport(disposition: mode == 2 ? .recoveryRequired(.active) : .clean(.restored),
+            deviceCloseReturn: mode == 3 ? -1 : 0)
+        try await lifecycle.admit(authorization: ownerAuthorization(), competitorProbe: { [] },
+            sessionProvider: { ownerSession() }, rootGenerationProvider: { 1 },
+            admit: { _ in OwnerFakeSession(events: events, state: mode == 1 ? .active : .restored, report: report) })
+        let owner = PrecisionRuntimeOwner(launchID: UUID(), observerRunID: runID, intent: intent, lifecycle: lifecycle)
+        if mode == 0 {
+            try await owner.releaseVerifiedRestoredSession()
+            #expect(await owner.phase == .released)
+            #expect(events.values == ["admit", "shutdown", "release"])
+        } else {
+            await #expect(throws: mode == 4 ? PrecisionRuntimeOwnerError.restartFenceUnavailable : .stillOwningRuntime) { try await owner.releaseVerifiedRestoredSession() }
+            if mode == 4 { #expect(await owner.phase == .shutDown) }
+            #expect(await owner.blocksObserverRestart)
+            #expect(!events.values.contains("release"))
+        }
         await owner.prepareForQuit()
     }
 }

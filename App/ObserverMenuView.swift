@@ -140,7 +140,17 @@ struct ObserverMenuView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if model.precisionResumeAvailable && !model.runtimeOwnerIsBound {
+            Toggle("Start Precision automatically", isOn: Binding(
+                get: { model.automaticPrecisionEnabled },
+                set: { model.setAutomaticPrecisionEnabled($0) }
+            ))
+            Text("Remembers this trackball for app and Mac restarts. It may reassign the Precision button to mute and volume after checking the device.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(model.automaticPrecisionStatus)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if model.precisionResumeAvailable && !model.runtimeOwnerIsBound && !model.automaticPrecisionEnabled {
                 Button("Resume previous Precision session") {
                     Task { await model.resumePreviousPrecisionSession() }
                 }
@@ -1882,7 +1892,7 @@ struct ObserverMenuView: View {
             .font(.caption)
             .foregroundStyle(model.audioStatus.isFailure ? .orange : .secondary)
 
-            Text("Tap Precision to mute, or hold it and scroll to change volume. Keep BetterTouchTool and Logi Options quit. Audio resets to off when the app launches.")
+            Text("Tap Precision to mute, or hold it and scroll to change volume. Keep BetterTouchTool and Logi Options quit. Automatic startup can reconnect these controls after app or Mac restarts.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

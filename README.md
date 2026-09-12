@@ -15,13 +15,20 @@ proved with tests, and promoted only behind an explicit review. Read
 
 ## Where things stand
 
-The September 11 restart-validation source adds **Resume previous Precision
+The September 11 automatic-start candidate adds **Start Precision automatically**.
+It remembers a device-bound opt-in and checks each new launch before resuming
+audio or activating a verified clean baseline. One bounded flow handles completed
+session archival and a fresh observer; ambiguous states remain blocked. The
+setting defaults off and hardware restart acceptance remains pending. See
+[restart development](RESTART-DEVELOPMENT.md).
+
+The earlier restart-validation source added **Resume previous Precision
 session**. It sequences fresh checks and performs GET-only resumption through
 the existing owner facade; it cannot fall back to an activate or restore SET.
 A device returning to baseline is recorded and left inactive. Hardware acceptance
 of the new notification connection is pending. The persistent preference and
-restart decision policy are implemented as non-authorizing package types; no
-unattended Precision startup is enabled yet. See [restart development](RESTART-DEVELOPMENT.md).
+restart decision policy are implemented as non-authorizing package types; that earlier candidate did not enable
+unattended Precision startup. See [restart development](RESTART-DEVELOPMENT.md).
 
 The previous September 9 volume-feedback candidate (`b0bdf27`) includes guarded
 lifecycle handling, fresh endpoint identity verification, Controls/Advanced,

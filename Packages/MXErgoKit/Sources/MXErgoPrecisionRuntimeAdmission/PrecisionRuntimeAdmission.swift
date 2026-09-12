@@ -184,10 +184,12 @@ package enum PrecisionRuntimeAdmissionReview {
 /// burns the capability so a mismatched launch cannot probe and replay it.
 package actor PrecisionRuntimeAdmissionAuthorization {
     private let binding: PrecisionRuntimeAdmissionIntent
+    package nonisolated let automaticPermit: PrecisionAutomaticRunPermit?
     private var consumed = false
 
-    fileprivate init(binding: PrecisionRuntimeAdmissionIntent) {
+    fileprivate init(binding: PrecisionRuntimeAdmissionIntent, automaticPermit: PrecisionAutomaticRunPermit? = nil) {
         self.binding = binding
+        self.automaticPermit = automaticPermit
     }
 
     fileprivate func consume(
@@ -198,6 +200,7 @@ package actor PrecisionRuntimeAdmissionAuthorization {
             throw PrecisionRuntimeAdmissionError.authorizationAlreadyConsumed
         }
         consumed = true
+        try automaticPermit?.validate()
         guard binding.matches(intent) else {
             throw PrecisionRuntimeAdmissionError.invalidAuthorizationBinding
         }
@@ -208,6 +211,23 @@ package actor PrecisionRuntimeAdmissionAuthorization {
 }
 
 package enum PrecisionRuntimeAdmissionAuthorizationFactory {
+    package static func issueAutomatically(
+        for intent: PrecisionRuntimeAdmissionIntent,
+        permit: PrecisionAutomaticRunPermit,
+        nowUptimeNanoseconds: UInt64 = DispatchTime.now().uptimeNanoseconds
+    ) throws -> PrecisionRuntimeAdmissionAuthorization {
+        try validateIntent(intent)
+        try requireAuthorizationUnexpired(intent, nowUptimeNanoseconds: nowUptimeNanoseconds)
+        let decision = PrecisionSeamlessRestartPolicy.review(
+            consent: permit.consent, readiness: intent.readiness, runtime: intent.expectedRuntimeSnapshot)
+        guard (intent.operation == .activate && decision == .activateAfterFreshBaseline)
+            || (intent.operation == .resume && decision == .resumeWithFreshRead) else {
+            throw PrecisionRuntimeAdmissionError.invalidAuthorizationBinding
+        }
+        try permit.reserve(intent.operation, readiness: intent.readiness)
+        return PrecisionRuntimeAdmissionAuthorization(binding: intent, automaticPermit: permit)
+    }
+
     package static func issue(
         for intent: PrecisionRuntimeAdmissionIntent,
         explicitlyConfirmed: Bool
@@ -268,7 +288,12 @@ package struct PrecisionRuntimeAdmissionConfiguration: Sendable {
         self.intent = intent
         self.authorization = authorization
         self.hostHandoff = hostHandoff
-        self.competitorProbe = competitorProbe
+        self.competitorProbe = {
+            try authorization.automaticPermit?.validateInitialOperation()
+            let result = try competitorProbe()
+            try authorization.automaticPermit?.validateInitialOperation()
+            return result
+        }
         self.sessionProvider = sessionProvider
         self.rootGenerationProvider = rootGenerationProvider
         self.handoffTimeoutNanoseconds = handoffTimeoutNanoseconds
@@ -296,7 +321,12 @@ package struct PrecisionRuntimeAdmissionConfiguration: Sendable {
         self.intent = intent
         self.authorization = authorization
         self.hostHandoff = hostHandoff
-        self.competitorProbe = competitorProbe
+        self.competitorProbe = {
+            try authorization.automaticPermit?.validateInitialOperation()
+            let result = try competitorProbe()
+            try authorization.automaticPermit?.validateInitialOperation()
+            return result
+        }
         self.sessionProvider = sessionProvider
         self.rootGenerationProvider = rootGenerationProvider
         self.handoffTimeoutNanoseconds = handoffTimeoutNanoseconds
@@ -489,7 +519,8 @@ package enum PrecisionRuntimeAdmissionFactory {
                 unsolicitedHIDPPHandler:
                     configuration.unsolicitedHIDPPHandler,
                 deviceDisconnectHandler:
-                    configuration.deviceDisconnectHandler
+                    configuration.deviceDisconnectHandler,
+                automaticPermit: configuration.authorization.automaticPermit
             )
             runtime = try await makeRuntime(runtimeConfiguration)
         } catch {
@@ -506,7 +537,15 @@ package enum PrecisionRuntimeAdmissionFactory {
             rootGenerationProvider: configuration.rootGenerationProvider,
             nowProvider: configuration.nowProvider
         )
-        try await admission.performInitiallyAuthorized(intent)
+        do {
+            try configuration.authorization.automaticPermit?.validate()
+            try await admission.performInitiallyAuthorized(intent)
+            configuration.authorization.automaticPermit?.finishInitialOperation()
+        } catch {
+            configuration.authorization.automaticPermit?.finishInitialOperation()
+            _ = await admission.shutdown()
+            throw error
+        }
         return admission
     }
 

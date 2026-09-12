@@ -1,0 +1,10 @@
+{
+  "sourceCommit": "7cc86b0152af35cd2cbad4e311c1b031d880ecf2",
+  "executableSHA256": "be4715995dd03eb9d2f9675d776a9d11a4898c1d96128a72cd5ad36c8931d7f3",
+  "tests": 554,
+  "skipped": 0,
+  "automaticStartup": "off, preference file absent",
+  "ui": "Start Precision automatically visible; waiting for trackball; remapping and launch at login on; both permissions granted",
+  "hardwareAutomaticAcceptance": "pending",
+  "recordsUnchanged": true
+}

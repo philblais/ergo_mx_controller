@@ -2,10 +2,17 @@
 
 ## September 11 automatic-start candidate
 
-The automatic-start setting and guarded startup flow are implemented. The
-candidate defaults off and needs attended first enablement and app/login/reboot
-acceptance. Automated verification: 554 tests, no skips. Full build identities
-and installation evidence will be recorded below after the signed Release build.
+Installed September 12: source `7cc86b0152af35cd2cbad4e311c1b031d880ecf2`.
+Release executable SHA-256:
+`be4715995dd03eb9d2f9675d776a9d11a4898c1d96128a72cd5ad36c8931d7f3`.
+All 554 tests pass with no skips; four signed builds/audits pass. Release built
+with Swift warnings treated as errors and passes strict signature verification.
+Retained candidate, previous app and logs: `build/precision-automatic-be471599/`.
+
+**Start Precision automatically** is visible and off. Both permissions are
+granted; remapping and Launch at login remain on. Startup initially waits for the
+trackball. Saved runtime and all five protected files are byte-for-byte unchanged.
+The candidate needs attended first enablement and app/login/reboot acceptance.
 See [restart development](RESTART-DEVELOPMENT.md) for bounded behavior and gates.
 
 ## Previous September 11 restart-validation candidate

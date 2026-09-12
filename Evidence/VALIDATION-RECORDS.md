@@ -1269,3 +1269,37 @@ notification delivery, or functional mute/volume after restart. Resume is hidden
 because this session is now completed and the runtime still owns the connection.
 Automatic completed-session rollover and fresh activation remain unimplemented.
 No live HID query or SET was invoked by the agent during this inspection.
+
+
+### Installation validation record — 2026-09-12 automatic Precision candidate
+
+Source `7cc86b0152af35cd2cbad4e311c1b031d880ecf2` is installed at
+`/Applications/MX Ergo Controller.app`. Executable SHA-256:
+`be4715995dd03eb9d2f9675d776a9d11a4898c1d96128a72cd5ad36c8931d7f3`.
+554 tests passed with zero skips; all four signed builds and audits passed.
+Release built with Swift warnings treated as errors; both retained and installed
+app signatures validate on disk and satisfy the designated requirement.
+Candidate and previous `dcf86671…852f5` app are retained under
+`build/precision-automatic-be471599/` with verification logs and build-info.json.
+
+Before the update, the old app reported disconnected/recovery-required in memory.
+The saved runtime remained transaction `A7343331-22E0-4282-B4A2-DCFF02CD5C0E`,
+revision 3, running/appliedVerified, SHA-256
+`b67c663066ac41c84498e0ff874e9afd6f05e07aee42dfd01b66c3f70d98e0b8`.
+The September 11 pre-update snapshot and September 12 installation snapshot
+retain the same bytes. This saved state is not proof of current physical state.
+
+The agent used normal app Quit, verified process exit, installed the signed
+candidate, and reopened it. Controls initially showed Waiting for MX Ergo,
+Input Monitoring and Accessibility granted, Button remapping On/Active, Launch
+at login On, and Precision Ready to resume. The new Start Precision automatically
+checkbox is visible and off. Its preference file remains absent. Resume is
+disabled until the device is connected. All six saved-file hashes match before
+and after installation; see `2026-09-12-automatic-start-install/`.
+
+No live HID++ query, SET, automatic activation, or restoration was initiated by
+the agent. Automatic Precision notification delivery, volume feedback and
+app/login/reboot acceptance remain pending attended testing. The user should
+connect the trackball, enable the new checkbox once, wait for Active, test
+Precision tap/hold-scroll/release and the popup, then repeat after normal app
+quit/reopen. Deliberate write-interruption races remain fake-transport tests.

@@ -2609,3 +2609,11 @@ resume, both sides of the physical-write boundary, and clean shutdown/close/
 fence-release requirements. The next gate is attended opt-in, app restart,
 login and reboot with Precision tap, hold-scroll, release and volume feedback.
 No live HID query or SET was invoked by the agent in development or automated tests.
+
+
+September 12 installation: Release `be471599…1d7f3` from source `7cc86b0` is
+installed; strict signature verification passed. The default-off automatic
+setting is visible. Runtime and five protected-file hashes did not change.
+Candidate, prior app and logs are retained in `build/precision-automatic-be471599/`.
+Attended automatic restart acceptance remains pending. No live HID++ query or
+SET was initiated by the agent during installation.

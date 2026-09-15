@@ -32,3 +32,18 @@ Protocol reference: https://lekensteyn.nl/files/logitech/x2205_pointermotionscal
 
 Files in this directory were copied from Application Support before changing the candidate.
 The physical slow state is user-reported; no scaling measurement has been collected yet.
+
+## Installation observation
+
+After the user reported the app closed, a read-only process check confirmed it
+was absent. A newer runtime transaction `E533C5DC-9A97-40F5-B7C9-DAE4748D13AB`
+was present, still revision 3/running with the same verified reporting bytes.
+Its attempt ID is `99497A9B-3ADF-4D75-AAC1-AADCB43AD18A`. It differs from the
+earlier capture only in transaction/attempt identifiers and timestamps; no
+attribution is made about when or how the user started this transaction.
+It is preserved as `pre-install-runtime.json`.
+
+Candidate executable `5129d680f7f6f4ce0cbf1ecc01ef635929f24267060227327223decc38ce71e8`
+was installed and strictly signature-verified. The five protected files, automatic
+preference and runtime were unchanged by installation. The app was left closed;
+no live HID operation was initiated and no tracking measurement was collected.

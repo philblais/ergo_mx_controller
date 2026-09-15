@@ -111,7 +111,9 @@ The warnings-as-errors Release build passed; strict signature verification
 passed with Team `XW848M73T3`, hardened runtime, arm64/x86_64. Executable SHA-256:
 `5129d680f7f6f4ce0cbf1ecc01ef635929f24267060227327223decc38ce71e8`.
 The candidate, previous installed app and logs are retained in
-`build/precision-tracking-5129d680/`. Installation is pending the user closing
-the running controller; the previous automatic-start build remains installed.
-All five pinned files, runtime journal and automatic preference match the
-captured starting hashes. No live HID operation was initiated by the agent.
+`build/precision-tracking-5129d680/`. Installed on September 14 after the user closed the controller; the installed
+executable hash and strict signature match the candidate. The app was left closed.
+All five pinned files and the automatic preference match the original captured
+hashes. A newer verified-active runtime was observed before installation and
+preserved as `pre-install-runtime.json`; all seven pre-install hashes remained
+unchanged during installation. No live HID operation was initiated by the agent.

@@ -2645,3 +2645,9 @@ recovery status after diagnostic failure. All four signed builds and audits
 passed. The next gate is the attended slow/normal measurement; automatic native
 Precision correction remains unimplemented. No live HID query or SET was
 initiated by the agent in development or automated tests.
+
+September 14 installation: tracking diagnostic source `44486e1`, executable
+`5129d680…ce71e8`, is installed with its strict signature verified. All seven
+pre-install settings/journal hashes are unchanged. The app was left closed for
+the user to begin the attended measurement. No live HID operation was initiated
+by the agent during installation.

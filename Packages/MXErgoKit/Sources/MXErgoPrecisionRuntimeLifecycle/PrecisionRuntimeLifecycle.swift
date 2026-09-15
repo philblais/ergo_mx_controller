@@ -37,12 +37,16 @@ package protocol PrecisionRuntimeLifecycleSession: AnyObject, Sendable {
     ) async throws
     func shutdown() async -> PrecisionRuntimeShutdownReport
     func inputDiagnostics() async -> PrecisionInputDiagnostics?
+    func inspectPointerScaling() async throws -> PrecisionPointerScalingObservation
 }
 
 extension PrecisionRuntimeLifecycleSession {
     /// Diagnostics are evidence, not a capability. A session that cannot
     /// produce them is valid; it simply reports nothing.
     package func inputDiagnostics() async -> PrecisionInputDiagnostics? { nil }
+    package func inspectPointerScaling() async throws -> PrecisionPointerScalingObservation {
+        throw PrecisionPointerInspectionError.unavailable
+    }
 }
 
 extension PrecisionRuntimeAdmission: PrecisionRuntimeLifecycleSession {}
@@ -69,7 +73,21 @@ package actor PrecisionRuntimeLifecycle {
     private var shutdownTask: Task<PrecisionRuntimeShutdownReport?, Never>?
     private var shutdownRequested = false
 
-    /// Read-only. Available whenever a session exists, regardless of phase.
+    /// A diagnostic failure retains the ordered shutdown classification, so
+    /// an active diverted button cannot be reported as restored.
+    package func inspectPointerScaling() async throws -> PrecisionPointerScalingObservation {
+        try requireAdmitted()
+        guard let session else { throw PrecisionPointerInspectionError.unavailable }
+        do {
+            let result = try await session.inspectPointerScaling()
+            try requireAdmitted()
+            return result
+        } catch {
+            _ = await shutdown()
+            throw error
+        }
+    }
+
     package func inputDiagnostics() async -> PrecisionInputDiagnostics? {
         await session?.inputDiagnostics()
     }

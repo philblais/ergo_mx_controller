@@ -40,6 +40,8 @@ private struct DriverFixture {
     func reply(to request: HIDPP20LongMessage, parameters: [UInt8]? = nil) throws -> HIDPP20LongMessage {
         let payload: [UInt8]
         if let parameters { payload = parameters }
+        else if request.featureIndex == 11 { payload = [1, 73] }
+        else if request.featureIndex == 0 && request.parameters[0] == 0x22 { payload = [11, 0, 0] }
         else if request.featureIndex == 0 {
             payload = request.parameters[0] == 0x1B ? [7, 0, 3] : [9, 0, 1]
         } else if request.functionID == 0 { payload = info }
@@ -217,4 +219,40 @@ private func runDriver(_ endpoint: DriverEndpoint, timeout: UInt64 = 2_000_000_0
         }
         #expect(endpoint.counts.writes == 0 && !endpoint.counts.open)
     }
+}
+
+
+@Test func pointerDriverKeepsThreeGetsOnTheBoundEndpoint() async throws {
+    for mode: DriverEndpoint.Mode in [.normal, .delayed] {
+        let endpoint = try DriverEndpoint(mode)
+        let result = try await PrecisionConnectionVerificationDriver.inspectPointerScaling(
+            endpoint: endpoint, binding: endpoint.binding, competitorProbe: { [] })
+        #expect(result.rawScaling == 329)
+        #expect(result.device == endpoint.fixture.session.device && result.rootGeneration == 17)
+        #expect(endpoint.counts.writes == 3 && endpoint.counts.ends == 3 && !endpoint.counts.open)
+        #expect(endpoint.output.allSatisfy { $0.connectionVerification != nil && $0.bytes[3] >> 4 == 0 })
+    }
+}
+
+@Test func pointerDriverRejectsForeignSourceDisconnectAndLateCompetitors() async throws {
+    for mode: DriverEndpoint.Mode in [.foreignSource, .disconnect, .normal] {
+        let endpoint = try DriverEndpoint(mode)
+        await #expect(throws: (any Error).self) {
+            try await PrecisionConnectionVerificationDriver.inspectPointerScaling(endpoint: endpoint,
+                binding: endpoint.binding, competitorProbe: { endpoint.counts.ends == 3 ? ["Logi Options"] : [] })
+        }
+        #expect(!endpoint.counts.open)
+        #expect(endpoint.counts.writes == (mode == .normal ? 3 : 1))
+        #expect(endpoint.counts.ends == endpoint.counts.writes)
+    }
+}
+
+@Test func pointerDriverTimeoutEndsItsWindowWithoutRetry() async throws {
+    let endpoint = try DriverEndpoint(.silent)
+    await #expect(throws: PrecisionTransportReportIOError.timeout) {
+        try await PrecisionConnectionVerificationDriver.inspectPointerScaling(endpoint: endpoint,
+            binding: endpoint.binding, competitorProbe: { [] })
+    }
+    #expect(endpoint.counts.writes == 1 && endpoint.counts.ends == 1)
+    #expect(endpoint.counts.cancellations > 0 && !endpoint.counts.open)
 }

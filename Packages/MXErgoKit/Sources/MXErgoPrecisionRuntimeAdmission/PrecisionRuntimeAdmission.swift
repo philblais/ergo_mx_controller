@@ -581,6 +581,25 @@ package actor PrecisionRuntimeAdmission {
     package func inputDiagnostics() async -> PrecisionInputDiagnostics? {
         await runtime?.inputDiagnostics()
     }
+    package func inspectPointerScaling() async throws -> PrecisionPointerScalingObservation {
+        try beginCommand()
+        defer { finishCommand() }
+        guard stateStorage == .active || stateStorage == .restored,
+              let runtime, let operationLease,
+              operationLease.protects(journalURL: baseIntent.runtimeJournalURL) else {
+            throw PrecisionPointerInspectionError.unavailable
+        }
+        try requireNoCompetitors(competitorProbe)
+        do {
+            let result = try await runtime.inspectPointerScaling()
+            try requireCommandOperational()
+            try requireNoCompetitors(competitorProbe)
+            return result
+        } catch {
+            _ = await shutdown()
+            throw error
+        }
+    }
     private var operationLease: MXErgoDeviceOperationLease?
     private var stateStorage: PrecisionRuntimeAdmissionState = .admitting
     private var commandInProgress = false

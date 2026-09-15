@@ -560,6 +560,7 @@ import Testing
         "resumeVerifiedSession: Bool = false",
         "confirmRecovery(",
         "confirmDeactivation(",
+        "public func inspectPointerScaling()",
         "explicitlyConfirmed",
         "prepareForQuit()",
         "completeSessionRollover()",
@@ -973,4 +974,27 @@ private final class LockedOwnerEvents: @unchecked Sendable {
         }
         await owner.prepareForQuit()
     }
+}
+
+
+@Test func failedTrackingDiagnosticPreservesActiveDiversionRecoveryStatus() async throws {
+    let runID = UUID()
+    let events = LockedOwnerEvents()
+    let intent = ownerLifecycleIntent(observerRunID: runID)
+    let lifecycle = PrecisionRuntimeLifecycle(intent: intent,
+        fence: MXErgoObserverRestartFence(fenceID: UUID(), capturedRunID: runID, observerID: UUID()),
+        hostHandoff: OwnerStubHandoff(events: events), releaseFence: { _ in false })
+    try await lifecycle.admit(authorization: ownerAuthorization(), competitorProbe: { [] },
+        sessionProvider: { ownerSession() }, rootGenerationProvider: { 1 },
+        admit: { _ in OwnerFakeSession(events: events, state: .active,
+            report: PrecisionRuntimeShutdownReport(disposition: .recoveryRequired(.active), deviceCloseReturn: 0)) })
+    let owner = PrecisionRuntimeOwner(launchID: UUID(), observerRunID: runID, intent: intent, lifecycle: lifecycle)
+    owner.precisionHeld.set(true)
+    await #expect(throws: PrecisionPointerInspectionError.unavailable) { try await owner.inspectPointerScaling() }
+    #expect(await owner.phase == .shutDown)
+    #expect(await owner.diversionStatus == .shutDown(recoveryRequired: true))
+    #expect(await lifecycle.shutdownRequiresRecovery)
+    #expect(events.values == ["admit", "shutdown"])
+    await owner.prepareForQuit()
+    #expect(events.values == ["admit", "shutdown"])
 }

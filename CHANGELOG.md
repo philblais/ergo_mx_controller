@@ -2617,3 +2617,31 @@ setting is visible. Runtime and five protected-file hashes did not change.
 Candidate, prior app and logs are retained in `build/precision-automatic-be471599/`.
 Attended automatic restart acceptance remains pending. No live HID++ query or
 SET was initiated by the agent during installation.
+
+### September 14 — read-only tracking diagnostic for the startup slow-mode issue
+
+The user reports automatic restart succeeds but an early Precision press can
+leave native slow tracking active after mute/volume starts. The new Controls
+**Check tracking speed** action reads the device's `0x2205` scaling through the
+existing owner facade and exact acquired endpoint. A fixed three-GET sequence
+resolves the feature dynamically, reads scaling, then rechecks the descriptor
+with distinct correlation keys. Raw frames and identity are saved separately
+for a later user-observed slow/normal comparison. A measurement is not a native
+mode flag, enrolled normal speed, or permission to set tracking speed.
+
+The runtime serializes the diagnostic with other operations and permits one
+attempt per admitted runtime. Deadline, source, competitor and descriptor
+failures stop the session and retain its actual shutdown/recovery classification.
+Older owner results cannot overwrite the current UI. No dependency edge,
+additional hardware output site, pointer-scaling SET, retry, inverse command,
+new event post or suppressing tap, or pinned-journal rewrite was added.
+
+Eleven new tests raise the package total from 554 to 565, all passing with no
+skips. They cover exact three-GET transcripts, unsupported/changing descriptors,
+malformed/echo/error replies, delayed reply correlation, bounded input, abort,
+foreign endpoints, disconnection, late competitors, timeout cleanup, physical
+capability tampering/replay, one-attempt runtime behavior, and preserved active
+recovery status after diagnostic failure. All four signed builds and audits
+passed. The next gate is the attended slow/normal measurement; automatic native
+Precision correction remains unimplemented. No live HID query or SET was
+initiated by the agent in development or automated tests.

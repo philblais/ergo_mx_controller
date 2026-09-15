@@ -21,12 +21,33 @@ enum PrecisionConnectionVerificationDriver {
         requestTimeoutNanoseconds: UInt64,
         totalTimeoutNanoseconds: UInt64 = 30_000_000_000
     ) async throws -> PrecisionConnectionVerificationObservation {
+        try await run(sequence: PrecisionReadOnlyConnectionVerification(expectedSession: binding.session),
+            endpoint: endpoint, binding: binding, competitorProbe: competitorProbe,
+            requestTimeoutNanoseconds: requestTimeoutNanoseconds, totalTimeoutNanoseconds: totalTimeoutNanoseconds)
+    }
+
+    static func inspectPointerScaling(
+        endpoint: any PrecisionIOHIDAcquiredEndpoint, binding: PrecisionTransportBinding,
+        competitorProbe: @escaping @Sendable () throws -> [String]
+    ) async throws -> PrecisionPointerScalingObservation {
+        try await run(sequence: PrecisionReadOnlyPointerScaling(expectedSession: binding.session,
+            rootGeneration: binding.rootGeneration), endpoint: endpoint, binding: binding,
+            competitorProbe: competitorProbe, requestTimeoutNanoseconds: 2_000_000_000,
+            totalTimeoutNanoseconds: 6_000_000_000)
+    }
+
+    static func run<Sequence: PrecisionReadOnlyEndpointSequence>(
+        sequence initialSequence: Sequence,
+        endpoint: any PrecisionIOHIDAcquiredEndpoint, binding: PrecisionTransportBinding,
+        competitorProbe: @escaping @Sendable () throws -> [String],
+        requestTimeoutNanoseconds: UInt64, totalTimeoutNanoseconds: UInt64
+    ) async throws -> Sequence.Observation {
         guard requestTimeoutNanoseconds > 0, totalTimeoutNanoseconds > 0,
               requestTimeoutNanoseconds <= 30_000_000_000,
               totalTimeoutNanoseconds <= 30_000_000_000 else {
             throw PrecisionConnectionVerificationDriverError.invalidDeadline
         }
-        var sequence = try PrecisionReadOnlyConnectionVerification(expectedSession: binding.session)
+        var sequence = initialSequence
         let totalDeadline = DispatchTime.now().uptimeNanoseconds + totalTimeoutNanoseconds
         while sequence.observation == nil {
             try validate(endpoint, competitorProbe)

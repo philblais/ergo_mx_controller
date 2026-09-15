@@ -287,3 +287,104 @@ private func advance(_ sequence: inout PrecisionReadOnlyConnectionVerification,
         }
     }
 }
+
+
+@Test func pointerScalingUsesThreeDistinctGetKeysAndPreservesRawTranscript() throws {
+    let fixture = try ConnectionVerificationFixture()
+    var sequence = try PrecisionReadOnlyPointerScaling(expectedSession: fixture.session, rootGeneration: 19)
+    var requests: [[UInt8]] = []
+    var replies: [[UInt8]] = []
+    for step in 0..<3 {
+        let token = try sequence.beginOutputRequest()
+        let request = token.message
+        #expect(token.session == fixture.session)
+        #expect(request.functionID == 0)
+        #expect(request.softwareID == UInt8(step + 4))
+        #expect(request.featureIndex == (step == 1 ? 11 : 0))
+        #expect(Array(request.parameters.prefix(2)) == (step == 1 ? [0, 0] : [0x22, 5]))
+        let reply = try fixture.reply(to: request, parameters: step == 1 ? [1, 73] : [11, 0, 0])
+        if step == 2 { #expect(try sequence.observe(bytes: replies[0]) == false) }
+        #expect(try sequence.observe(bytes: reply.bytes))
+        requests.append(request.bytes); replies.append(reply.bytes)
+    }
+    let result = try #require(sequence.observation)
+    #expect(result.rawScaling == 329)
+    #expect(result.rootGeneration == 19 && result.connectionEpoch == fixture.session.connectionEpoch)
+    #expect(result.device == fixture.session.device && result.featureIndex == 11)
+    #expect(result.requests == requests && result.responses == replies)
+    #expect(try JSONDecoder().decode(PrecisionPointerScalingObservation.self,
+        from: JSONEncoder().encode(result)) == result)
+    #expect(throws: PrecisionPointerInspectionError.alreadyAttempted) { try sequence.beginOutputRequest() }
+}
+
+@Test func pointerScalingRejectsUnsupportedFeatureDescriptorsBeforeReadingScaling() throws {
+    let fixture = try ConnectionVerificationFixture()
+    for payload: [UInt8] in [[0, 0, 0], [0xFF, 0, 0], [7, 0, 0], [11, 0, 1]] {
+        var sequence = try PrecisionReadOnlyPointerScaling(expectedSession: fixture.session, rootGeneration: 19)
+        let request = try sequence.beginOutputRequest().message
+        #expect(throws: PrecisionPointerInspectionError.unsupported) {
+            try sequence.observe(bytes: fixture.reply(to: request, parameters: payload).bytes)
+        }
+        #expect(sequence.observation == nil)
+        #expect(throws: PrecisionPointerInspectionError.alreadyAttempted) { try sequence.beginOutputRequest() }
+    }
+}
+
+@Test func pointerScalingRejectsChangedDescriptorAndInvalidScale() throws {
+    let fixture = try ConnectionVerificationFixture()
+    for invalidScale in [true, false] {
+        var sequence = try PrecisionReadOnlyPointerScaling(expectedSession: fixture.session, rootGeneration: 19)
+        let root = try sequence.beginOutputRequest().message
+        _ = try sequence.observe(bytes: fixture.reply(to: root, parameters: [11, 0, 0]).bytes)
+        let get = try sequence.beginOutputRequest().message
+        if invalidScale {
+            #expect(throws: PrecisionPointerInspectionError.invalidResponse) {
+                try sequence.observe(bytes: fixture.reply(to: get, parameters: [0x10, 1]).bytes)
+            }
+        } else {
+            _ = try sequence.observe(bytes: fixture.reply(to: get, parameters: [1, 0]).bytes)
+            let final = try sequence.beginOutputRequest().message
+            #expect(throws: PrecisionConnectionVerificationError.featureChanged) {
+                try sequence.observe(bytes: fixture.reply(to: final, parameters: [11, 1, 0]).bytes)
+            }
+        }
+        #expect(sequence.observation == nil)
+        #expect(throws: PrecisionPointerInspectionError.alreadyAttempted) { try sequence.beginOutputRequest() }
+    }
+}
+
+@Test func pointerScalingMalformedEchoAndProtocolErrorAreTerminal() throws {
+    let fixture = try ConnectionVerificationFixture()
+    for kind in 0..<3 {
+        var sequence = try PrecisionReadOnlyPointerScaling(expectedSession: fixture.session, rootGeneration: 19)
+        let request = try sequence.beginOutputRequest().message
+        let bytes = kind == 0 ? [0x11] : kind == 1 ? request.bytes :
+            [0x11, 0, 0xFF, request.featureIndex, request.address, 8] + Array(repeating: 0, count: 14)
+        #expect(throws: (any Error).self) { try sequence.observe(bytes: bytes) }
+        #expect(sequence.observation == nil)
+        #expect(throws: PrecisionPointerInspectionError.alreadyAttempted) { try sequence.beginOutputRequest() }
+    }
+}
+
+@Test func pointerScalingCandidateBudgetAndAbortPreventAdditionalOutput() throws {
+    let fixture = try ConnectionVerificationFixture()
+    var sequence = try PrecisionReadOnlyPointerScaling(expectedSession: fixture.session, rootGeneration: 19)
+    _ = try sequence.beginOutputRequest()
+    #expect(throws: PrecisionPointerInspectionError.alreadyAttempted) { try sequence.beginOutputRequest() }
+    let foreign = try HIDPP20LongMessage(deviceIndex: 1, featureIndex: 0,
+        functionID: 0, softwareID: 4, parameters: [11, 0, 0])
+    for _ in 0..<32 { #expect(try sequence.observe(bytes: foreign.bytes) == false) }
+    #expect(throws: PrecisionConnectionVerificationError.candidateLimitExceeded) {
+        try sequence.observe(bytes: foreign.bytes)
+    }
+    for stage in 0...3 {
+        var aborted = try PrecisionReadOnlyPointerScaling(expectedSession: fixture.session, rootGeneration: 19)
+        for step in 0..<stage {
+            let request = try aborted.beginOutputRequest().message
+            _ = try aborted.observe(bytes: fixture.reply(to: request, parameters: step == 1 ? [1, 0] : [11, 0, 0]).bytes)
+        }
+        aborted.abort()
+        #expect(aborted.observation == nil)
+        #expect(throws: PrecisionPointerInspectionError.alreadyAttempted) { try aborted.beginOutputRequest() }
+    }
+}

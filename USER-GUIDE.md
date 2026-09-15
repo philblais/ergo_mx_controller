@@ -28,6 +28,20 @@ If automatic setup stops, open **Advanced** for the result. Unexpected or
 uncertain saved state requires review; repeatedly toggling automatic startup will
 not retry it. Disconnection during an active session still stops that session.
 
+## Tracking stays slow after startup
+
+There is an open issue: pressing the physical Precision button before startup
+finishes can leave native slow tracking on after mute/volume activates.
+The new **Check tracking speed** button collects a read-only measurement for this
+investigation. It does not reset speed or determine whether native Precision is on.
+Use it once while the pointer is slow and report the displayed value.
+
+To return control to the trackball, use **Restore Precision button…** and wait
+for the app to confirm restoration before pressing the physical button to return
+to normal tracking. Leave the app open until the observation is recorded.
+Do not use a power cycle before the slow measurement: it could erase the state
+we need to compare. If restoration reports uncertainty, stop and share that result.
+
 ## Open the app
 
 Open **MX Ergo Controller** from Applications. Keep BetterTouchTool, Logitech

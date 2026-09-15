@@ -829,3 +829,37 @@ private func sourceText(under directory: URL) throws -> String {
     #expect(runtime.calls.count == 1)
     await writer.shutdownAndDrain()
 }
+
+
+@Test func pointerGetCapabilitiesCannotBeChangedToScalingSetOrReplayed() async throws {
+    let fixture = try outputFixture()
+    let runtime = RecordingOutputRuntime(descriptor: validDescriptor())
+    let writer = try PrecisionIOHIDOutputWriter(plan: fixture.plan, binding: fixture.binding, runtime: runtime)
+    var sequence = try PrecisionReadOnlyPointerScaling(expectedSession: fixture.binding.session,
+        rootGeneration: fixture.binding.rootGeneration)
+    for step in 0..<3 {
+        let token = try sequence.beginOutputRequest()
+        let message = token.message
+        func frame(bytes: [UInt8]) -> PrecisionTransportOutputFrame {
+            PrecisionTransportOutputFrame(requestID: token.requestID, reportType: .output,
+                reportID: 0x11, bytes: bytes, device: fixture.binding.session.device,
+                connectionEpoch: fixture.binding.session.connectionEpoch,
+                rootGeneration: fixture.binding.rootGeneration, connectionVerification: token)
+        }
+        var forged = message.bytes
+        forged[3] |= 0x10
+        await #expect(throws: PrecisionWriteLifecycleError.invalidFrame) {
+            try await writer.write(frame(bytes: forged))
+        }
+        #expect(try await writer.write(frame(bytes: message.bytes)) == 0)
+        await #expect(throws: PrecisionWriteLifecycleError.duplicateRequest(token.requestID)) {
+            try await writer.write(frame(bytes: message.bytes))
+        }
+        let reply = try HIDPP20LongMessage(deviceIndex: 0, featureIndex: message.featureIndex,
+            functionID: 0, softwareID: message.softwareID, parameters: step == 1 ? [1, 73] : [11, 0, 0])
+        _ = try sequence.observe(bytes: reply.bytes)
+    }
+    #expect(runtime.calls.count == 3)
+    #expect(runtime.calls.allSatisfy { $0.bytes[3] >> 4 == 0 })
+    await writer.shutdownAndDrain()
+}

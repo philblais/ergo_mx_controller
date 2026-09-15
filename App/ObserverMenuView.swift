@@ -170,6 +170,19 @@ struct ObserverMenuView: View {
             if model.runtimeOwnerControlIsDiverted && !model.runtimeOwnerNeedsRecovery {
                 audioTestSection
             }
+            if model.runtimeOwnerIsAdmitted && !model.runtimeOwnerNeedsRecovery {
+                Button("Check tracking speed") {
+                    Task { await model.inspectPointerScaling() }
+                }
+                .disabled(model.pointerInspectionAttempted || model.runtimeOwnerOperationInProgress || model.precisionResumeInProgress)
+                Text("Reads the trackball’s speed setting for comparison. It does not change tracking speed or turn native Precision mode off.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let trackingStatus = model.pointerInspectionStatus {
+                Text(trackingStatus).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if !model.runtimeOwnerNeedsRecovery && !model.runtimeOwnerCanRecover && !model.runtimeOwnerDeviceDisconnected {
                 precisionSessionControls
             }

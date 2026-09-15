@@ -1,0 +1,9 @@
+{
+  "device-state-journal.json": "60ab614927d20871994ad0ebe7368158af9a26b2c1d60f7a2ab3c51635f77097",
+  "device-state-journal.pre-firmware-identity.json": "4ef802eb1185c56f24b7635324113ab414f2acca499a4addc4e4117cd3cdf3aa",
+  "restore-trial-probe-result.json": "7887950ec9602a21ff1d030310b0cb52b78a02e9a495f58bd7396922436c5460",
+  "restore-only-precision-trial.json": "1efee23b585baac98ad2a6a888bbf741d88674fb71479640a332cf2c4cba66ac",
+  "restore-only-precision-reconciliation-result.json": "f208abe8cf1e2b5ac31c67c0eaf6649f8f1369f1238f2cab40631896647c6593",
+  "precision-runtime-v3.json": "5c821d9cdbac185545dd1fee8605919827ed655d645dc4530cf84daaf75d46ef",
+  "precision-automatic-restart-v1.json": "254ec9e19eb32bb89025f7a1d49f4288524b11b9d48dca3c804b4fedcbaf7828"
+}

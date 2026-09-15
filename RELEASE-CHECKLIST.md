@@ -97,3 +97,21 @@ global matching-button mappings, and explicit Precision activation each session.
 Public distribution, other devices, and unattended Precision activation are
 outside this release. No source, personal evidence, or backup is published by
 this checklist.
+
+## September 14 tracking diagnostic candidate
+
+Automatic startup has a user-reported defect: a physical Precision press before
+readiness can leave native slow tracking latched after audio starts. Acceptance
+is therefore incomplete despite successful automatic restart. The read-only
+tracking diagnostic is ready for attended comparison; it does not correct the
+mode. Full verification passed 565 tests with no skips and all four signed
+builds/audits. See RESTART-DEVELOPMENT.md for the next evidence gate.
+
+The warnings-as-errors Release build passed; strict signature verification
+passed with Team `XW848M73T3`, hardened runtime, arm64/x86_64. Executable SHA-256:
+`5129d680f7f6f4ce0cbf1ecc01ef635929f24267060227327223decc38ce71e8`.
+The candidate, previous installed app and logs are retained in
+`build/precision-tracking-5129d680/`. Installation is pending the user closing
+the running controller; the previous automatic-start build remains installed.
+All five pinned files, runtime journal and automatic preference match the
+captured starting hashes. No live HID operation was initiated by the agent.

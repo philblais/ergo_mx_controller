@@ -412,15 +412,19 @@ private final class FakeRuntimeEndpoint:
     private var closeReturnStorage: Int32?
     private var connectionActive = false
     private var disconnectHandler: (@Sendable () -> Void)?
+    private let pointerReads: Bool
+    private var pointerFrame: PrecisionTransportOutputFrame?
 
     init(
         events: RuntimeEventRecorder,
         startError: RuntimeTestError? = nil,
-        closeReturn: Int32
+        closeReturn: Int32,
+        pointerReads: Bool = false
     ) {
         self.events = events
         self.startError = startError
         configuredCloseReturn = closeReturn
+        self.pointerReads = pointerReads
     }
 
     func start() async throws {
@@ -442,7 +446,10 @@ private final class FakeRuntimeEndpoint:
     var deviceCloseReturn: Int32? { lock.withLock { closeReturnStorage } }
 
     func write(_ frame: PrecisionTransportOutputFrame) async throws -> Int32 {
-        _ = frame
+        if pointerReads {
+            lock.withLock { pointerFrame = frame }
+            events.record("pointer-get")
+        }
         return 0
     }
 
@@ -457,8 +464,16 @@ private final class FakeRuntimeEndpoint:
     func beginRequest(_ frame: PrecisionTransportOutputFrame) throws { _ = frame }
 
     func read(for requestID: UUID) async throws -> PrecisionTransportInputFrame {
-        _ = requestID
-        throw RuntimeTestError.unused
+        guard pointerReads, let frame = lock.withLock({ pointerFrame }), frame.requestID == requestID else {
+            throw RuntimeTestError.unused
+        }
+        let request = try HIDPP20LongMessage(bytes: frame.bytes)
+        let reply = try HIDPP20LongMessage(deviceIndex: 0, featureIndex: request.featureIndex,
+            functionID: 0, softwareID: request.softwareID,
+            parameters: request.featureIndex == 0 ? [11, 0, 0] : [1, 73])
+        return PrecisionTransportInputFrame(reportType: .input, reportID: 0x11,
+            bytes: reply.bytes, device: frame.device, connectionEpoch: frame.connectionEpoch,
+            rootGeneration: frame.rootGeneration)
     }
 
     func endRequest(_ requestID: UUID) { _ = requestID }
@@ -913,4 +928,34 @@ private actor EndpointEvidenceGate {
     }
     #expect(transports.value == 0)
     #expect(endpoint.deviceCloseReturn == 0)
+}
+
+
+@Test func runtimePointerInspectionIsOneAttemptAndFailureStopsTheRuntime() async throws {
+    for succeeds in [true, false] {
+        let fixture = try runtimeFixture()
+        let events = RuntimeEventRecorder()
+        let endpoint = FakeRuntimeEndpoint(events: events, closeReturn: 0, pointerReads: succeeds)
+        let transport = FakeRuntimeTransport(session: fixture.binding.session, events: events)
+        let runtime = try await PrecisionRuntimeCompositionFactory.make(configuration: fixture.configuration,
+            verifyConnection: { _, _ in }, acquire: { _, _, _ in endpoint },
+            makeTransport: { _, _ in transport })
+        if succeeds {
+            #expect(try await runtime.inspectPointerScaling().rawScaling == 329)
+            #expect(events.count("pointer-get") == 3)
+            await #expect(throws: PrecisionPointerInspectionError.alreadyAttempted) {
+                try await runtime.inspectPointerScaling()
+            }
+            #expect(events.count("pointer-get") == 3)
+            #expect(try await runtime.lifecycleState() == .inactive)
+        } else {
+            await #expect(throws: RuntimeTestError.unused) { try await runtime.inspectPointerScaling() }
+            #expect(events.count("endpoint-shutdown") == 1)
+            await #expect(throws: PrecisionRuntimeOperationError.permanentlyStopped) {
+                try await runtime.inspectPointerScaling()
+            }
+        }
+        _ = await runtime.shutdown()
+        #expect(events.count("endpoint-shutdown") == 1)
+    }
 }

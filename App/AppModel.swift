@@ -13,6 +13,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var precisionResumeAvailable = false
     @Published private(set) var precisionResumeInProgress = false
     @Published private(set) var precisionResumeStatusText: String?
+    @Published private(set) var pointerInspectionAttempted = false
+    @Published private(set) var pointerInspectionStatus: String?
     private let precisionResumeFlow = PrecisionResumePreparationFlow()
     @Published private(set) var automaticPrecisionEnabled = false
     @Published private(set) var automaticPrecisionStatus = "Off"
@@ -1615,6 +1617,8 @@ final class AppModel: ObservableObject {
                 }
             )
             runtimeOwner = owner
+            pointerInspectionAttempted = false
+            pointerInspectionStatus = nil
             let bindingID = UUID()
             runtimeOwnerBindingID = bindingID
             guidedEnableAttempt = PrecisionSetupGuide.EnableAttempt()
@@ -1653,6 +1657,35 @@ final class AppModel: ObservableObject {
     /// control event is being delivered — precisely the case under
     /// investigation — the panel would sit at stale zeros and appear to confirm
     /// whatever the reader already believed.
+    func inspectPointerScaling() async {
+        guard !isTerminating, !pointerInspectionAttempted,
+              !runtimeOwnerOperationInProgress, !precisionResumeInProgress,
+              runtimeOwnerIsAdmitted, !runtimeOwnerNeedsRecovery,
+              let owner = runtimeOwner else { return }
+        pointerInspectionAttempted = true
+        runtimeOwnerOperationInProgress = true
+        pointerInspectionStatus = "Reading tracking speed…"
+        defer { if runtimeOwner === owner { runtimeOwnerOperationInProgress = false } }
+        do {
+            let observation = try await owner.inspectPointerScaling()
+            guard !isTerminating, runtimeOwner === owner else { return }
+            let directory = Self.journalFileURL.deletingLastPathComponent()
+                .appendingPathComponent("tracking-diagnostics", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let file = directory.appendingPathComponent("tracking-\(UUID()).json")
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            try encoder.encode(observation).write(to: file, options: .atomic)
+            pointerInspectionStatus = String(format: "Reported tracking scale: %.3f× (0x%04X). Saved for comparison; this does not identify the native Precision mode.",
+                Double(observation.rawScaling) / 256, observation.rawScaling)
+            diagnosticsLog.append("GET-only tracking measurement saved: \(file.lastPathComponent)")
+        } catch {
+            guard !isTerminating, runtimeOwner === owner else { return }
+            pointerInspectionStatus = "Tracking check stopped: \(error). No tracking setting was changed."
+        }
+        await refreshRuntimeOwnerFlags()
+    }
+
     func refreshInputDiagnostics() async {
         await refreshRuntimeOwnerFlags()
     }

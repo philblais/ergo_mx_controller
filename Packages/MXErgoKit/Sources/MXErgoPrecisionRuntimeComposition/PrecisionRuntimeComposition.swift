@@ -386,7 +386,9 @@ package enum PrecisionRuntimeCompositionFactory {
             endpoint: endpoint,
             transport: transport,
             lifecycle: lifecycle,
-            operationLease: configuration.operationLease
+            operationLease: configuration.operationLease,
+            pointerInspectionBinding: configuration.binding,
+            pointerInspectionProbe: configuration.competitorProbe
         )
         endpoint.setDisconnectHandler {
             configuration.deviceDisconnectHandler?()
@@ -427,6 +429,9 @@ extension PrecisionRuntimeControlling {
     /// Diagnostics are evidence, not a capability. A runtime that cannot
     /// produce them is valid; it simply reports nothing.
     package func inputDiagnostics() async -> PrecisionInputDiagnostics? { nil }
+    package func inspectPointerScaling() async throws -> PrecisionPointerScalingObservation {
+        throw PrecisionPointerInspectionError.unavailable
+    }
 }
 
 package protocol PrecisionRuntimeControlling: AnyObject, Sendable {
@@ -438,6 +443,7 @@ package protocol PrecisionRuntimeControlling: AnyObject, Sendable {
     func shutdown() async -> PrecisionRuntimeShutdownReport
     /// Read-only evidence about the input path. Never gates an operation.
     func inputDiagnostics() async -> PrecisionInputDiagnostics?
+    func inspectPointerScaling() async throws -> PrecisionPointerScalingObservation
 }
 
 /// Productless, package-only owner of the complete precision runtime graph.
@@ -462,17 +468,48 @@ package actor PrecisionRuntimeComposition: PrecisionRuntimeControlling {
     private var shutdownWaiters:
         [CheckedContinuation<PrecisionRuntimeShutdownReport, Never>] = []
     private var deviceDisconnected = false
+    private let pointerInspectionBinding: PrecisionTransportBinding?
+    private let pointerInspectionProbe: @Sendable () throws -> [String]
+    private var pointerInspectionAttempted = false
 
     init(
         endpoint: any PrecisionIOHIDAcquiredEndpoint,
         transport: any PrecisionTransportSession,
         lifecycle: PrecisionTemporaryDiversionLifecycle,
-        operationLease: MXErgoDeviceOperationLease
+        operationLease: MXErgoDeviceOperationLease,
+        pointerInspectionBinding: PrecisionTransportBinding? = nil,
+        pointerInspectionProbe: @escaping @Sendable () throws -> [String] = { throw PrecisionPointerInspectionError.unavailable }
     ) {
         self.endpoint = endpoint
         self.transport = transport
         self.lifecycle = lifecycle
         retainedOperationLease = operationLease
+        self.pointerInspectionBinding = pointerInspectionBinding
+        self.pointerInspectionProbe = pointerInspectionProbe
+    }
+
+    package func inspectPointerScaling() async throws -> PrecisionPointerScalingObservation {
+        let token = try beginOperation()
+        guard !pointerInspectionAttempted, let binding = pointerInspectionBinding,
+              retainedOperationLease != nil else {
+            endOperation(token)
+            throw PrecisionPointerInspectionError.alreadyAttempted
+        }
+        pointerInspectionAttempted = true
+        do {
+            let observation = try await PrecisionConnectionVerificationDriver.inspectPointerScaling(
+                endpoint: endpoint, binding: binding, competitorProbe: pointerInspectionProbe)
+            // Shutdown/removal during an awaited read cannot publish a result.
+            guard case .running = state, !deviceDisconnected else {
+                throw PrecisionPointerInspectionError.unavailable
+            }
+            endOperation(token)
+            return observation
+        } catch {
+            endOperation(token)
+            _ = await shutdown()
+            throw error
+        }
     }
 
     package func lifecycleState()

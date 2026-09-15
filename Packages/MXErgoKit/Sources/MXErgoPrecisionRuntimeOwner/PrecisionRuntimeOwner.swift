@@ -179,6 +179,21 @@ public actor PrecisionRuntimeOwner {
 
     /// Read-only evidence about what the input path received. Returns nil
     /// before admission, when there is no runtime to ask.
+    /// Attended GET-only measurement. This does not establish native mode or
+    /// authorize changing tracking speed. Each admitted runtime can inspect once.
+    public func inspectPointerScaling() async throws -> PrecisionPointerScalingObservation {
+        guard !quitRequested, !deviceDisconnected else { throw PrecisionRuntimeOwnerError.notAdmitted }
+        do {
+            let observation = try await lifecycle.inspectPointerScaling()
+            guard !quitRequested, !deviceDisconnected else { throw PrecisionRuntimeOwnerError.notAdmitted }
+            return observation
+        } catch {
+            precisionHeld.set(false)
+            await publishDiversionStatus()
+            throw error
+        }
+    }
+
     public func inputDiagnostics() async -> PrecisionInputDiagnosticsSnapshot? {
         guard let diagnostics = await lifecycle.inputDiagnostics() else {
             return nil

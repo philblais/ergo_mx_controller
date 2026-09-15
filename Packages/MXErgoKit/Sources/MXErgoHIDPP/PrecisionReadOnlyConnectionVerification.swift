@@ -41,7 +41,7 @@ package struct PrecisionConnectionVerificationRequest: Sendable, Equatable {
 /// Pure read-only sequence. The driver must separately bind
 /// source/device lifetime, enforce a deadline, and abort on timeout or removal.
 /// Each response key is used once: firmware replies do not echo entity indexes.
-package struct PrecisionReadOnlyConnectionVerification: Sendable {
+package struct PrecisionReadOnlyConnectionVerification: PrecisionReadOnlyEndpointSequence {
     package static let maximumEntityCount: UInt8 = 15
     package static let maximumRequestCount = 19
     package static let maximumCandidateCount = 64
@@ -234,5 +234,108 @@ package struct PrecisionReadOnlyConnectionVerification: Sendable {
     private mutating func fail(_ error: PrecisionConnectionVerificationError) -> PrecisionConnectionVerificationError {
         abort()
         return error
+    }
+}
+
+/// Only fixed package sequences can mint output capabilities; the driver accepts
+/// a sequence, never arbitrary packets supplied by a caller.
+package protocol PrecisionReadOnlyEndpointSequence: Sendable {
+    associatedtype Observation: Sendable
+    var observation: Observation? { get }
+    mutating func beginOutputRequest() throws -> PrecisionConnectionVerificationRequest
+    mutating func observe(bytes: [UInt8]) throws -> Bool
+    mutating func abort()
+}
+
+
+package enum PrecisionPointerInspectionError: Error, Sendable, Equatable {
+    case unsupported
+    case invalidResponse
+    case alreadyAttempted
+    case unavailable
+}
+
+/// Read-only x2205 protocol: Root lookup, getPointerScalingValue, Root recheck.
+/// A scaler is a measurement, not proof of native Precision mode or SET consent.
+package struct PrecisionReadOnlyPointerScaling: PrecisionReadOnlyEndpointSequence {
+    private let session: DeviceTransactionSession
+    private let rootGeneration: UInt64
+    private var stage = 0
+    private var pending: PrecisionConnectionVerificationRequest?
+    private var feature: HIDPP20FeatureDescriptor?
+    private var scaling: UInt16?
+    private var candidates = 0
+    private var requests: [[UInt8]] = []
+    private var responses: [[UInt8]] = []
+    package private(set) var observation: PrecisionPointerScalingObservation?
+
+    package init(expectedSession: DeviceTransactionSession, rootGeneration: UInt64) throws {
+        _ = try PrecisionReadOnlyConnectionVerification(expectedSession: expectedSession)
+        session = expectedSession
+        self.rootGeneration = rootGeneration
+    }
+
+    package mutating func beginOutputRequest() throws -> PrecisionConnectionVerificationRequest {
+        guard (0...2).contains(stage), pending == nil else { throw PrecisionPointerInspectionError.alreadyAttempted }
+        let message: HIDPP20LongMessage
+        if stage == 1 {
+            guard let feature else { abort(); throw PrecisionPointerInspectionError.unavailable }
+            message = try HIDPP20LongMessage(deviceIndex: 0, featureIndex: feature.index,
+                functionID: 0, softwareID: 5, parameters: [])
+        } else {
+            message = try HIDPP20Root.getFeatureRequest(0x2205, deviceIndex: 0, softwareID: stage == 0 ? 4 : 6)
+        }
+        let request = PrecisionConnectionVerificationRequest(session: session, message: message)
+        pending = request
+        requests.append(message.bytes)
+        return request
+    }
+
+    package mutating func observe(bytes: [UInt8]) throws -> Bool {
+        do {
+            guard let pending, (0...2).contains(stage) else { throw PrecisionPointerInspectionError.unavailable }
+            candidates += 1
+            guard candidates <= 32 else { throw PrecisionConnectionVerificationError.candidateLimitExceeded }
+            let response = try HIDPP20LongMessage(bytes: bytes)
+            if let error = HIDPP20ErrorResponse(message: response) {
+                guard error.requestKey == pending.message.requestKey else { return false }
+                throw PrecisionConnectionVerificationError.protocolError(error.rawErrorCode)
+            }
+            guard response.requestKey == pending.message.requestKey else { return false }
+            guard response.bytes != pending.message.bytes else { throw PrecisionConnectionVerificationError.echoedRequest }
+            responses.append(bytes)
+            switch stage {
+            case 0:
+                let descriptor = try HIDPP20Root.decodeFeatureDescriptor(from: response)
+                guard descriptor.isSupported, descriptor.index != 0xFF,
+                      descriptor.index != session.featureIndex, descriptor.version == 0 else {
+                    throw PrecisionPointerInspectionError.unsupported
+                }
+                feature = descriptor
+            case 1:
+                let value = UInt16(response.parameters[0]) << 8 | UInt16(response.parameters[1])
+                guard value > 0, value <= 0x1000 else { throw PrecisionPointerInspectionError.invalidResponse }
+                scaling = value
+            case 2:
+                let descriptor = try HIDPP20Root.decodeFeatureDescriptor(from: response)
+                guard descriptor == feature, let scaling, let feature else {
+                    throw PrecisionConnectionVerificationError.featureChanged
+                }
+                observation = PrecisionPointerScalingObservation(device: session.device,
+                    connectionEpoch: session.connectionEpoch, rootGeneration: rootGeneration,
+                    featureIndex: feature.index, featureVersion: feature.version, rawScaling: scaling,
+                    requests: requests, responses: responses)
+            default: throw PrecisionPointerInspectionError.unavailable
+            }
+            self.pending = nil
+            stage += 1
+            return true
+        } catch { abort(); throw error }
+    }
+
+    package mutating func abort() {
+        stage = -1
+        pending = nil
+        observation = nil
     }
 }

@@ -23,6 +23,10 @@ final class AppModel: ObservableObject {
     private var automaticPrecisionAttempted = false
     private var automaticPrecisionTask: Task<Void, Never>?
     private var automaticPrecisionRun: PrecisionAutomaticRestartRun?
+    private var sleepReconnectCycleID: UUID?
+    private var sleepReconnectTask: Task<PrecisionWakeReconnectRun?, Never>?
+    private var sleepReconnectCompletionStarted = false
+    private var sleepReconnectShouldRestoreAudio = false
     private var freshObserverWaiter: CheckedContinuation<Bool, Never>?
     private var freshObserverDeadline: Task<Void, Never>?
     private static var automaticPrecisionPreference: PrecisionAutomaticRestartPreference {
@@ -42,6 +46,9 @@ final class AppModel: ObservableObject {
                 isTerminating = true
                 automaticPrecisionRun?.revoke()
                 automaticPrecisionTask?.cancel()
+                sleepReconnectCycleID = nil
+                sleepReconnectCompletionStarted = true
+                sleepReconnectShouldRestoreAudio = false
                 finishFreshObserverWait(false)
                 pendingObserverRestart = false
                 disableAudioForTermination()
@@ -275,6 +282,8 @@ final class AppModel: ObservableObject {
     private var firmwareMigrationPlanGeneration: UInt64?
     private var workspaceLaunchObserver: NSObjectProtocol?
     private var applicationActivateObserver: NSObjectProtocol?
+    private var workspaceWillSleepObserver: NSObjectProtocol?
+    private var workspaceDidWakeObserver: NSObjectProtocol?
     private var didBootstrap = false
     private var pendingObserverRestart = false
     private let audioFeedback = AudioFeedbackPresenter()
@@ -314,6 +323,190 @@ final class AppModel: ObservableObject {
                 self?.refreshPermissionStatus()
             }
         }
+        workspaceWillSleepObserver = NSWorkspace.shared.notificationCenter
+            .addObserver(
+                forName: NSWorkspace.willSleepNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.preparePrecisionForSleep()
+                }
+            }
+        workspaceDidWakeObserver = NSWorkspace.shared.notificationCenter
+            .addObserver(
+                forName: NSWorkspace.didWakeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.resumePrecisionAfterWake()
+                }
+            }
+    }
+
+    private func preparePrecisionForSleep() {
+        if let cycleID = sleepReconnectCycleID {
+            automaticPrecisionRun?.revoke()
+            sleepReconnectCycleID = nil
+            sleepReconnectCompletionStarted = true
+            sleepReconnectShouldRestoreAudio = false
+            stopWheelObserver()
+            setAudioExecutionEnabled(false)
+            automaticPrecisionNeedsAttention = true
+            automaticPrecisionStatus =
+                "The Mac slept again before Precision finished reconnecting. Audio remains off; quit and reopen the app."
+            diagnosticsLog.append(
+                "Sleep reconnect \(cycleID): invalidated by a second sleep notification"
+            )
+            return
+        }
+        guard
+              automaticPrecisionEnabled,
+              runtimeOwnerControlIsDiverted,
+              !runtimeOwnerNeedsRecovery,
+              !runtimeOwnerDeviceDisconnected,
+              !runtimeOwnerOperationInProgress,
+              !precisionResumeInProgress,
+              let owner = runtimeOwner,
+              let automaticRun = automaticPrecisionRun else {
+            return
+        }
+        let cycleID = UUID()
+        sleepReconnectCycleID = cycleID
+        sleepReconnectCompletionStarted = false
+        sleepReconnectShouldRestoreAudio = audioExecutionEnabled
+        stopWheelObserver()
+        setAudioExecutionEnabled(false)
+        runtimeOwnerOperationInProgress = true
+        automaticPrecisionStatus = "Pausing Precision for Mac sleep…"
+        diagnosticsLog.append("Sleep reconnect \(cycleID): ordered endpoint shutdown started")
+        sleepReconnectTask = Task { [weak self] in
+            do {
+                let run = try await owner.prepareForSleepReconnect(
+                    automaticRun: automaticRun,
+                    sleepCycleID: cycleID
+                )
+                guard let self,
+                      self.sleepReconnectCycleID == cycleID,
+                      !self.isTerminating else {
+                    return nil
+                }
+                self.runtimeOwnerOperationInProgress = false
+                self.automaticPrecisionStatus =
+                    "Precision paused safely. Waiting for the Mac to wake…"
+                self.diagnosticsLog.append(
+                    "Sleep reconnect \(cycleID): endpoint closed and resume-only capability issued"
+                )
+                return run
+            } catch {
+                guard let self, self.sleepReconnectCycleID == cycleID else {
+                    return nil
+                }
+                self.runtimeOwnerOperationInProgress = false
+                self.automaticPrecisionNeedsAttention = true
+                self.automaticPrecisionStatus =
+                    "Precision could not pause safely for sleep. Audio remains off; quit and reopen the app."
+                self.diagnosticsLog.append(
+                    "Sleep reconnect \(cycleID) stopped during shutdown: \(error)"
+                )
+                return nil
+            }
+        }
+    }
+
+    private func resumePrecisionAfterWake() {
+        guard !sleepReconnectCompletionStarted,
+              let cycleID = sleepReconnectCycleID,
+              let task = sleepReconnectTask else {
+            return
+        }
+        sleepReconnectCompletionStarted = true
+        Task { [weak self] in
+            guard let self else { return }
+            let wakeRun = await task.value
+            guard self.sleepReconnectCycleID == cycleID,
+                  !self.isTerminating else { return }
+            guard self.automaticPrecisionEnabled,
+                  let wakeRun,
+                  wakeRun.sleepCycleID == cycleID,
+                  (try? wakeRun.validate()) != nil else {
+                self.finishSleepReconnect(
+                    cycleID: cycleID,
+                    message: "Precision did not reconnect after wake. Audio remains off; quit and reopen the app.",
+                    succeeded: false
+                )
+                return
+            }
+
+            let previousObserverRunID = await self.runtimeOwner?.observerRunID
+            self.runtimeOwner = nil
+            self.runtimeOwnerBindingID = nil
+            self.runtimeOwnerSession = nil
+            self.runtimeOwnerRootGeneration = nil
+            await self.refreshRuntimeOwnerFlags()
+            self.stop()
+            self.connectionGeneration &+= 1
+            self.rootQueryAttempted = false
+            self.rootQuerySucceeded = false
+            self.firmwareFingerprintAttempted = false
+            self.restoreTrialSimulationAttempted = false
+            self.precisionPreflightAttempted = false
+            self.precisionReadinessAttempted = false
+            self.refreshJournalRotationReview()
+            self.automaticPrecisionStatus =
+                "Mac woke. Reopening the Precision connection…"
+            self.start()
+            guard await self.waitForFreshObserver(),
+                  self.sleepReconnectCycleID == cycleID,
+                  (try? wakeRun.validate()) != nil else {
+                self.finishSleepReconnect(
+                    cycleID: cycleID,
+                    message: "The trackball was not ready after wake. Audio remains off; quit and reopen the app.",
+                    succeeded: false
+                )
+                return
+            }
+            await self.preparePrecisionSession(
+                resume: true,
+                automaticRun: nil,
+                wakeRun: wakeRun,
+                enableAudioOnSuccess: self.sleepReconnectShouldRestoreAudio,
+                previousObserverRunID: previousObserverRunID
+            )
+            let succeeded = self.runtimeOwnerControlIsDiverted
+                && !self.runtimeOwnerNeedsRecovery
+                && !self.runtimeOwnerDeviceDisconnected
+            let message: String
+            if succeeded, self.audioExecutionEnabled {
+                message = "Precision reconnected after wake."
+            } else if succeeded {
+                message = "Precision reconnected after wake. Audio remains paused."
+            } else {
+                message = "Precision did not verify active after wake. Audio remains off; quit and reopen the app."
+            }
+            self.finishSleepReconnect(
+                cycleID: cycleID,
+                message: message,
+                succeeded: succeeded
+            )
+        }
+    }
+
+    private func finishSleepReconnect(
+        cycleID: UUID,
+        message: String,
+        succeeded: Bool
+    ) {
+        guard sleepReconnectCycleID == cycleID else { return }
+        automaticPrecisionNeedsAttention = !succeeded
+        automaticPrecisionStatus = message
+        diagnosticsLog.append("Sleep reconnect \(cycleID): \(message)")
+        runtimeOwnerOperationInProgress = false
+        sleepReconnectCycleID = nil
+        sleepReconnectTask = nil
+        sleepReconnectCompletionStarted = false
+        sleepReconnectShouldRestoreAudio = false
     }
 
     func bootstrapOnLaunch() {
@@ -1414,7 +1607,7 @@ final class AppModel: ObservableObject {
                 try run.validate()
                 automaticPrecisionNeedsAttention = !audioExecutionEnabled
                 automaticPrecisionStatus = audioExecutionEnabled
-                    ? "Precision starts automatically when this app opens."
+                    ? "Precision starts automatically and reconnects after Mac sleep."
                     : "Automatic setup stopped. Open Advanced to review the result before trying again."
             } catch {
                 automaticPrecisionNeedsAttention = automaticPrecisionEnabled
@@ -1457,8 +1650,15 @@ final class AppModel: ObservableObject {
         await preparePrecisionSession(resume: true, automaticRun: nil)
     }
 
-    private func preparePrecisionSession(resume: Bool, automaticRun: PrecisionAutomaticRestartRun?, previousObserverRunID: UUID? = nil) async {
-        guard (automaticRun != nil || precisionResumeAvailable), !precisionResumeInProgress,
+    private func preparePrecisionSession(
+        resume: Bool,
+        automaticRun: PrecisionAutomaticRestartRun?,
+        wakeRun: PrecisionWakeReconnectRun? = nil,
+        enableAudioOnSuccess: Bool = true,
+        previousObserverRunID: UUID? = nil
+    ) async {
+        guard (automaticRun != nil || wakeRun != nil || precisionResumeAvailable),
+              !precisionResumeInProgress,
               runtimeOwner == nil, !isTerminating, status == .observing,
               devices.count == 1, rootQueryGateFailureText == nil,
               inputMonitoringGranted, accessibilityGranted, !audioExecutionEnabled else { return }
@@ -1470,6 +1670,7 @@ final class AppModel: ObservableObject {
                 !isTerminating && connectionGeneration == generation
                     && inputMonitoringGranted && accessibilityGranted
                     && (automaticRun == nil || (try? automaticRun?.validate()) != nil)
+                    && (wakeRun == nil || (try? wakeRun?.validate()) != nil)
             },
             step: { [self] step in
                 switch step {
@@ -1522,7 +1723,15 @@ final class AppModel: ObservableObject {
                     runtimeOwnerOperationInProgress = true
                     defer { runtimeOwnerOperationInProgress = false }
                     do {
-                        if let automaticRun {
+                        if let wakeRun {
+                            try wakeRun.validate()
+                            try await owner.admitAfterWake(
+                                run: wakeRun,
+                                competitorProbe: { Self.precisionCompetitorDisplayNames() },
+                                sessionProvider: { session },
+                                rootGenerationProvider: { rootGeneration }
+                            )
+                        } else if let automaticRun {
                             try automaticRun.validate()
                             try await owner.admitAutomatically(run: automaticRun,
                                 competitorProbe: { Self.precisionCompetitorDisplayNames() },
@@ -1549,18 +1758,29 @@ final class AppModel: ObservableObject {
            runtimeOwnerControlIsDiverted, !runtimeOwnerNeedsRecovery,
            !runtimeOwnerDeviceDisconnected, !isTerminating,
            connectionGeneration == generation,
-           (automaticRun == nil || (try? automaticRun?.validate()) != nil) {
-            startWheelObserver(owner: owner)
-            setAudioExecutionEnabled(true)
-            precisionResumeStatusText = automaticRun == nil
+           (automaticRun == nil || (try? automaticRun?.validate()) != nil),
+           (wakeRun == nil || (try? wakeRun?.validate()) != nil) {
+            if enableAudioOnSuccess {
+                startWheelObserver(owner: owner)
+                setAudioExecutionEnabled(true)
+            }
+            precisionResumeStatusText = wakeRun != nil && !enableAudioOnSuccess
+                ? "Precision reconnected after wake. Audio remains paused."
+                : wakeRun != nil
+                ? "Precision audio reconnected after wake. Button settings were unchanged."
+                : automaticRun == nil
                 ? "Precision audio resumed. Button settings were unchanged."
                 : "Precision audio is ready. Tap to mute; hold and scroll to adjust volume."
             runtimeOwnerStatusText = precisionResumeStatusText ?? "Precision audio resumed"
             diagnosticsLog.append(resume
-                ? "Precision GET-only resume verified active; audio enabled"
+                ? enableAudioOnSuccess
+                    ? "Precision GET-only resume verified active; audio enabled"
+                    : "Precision GET-only resume verified active; audio remains paused"
                 : "Precision automatic activation verified active after fresh baseline; audio enabled")
         } else if runtimeOwnerIsAdmitted && !runtimeOwnerControlIsDiverted && !runtimeOwnerNeedsRecovery {
-            precisionResumeStatusText = automaticRun == nil
+            precisionResumeStatusText = wakeRun != nil
+                ? "The trackball no longer reports the active Precision assignment. Audio remains off; quit and reopen the app."
+                : automaticRun == nil
                 ? "The trackball returned to its original Precision setting. No button setting was changed. Quit and reopen before preparing a new session."
                 : "The original Precision setting was verified. Preparing a fresh session…"
             diagnosticsLog.append("Precision GET-only resume observed baseline; audio remains off")

@@ -79,6 +79,19 @@ public final class PrecisionAutomaticRestartRun: Sendable {
     }
 }
 
+/// Opaque one-use authority for a single post-wake GET-only resume. It cannot
+/// be used by the activation path and contains no physical mutation claim.
+public final class PrecisionWakeReconnectRun: Sendable {
+    package let permit: PrecisionWakeResumePermit
+
+    package init(permit: PrecisionWakeResumePermit) {
+        self.permit = permit
+    }
+
+    public var sleepCycleID: UUID { permit.sleepCycleID }
+    public func validate() throws { try permit.validate() }
+}
+
 private func digest(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
 }

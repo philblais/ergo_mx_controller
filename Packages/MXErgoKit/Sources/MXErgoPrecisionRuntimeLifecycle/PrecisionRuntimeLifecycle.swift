@@ -178,7 +178,8 @@ package actor PrecisionRuntimeLifecycle {
         handoffTimeoutNanoseconds: UInt64 = 5_000_000_000,
         operationTimeoutNanoseconds: UInt64 = 5_000_000_000,
         unsolicitedHIDPPHandler: (@Sendable ([UInt8]) -> Void)? = nil,
-        deviceDisconnectHandler: (@Sendable () -> Void)? = nil
+        deviceDisconnectHandler: (@Sendable () -> Void)? = nil,
+        disconnectWitness: PrecisionRuntimeDisconnectWitness = .init()
     ) async throws {
         try await admit(
             authorization: authorization,
@@ -189,6 +190,7 @@ package actor PrecisionRuntimeLifecycle {
             operationTimeoutNanoseconds: operationTimeoutNanoseconds,
             unsolicitedHIDPPHandler: unsolicitedHIDPPHandler,
             deviceDisconnectHandler: deviceDisconnectHandler,
+            disconnectWitness: disconnectWitness,
             admit: { configuration in
                 try await PrecisionRuntimeAdmissionFactory.admit(
                     configuration: configuration
@@ -212,6 +214,7 @@ package actor PrecisionRuntimeLifecycle {
         },
         unsolicitedHIDPPHandler: (@Sendable ([UInt8]) -> Void)? = nil,
         deviceDisconnectHandler: (@Sendable () -> Void)? = nil,
+        disconnectWitness: PrecisionRuntimeDisconnectWitness = .init(),
         admit: @escaping Admit
     ) async throws {
         try requireBound()
@@ -229,6 +232,7 @@ package actor PrecisionRuntimeLifecycle {
             operationTimeoutNanoseconds: operationTimeoutNanoseconds,
             unsolicitedHIDPPHandler: unsolicitedHIDPPHandler,
             deviceDisconnectHandler: deviceDisconnectHandler,
+            disconnectWitness: disconnectWitness,
             nowProvider: nowProvider
         )
         // Reserve admission before suspension so shutdown can join a late result.

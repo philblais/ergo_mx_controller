@@ -44,8 +44,14 @@ not depend on keeping the automatic preference on.
 
 The baseline fallback is bounded to one fresh activation in the same launch.
 Physical disconnection of an already admitted active session still shuts it down
-for review; this change does not add a same-process reconnect loop. Relaunching
-can check a clean verified saved state, but cannot clear durable uncertainty.
+for review. An orderly Mac sleep is handled separately: `willSleep` disables
+audio, drains and closes the active endpoint, preserves the active journal, and
+releases the observer fence only after exact active classification, zero close,
+unchanged bytes, and a clear synchronous disconnect witness. `didWake` starts a
+different observer run and spends a one-use, sleep-cycle-bound capability on
+GET-only `.resume`. That capability has no mutation claim. Baseline, disconnect,
+changed evidence, opt-out, failed close, or a stale completion leaves audio off;
+there is no activation or recovery fallback.
 
 ## Review and verification
 
@@ -76,6 +82,9 @@ Precision tap mute/unmute, hold-and-scroll volume, release back to normal scroll
 and the volume popup. Quit and reopen the app, then repeat. With Launch at login
 on, repeat after log out/in and Mac reboot. Record exact observed outcomes against
 this candidate; automated tests do not establish physical notification delivery.
+With Precision active, also sleep the Mac once, wake it, wait for the reconnect
+status to finish, then repeat tap mute/unmute and hold-scroll volume. Repeat once
+with **Execute mute and volume** off and confirm it remains off after wake.
 Turning automatic startup off stops future activation. The separate audio toggle
 pauses current audio actions; Restore Precision button explicitly restores the
 normal button setting.

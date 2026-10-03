@@ -69,6 +69,7 @@ public actor PrecisionRuntimeOwner {
     private var deviceDisconnected = false
     private var quitRequested = false
     private var recoverLockedAfterAmbiguousSET = false
+    private let disconnectWitness: PrecisionRuntimeDisconnectWitness
     public nonisolated let precisionHeld = PrecisionHeldFlag()
 
     nonisolated public static func bind(
@@ -134,12 +135,14 @@ public actor PrecisionRuntimeOwner {
         launchID: UUID,
         observerRunID: UUID,
         intent: PrecisionRuntimeAdmissionIntent,
-        lifecycle: PrecisionRuntimeLifecycle
+        lifecycle: PrecisionRuntimeLifecycle,
+        disconnectWitness: PrecisionRuntimeDisconnectWitness = .init()
     ) {
         self.launchID = launchID
         self.observerRunID = observerRunID
         self.intent = intent
         self.lifecycle = lifecycle
+        self.disconnectWitness = disconnectWitness
         eventPump = PrecisionControlEventPump(
             featureIndex: intent.session.featureIndex
         )
@@ -336,6 +339,29 @@ public actor PrecisionRuntimeOwner {
             sessionProvider: sessionProvider, rootGenerationProvider: rootGenerationProvider)
     }
 
+    /// Opens a freshly bound endpoint with the one-use GET-only authority
+    /// minted by a completed pre-sleep rollover. This path cannot activate or
+    /// recover and cannot carry a mutation permit into the transport.
+    public func admitAfterWake(
+        run: PrecisionWakeReconnectRun,
+        competitorProbe: @escaping @Sendable () throws -> [String],
+        sessionProvider: @escaping @Sendable () async throws -> DeviceTransactionSession,
+        rootGenerationProvider: @escaping @Sendable () async throws -> UInt64
+    ) async throws {
+        guard !quitRequested, intent.operation == .resume,
+              await lifecycle.phase == .bound else {
+            throw PrecisionRuntimeOwnerError.notBound
+        }
+        let authorization = try PrecisionRuntimeAdmissionAuthorizationFactory
+            .issueWakeResume(for: intent, permit: run.permit)
+        try await admitBoundAuthorization(
+            authorization,
+            competitorProbe: competitorProbe,
+            sessionProvider: sessionProvider,
+            rootGenerationProvider: rootGenerationProvider
+        )
+    }
+
     /// Only a verified baseline can release an admitted owner for fresh setup.
     public func releaseVerifiedRestoredSession() async throws {
         guard !quitRequested, !deviceDisconnected, await lifecycle.phase == .admitted,
@@ -347,6 +373,67 @@ public actor PrecisionRuntimeOwner {
             throw PrecisionRuntimeOwnerError.restartFenceUnavailable
         }
         await publishDiversionStatus()
+    }
+
+    /// Ordered active rollover for Mac sleep. The durable state deliberately
+    /// remains active/recovery-required; only exact unchanged evidence, a zero
+    /// close result, and no synchronous disconnect witness may release the
+    /// observer fence and mint one resume-only wake capability.
+    public func prepareForSleepReconnect(
+        automaticRun: PrecisionAutomaticRestartRun,
+        sleepCycleID: UUID
+    ) async throws -> PrecisionWakeReconnectRun {
+        try automaticRun.validate()
+        guard !quitRequested, !deviceDisconnected,
+              !disconnectWitness.wasDisconnected,
+              await lifecycle.phase == .admitted,
+              await lifecycle.admissionState == .active else {
+            throw PrecisionRuntimeOwnerError.stillOwningRuntime
+        }
+        let receipt: PrecisionRuntimeWakeResumeReceipt
+        do {
+            receipt = try PrecisionRuntimeAdmissionReview
+                .captureWakeResumeReceipt(
+                    for: intent,
+                    sleepCycleID: sleepCycleID
+                )
+        } catch {
+            throw PrecisionRuntimeOwnerError.invalidIntent
+        }
+        precisionHeld.set(false)
+        eventPump = PrecisionControlEventPump(
+            featureIndex: intent.session.featureIndex
+        )
+        guard let report = await lifecycle.shutdown(),
+              report.disposition == .recoveryRequired(.active),
+              report.deviceCloseReturn == 0,
+              !deviceDisconnected,
+              !disconnectWitness.wasDisconnected else {
+            throw PrecisionRuntimeOwnerError.stillOwningRuntime
+        }
+        let wakePermit: PrecisionWakeResumePermit
+        do {
+            try automaticRun.validate()
+            wakePermit = try PrecisionRuntimeAdmissionReview
+                .makeWakeResumePermit(
+                    from: receipt,
+                    for: intent,
+                    parent: automaticRun.permit,
+                    disconnectWitness: disconnectWitness
+                )
+        } catch {
+            throw PrecisionRuntimeOwnerError.invalidIntent
+        }
+        guard try await lifecycle.releaseObserverRestartFence() else {
+            throw PrecisionRuntimeOwnerError.restartFenceUnavailable
+        }
+        do {
+            try wakePermit.validate()
+        } catch {
+            throw PrecisionRuntimeOwnerError.invalidIntent
+        }
+        await publishDiversionStatus()
+        return PrecisionWakeReconnectRun(permit: wakePermit)
     }
 
     private func confirmBoundAdmission(
@@ -403,7 +490,8 @@ public actor PrecisionRuntimeOwner {
                 },
                 deviceDisconnectHandler: { [weak self] in
                     Task { await self?.handleDeviceDisconnected() }
-                }
+                },
+                disconnectWitness: disconnectWitness
             )
             guard !quitRequested else { throw PrecisionRuntimeOwnerError.notBound }
             if deviceDisconnected {

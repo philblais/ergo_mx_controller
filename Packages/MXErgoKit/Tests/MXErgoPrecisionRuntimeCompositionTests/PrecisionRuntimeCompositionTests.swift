@@ -70,13 +70,15 @@ import Testing
         events: events
     )
     let notifications = RuntimeCounter()
+    let disconnectWitness = PrecisionRuntimeDisconnectWitness()
     let configuration = PrecisionRuntimeCompositionConfiguration(
         journalContext: fixture.configuration.journalContext,
         operationLease: fixture.configuration.operationLease,
         sessionProvider: fixture.configuration.sessionProvider,
         rootGenerationProvider: fixture.configuration.rootGenerationProvider,
         competitorProbe: fixture.configuration.competitorProbe,
-        deviceDisconnectHandler: { notifications.increment() }
+        deviceDisconnectHandler: { notifications.increment() },
+        disconnectWitness: disconnectWitness
     )
 
     let runtime = try await PrecisionRuntimeCompositionFactory.make(
@@ -93,6 +95,7 @@ import Testing
     )
 
     endpoint.fireDisconnect()
+    #expect(disconnectWitness.wasDisconnected)
     await waitUntil { notifications.value == 1 }
     await waitUntil {
         do {

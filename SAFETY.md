@@ -171,6 +171,18 @@ its baseline, deactivate it explicitly first. A physical disconnect while
 diverted is classified `recovery-required` and never triggers an automatic
 re-admit or re-SET on reconnect.
 
+An orderly Mac sleep notification is a narrower case. While persistent
+automatic Precision is enabled, the app may close the verified-active endpoint
+in the fixed teardown order before sleep. It may release the observer fence only
+after shutdown remains exactly `recoveryRequired(.active)`, device close returns
+zero, the runtime journal is byte-for-byte unchanged, and a callback-synchronous
+disconnect witness remains clear. Wake receives a non-serializable one-use
+capability bound to that exact journal, launch, sleep cycle and prior observer
+run. A different fresh observer run may use it only for GET-only `.resume`.
+The capability carries no automatic SET permit. Baseline, disconnect, changed
+evidence, close failure, opt-out or stale-cycle completion leaves audio off and
+never falls back to activation or recovery.
+
 The September 11 automatic restart candidate adds a visible device/baseline-bound
 opt-in. Each launch mints a fresh non-serializable one-use capability from that
 preference; it never reuses a manual-confirmation Boolean. A clean verified

@@ -15,6 +15,13 @@ proved with tests, and promoted only behind an explicit review. Read
 
 ## Where things stand
 
+The September 28 source adds an orderly active-Precision sleep rollover. Before
+sleep it closes the old HID endpoint without restoring or rewriting the button;
+after wake it creates a fresh endpoint and performs GET-only resume. The wake
+credential is one-use, bound to the exact unchanged active journal and sleep
+cycle, and cannot authorize a SET. Hardware acceptance of the new wake path is
+pending.
+
 The September 11 automatic-start candidate adds **Start Precision automatically**.
 It remembers a device-bound opt-in and checks each new launch before resuming
 audio or activating a verified clean baseline. One bounded flow handles completed

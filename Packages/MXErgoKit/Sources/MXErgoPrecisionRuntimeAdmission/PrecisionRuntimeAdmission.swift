@@ -108,6 +108,13 @@ package struct PrecisionRuntimeAdmissionIntent: Sendable {
     }
 }
 
+/// Opaque evidence captured while the pre-sleep runtime is still verified
+/// active. The owner may turn it into one resume-only permit only after the
+/// endpoint has drained and closed cleanly.
+package struct PrecisionRuntimeWakeResumeReceipt: Sendable, Equatable {
+    fileprivate let binding: PrecisionWakeResumeBinding
+}
+
 package enum PrecisionRuntimeAdmissionReview {
     /// Performs read-only journal inspection and captures the exact existing
     /// runtime revision/digest when present. No lock, file write, host handoff,
@@ -178,6 +185,48 @@ package enum PrecisionRuntimeAdmissionReview {
             return .activate
         }
     }
+
+    package static func captureWakeResumeReceipt(
+        for intent: PrecisionRuntimeAdmissionIntent,
+        sleepCycleID: UUID
+    ) throws -> PrecisionRuntimeWakeResumeReceipt {
+        guard let snapshot = try PrecisionRuntimeJournalBootstrap.inspect(
+            bootstrapRequest(for: intent)
+        ) else {
+            throw PrecisionRuntimeAdmissionError.runtimeJournalEvidenceChanged
+        }
+        try validateAction(.resume, snapshot: snapshot, permitsDeactivate: false)
+        return PrecisionRuntimeWakeResumeReceipt(binding: wakeResumeBinding(
+            for: intent,
+            snapshot: snapshot,
+            sleepCycleID: sleepCycleID,
+            priorObserverRunID: intent.observerRunID,
+            newObserverRunID: nil
+        ))
+    }
+
+    package static func makeWakeResumePermit(
+        from receipt: PrecisionRuntimeWakeResumeReceipt,
+        for intent: PrecisionRuntimeAdmissionIntent,
+        parent: PrecisionAutomaticRunPermit,
+        disconnectWitness: PrecisionRuntimeDisconnectWitness
+    ) throws -> PrecisionWakeResumePermit {
+        let current = try captureWakeResumeReceipt(
+            for: intent,
+            sleepCycleID: receipt.binding.sleepCycleID
+        )
+        guard current == receipt,
+              parent.consent.matches(intent.readiness),
+              !disconnectWitness.wasDisconnected else {
+            throw PrecisionRuntimeAdmissionError.runtimeJournalEvidenceChanged
+        }
+        try parent.validate()
+        return PrecisionWakeResumePermit(
+            parent: parent,
+            disconnectWitness: disconnectWitness,
+            binding: receipt.binding
+        )
+    }
 }
 
 /// Non-Codable, actor-isolated, and one-use. A failed consumption attempt also
@@ -185,11 +234,27 @@ package enum PrecisionRuntimeAdmissionReview {
 package actor PrecisionRuntimeAdmissionAuthorization {
     private let binding: PrecisionRuntimeAdmissionIntent
     package nonisolated let automaticPermit: PrecisionAutomaticRunPermit?
+    package nonisolated let wakeResumePermit: PrecisionWakeResumePermit?
     private var consumed = false
 
-    fileprivate init(binding: PrecisionRuntimeAdmissionIntent, automaticPermit: PrecisionAutomaticRunPermit? = nil) {
+    fileprivate init(
+        binding: PrecisionRuntimeAdmissionIntent,
+        automaticPermit: PrecisionAutomaticRunPermit? = nil,
+        wakeResumePermit: PrecisionWakeResumePermit? = nil
+    ) {
         self.binding = binding
         self.automaticPermit = automaticPermit
+        self.wakeResumePermit = wakeResumePermit
+    }
+
+    package nonisolated func validateInitialOperation() throws {
+        try automaticPermit?.validateInitialOperation()
+        try wakeResumePermit?.validateInitialOperation()
+    }
+
+    package nonisolated func finishInitialOperation() {
+        automaticPermit?.finishInitialOperation()
+        wakeResumePermit?.finishInitialOperation()
     }
 
     fileprivate func consume(
@@ -201,6 +266,7 @@ package actor PrecisionRuntimeAdmissionAuthorization {
         }
         consumed = true
         try automaticPermit?.validate()
+        try wakeResumePermit?.validate()
         guard binding.matches(intent) else {
             throw PrecisionRuntimeAdmissionError.invalidAuthorizationBinding
         }
@@ -226,6 +292,33 @@ package enum PrecisionRuntimeAdmissionAuthorizationFactory {
         }
         try permit.reserve(intent.operation, readiness: intent.readiness)
         return PrecisionRuntimeAdmissionAuthorization(binding: intent, automaticPermit: permit)
+    }
+
+    package static func issueWakeResume(
+        for intent: PrecisionRuntimeAdmissionIntent,
+        permit: PrecisionWakeResumePermit,
+        nowUptimeNanoseconds: UInt64 = DispatchTime.now().uptimeNanoseconds
+    ) throws -> PrecisionRuntimeAdmissionAuthorization {
+        try validateIntent(intent)
+        try requireAuthorizationUnexpired(
+            intent,
+            nowUptimeNanoseconds: nowUptimeNanoseconds
+        )
+        guard intent.operation == .resume,
+              let snapshot = intent.expectedRuntimeSnapshot else {
+            throw PrecisionRuntimeAdmissionError.invalidAuthorizationBinding
+        }
+        try permit.reserve(matching: wakeResumeBinding(
+            for: intent,
+            snapshot: snapshot,
+            sleepCycleID: permit.sleepCycleID,
+            priorObserverRunID: permit.priorObserverRunID,
+            newObserverRunID: intent.observerRunID
+        ))
+        return PrecisionRuntimeAdmissionAuthorization(
+            binding: intent,
+            wakeResumePermit: permit
+        )
     }
 
     package static func issue(
@@ -269,6 +362,7 @@ package struct PrecisionRuntimeAdmissionConfiguration: Sendable {
     package let operationTimeoutNanoseconds: UInt64
     package let unsolicitedHIDPPHandler: (@Sendable ([UInt8]) -> Void)?
     package let deviceDisconnectHandler: (@Sendable () -> Void)?
+    package let disconnectWitness: PrecisionRuntimeDisconnectWitness
     let nowProvider: @Sendable () -> UInt64
 
     package init(
@@ -283,15 +377,16 @@ package struct PrecisionRuntimeAdmissionConfiguration: Sendable {
         handoffTimeoutNanoseconds: UInt64 = 5_000_000_000,
         operationTimeoutNanoseconds: UInt64 = 5_000_000_000,
         unsolicitedHIDPPHandler: (@Sendable ([UInt8]) -> Void)? = nil,
-        deviceDisconnectHandler: (@Sendable () -> Void)? = nil
+        deviceDisconnectHandler: (@Sendable () -> Void)? = nil,
+        disconnectWitness: PrecisionRuntimeDisconnectWitness = .init()
     ) {
         self.intent = intent
         self.authorization = authorization
         self.hostHandoff = hostHandoff
         self.competitorProbe = {
-            try authorization.automaticPermit?.validateInitialOperation()
+            try authorization.validateInitialOperation()
             let result = try competitorProbe()
-            try authorization.automaticPermit?.validateInitialOperation()
+            try authorization.validateInitialOperation()
             return result
         }
         self.sessionProvider = sessionProvider
@@ -300,6 +395,7 @@ package struct PrecisionRuntimeAdmissionConfiguration: Sendable {
         self.operationTimeoutNanoseconds = operationTimeoutNanoseconds
         self.unsolicitedHIDPPHandler = unsolicitedHIDPPHandler
         self.deviceDisconnectHandler = deviceDisconnectHandler
+        self.disconnectWitness = disconnectWitness
         nowProvider = { DispatchTime.now().uptimeNanoseconds }
     }
 
@@ -316,15 +412,16 @@ package struct PrecisionRuntimeAdmissionConfiguration: Sendable {
         operationTimeoutNanoseconds: UInt64 = 5_000_000_000,
         unsolicitedHIDPPHandler: (@Sendable ([UInt8]) -> Void)? = nil,
         deviceDisconnectHandler: (@Sendable () -> Void)? = nil,
+        disconnectWitness: PrecisionRuntimeDisconnectWitness = .init(),
         nowProvider: @escaping @Sendable () -> UInt64
     ) {
         self.intent = intent
         self.authorization = authorization
         self.hostHandoff = hostHandoff
         self.competitorProbe = {
-            try authorization.automaticPermit?.validateInitialOperation()
+            try authorization.validateInitialOperation()
             let result = try competitorProbe()
-            try authorization.automaticPermit?.validateInitialOperation()
+            try authorization.validateInitialOperation()
             return result
         }
         self.sessionProvider = sessionProvider
@@ -333,6 +430,7 @@ package struct PrecisionRuntimeAdmissionConfiguration: Sendable {
         self.operationTimeoutNanoseconds = operationTimeoutNanoseconds
         self.unsolicitedHIDPPHandler = unsolicitedHIDPPHandler
         self.deviceDisconnectHandler = deviceDisconnectHandler
+        self.disconnectWitness = disconnectWitness
         self.nowProvider = nowProvider
     }
 }
@@ -520,6 +618,7 @@ package enum PrecisionRuntimeAdmissionFactory {
                     configuration.unsolicitedHIDPPHandler,
                 deviceDisconnectHandler:
                     configuration.deviceDisconnectHandler,
+                disconnectWitness: configuration.disconnectWitness,
                 automaticPermit: configuration.authorization.automaticPermit
             )
             runtime = try await makeRuntime(runtimeConfiguration)
@@ -538,11 +637,11 @@ package enum PrecisionRuntimeAdmissionFactory {
             nowProvider: configuration.nowProvider
         )
         do {
-            try configuration.authorization.automaticPermit?.validate()
+            try configuration.authorization.validateInitialOperation()
             try await admission.performInitiallyAuthorized(intent)
-            configuration.authorization.automaticPermit?.finishInitialOperation()
+            configuration.authorization.finishInitialOperation()
         } catch {
-            configuration.authorization.automaticPermit?.finishInitialOperation()
+            configuration.authorization.finishInitialOperation()
             _ = await admission.shutdown()
             throw error
         }
@@ -933,6 +1032,29 @@ private func bootstrapRequest(
         sourceBaselineTransactionID:
             intent.readiness.sourceBaselineTransactionID,
         runtimeJournalURL: intent.runtimeJournalURL
+    )
+}
+
+private func wakeResumeBinding(
+    for intent: PrecisionRuntimeAdmissionIntent,
+    snapshot: PrecisionRuntimeJournalSnapshot,
+    sleepCycleID: UUID,
+    priorObserverRunID: UUID,
+    newObserverRunID: UUID?
+) -> PrecisionWakeResumeBinding {
+    PrecisionWakeResumeBinding(
+        launchID: intent.launchID,
+        sleepCycleID: sleepCycleID,
+        priorObserverRunID: priorObserverRunID,
+        newObserverRunID: newObserverRunID,
+        sourceBaselineCanonicalPath: intent.sourceBaselineCanonicalPath,
+        runtimeJournalCanonicalPath: intent.runtimeJournalCanonicalPath,
+        sourceBaselineTransactionID:
+            intent.readiness.sourceBaselineTransactionID,
+        sourceBaselineSHA256: intent.readiness.sourceJournalSHA256,
+        runtimeJournalData: snapshot.data,
+        runtimeEnvelope: snapshot.envelope,
+        runtimeJournalSHA256: snapshot.sha256
     )
 }
 

@@ -18,6 +18,13 @@ scrolling for volume, release for normal scrolling, and check the volume popup.
 Then repeat after login and reboot. These hardware checks remain to be accepted
 for the new candidate.
 
+With the same setting on, an active Precision session now pauses its device
+connection as the Mac enters sleep and opens a fresh connection after wake. The
+app re-reads the saved active setting before mute and volume resume; it never
+reassigns the button during wake recovery. Wait for **Precision audio: Active**
+before using the button. If the status says reconnect stopped, leave audio off
+and quit and reopen the app instead of repeatedly pressing Precision.
+
 Turning automatic startup off cancels activation that has not yet started and
 prevents future automatic starts. An already-started operation finishes its
 checks; the app does not send an undo command. Current active audio has its own
@@ -26,7 +33,9 @@ button to its original behavior.
 
 If automatic setup stops, open **Advanced** for the result. Unexpected or
 uncertain saved state requires review; repeatedly toggling automatic startup will
-not retry it. Disconnection during an active session still stops that session.
+not retry it. An unplanned trackball/Bluetooth disconnection during an active
+session still stops that session; the automatic wake path applies only to an
+orderly Mac sleep rollover that closed the old endpoint successfully.
 
 ## Tracking stays slow after startup
 

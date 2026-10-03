@@ -93,6 +93,13 @@ still match these. `scripts/verify.sh` checks them.
   through admission and at physical write entry; uncertainty never triggers a
   retry, inverse command or automatic recovery. Pinned files are untouched. The
   setting defaults off; attended automatic-start hardware acceptance is pending.
+- **September 28 sleep/wake reconnect:** while that opt-in remains current, an
+  active endpoint may be rolled over at `willSleep` only after ordered shutdown,
+  exact active classification, zero close, unchanged runtime bytes, and a clear
+  synchronous disconnect witness. The resulting one-use capability permits only
+  GET-only `.resume` on a different fresh observer run after `didWake`; it carries
+  no SET authority and has no baseline-to-activate fallback. Any changed evidence,
+  disconnect, failed close, stale cycle or opt-out leaves audio off for review.
 
 Keep this accurate; it is the thing most likely to drift.
 

@@ -144,7 +144,7 @@ struct ObserverMenuView: View {
                 get: { model.automaticPrecisionEnabled },
                 set: { model.setAutomaticPrecisionEnabled($0) }
             ))
-            Text("Remembers this trackball for app and Mac restarts. It may reassign the Precision button to mute and volume after checking the device.")
+            Text("Remembers this trackball for app and Mac restarts, and reconnects after Mac sleep. Startup may reassign the Precision button after checking the device; wake recovery only reads and resumes the saved assignment.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Text(model.automaticPrecisionStatus)

@@ -1262,10 +1262,11 @@ private struct AdmissionFixture {
     func intent(
         operation: PrecisionTemporaryDiversionOperation,
         deadline: UInt64,
-        observerRunID: UUID? = nil
+        observerRunID: UUID? = nil,
+        launchID: UUID = UUID()
     ) throws -> PrecisionRuntimeAdmissionIntent {
         try PrecisionRuntimeAdmissionReview.makeIntent(
-            launchID: UUID(),
+            launchID: launchID,
             observerRunID: observerRunID ?? self.observerRunID,
             operation: operation,
             readiness: readiness,
@@ -2048,6 +2049,157 @@ private func sourceText(under directory: URL) throws -> String {
             acquireLease: { _ in throw AdmissionTestError.unused },
             bootstrap: { _, _ in throw AdmissionTestError.unused },
             makeRuntime: { _ in throw AdmissionTestError.unused })
+    }
+}
+
+@Test func wakeResumePermitIsExactOneUseReadOnlyAndDisconnectRevocable() async throws {
+    let fixture = try admissionFixture()
+    defer { fixture.cleanup() }
+    let journal = try JSONDecoder().decode(
+        DeviceStateJournal.self,
+        from: fixture.sourceData
+    )
+    let prepared = try DeviceTransactionEnvelope(baselineJournal: journal)
+    let armed = try DeviceTransactionReducer.reduce(
+        prepared,
+        event: .armApply(
+            controlID: PrecisionTemporaryDiversionPlan.controlID,
+            intended: fixture.readiness.plan.activeState,
+            attemptID: UUID(),
+            now: Date()
+        )
+    ).envelope
+    let active = try DeviceTransactionReducer.reduce(
+        armed,
+        event: .observeApply(
+            controlID: PrecisionTemporaryDiversionPlan.controlID,
+            state: fixture.readiness.plan.activeState,
+            now: Date()
+        )
+    ).envelope
+    try admissionEncoded(active).write(to: fixture.runtimeURL)
+    let runtimeBefore = try Data(contentsOf: fixture.runtimeURL)
+    let launchID = UUID()
+    let oldObserverRunID = UUID()
+    let oldIntent = try fixture.intent(
+        operation: .resume,
+        deadline: 400,
+        observerRunID: oldObserverRunID,
+        launchID: launchID
+    )
+    let parent = PrecisionAutomaticRunPermit(
+        consent: PrecisionSeamlessRestartConsent(
+            enabled: true,
+            readiness: fixture.readiness
+        ),
+        consentIsCurrent: { true }
+    )
+    let cycleID = UUID()
+    let receipt = try PrecisionRuntimeAdmissionReview.captureWakeResumeReceipt(
+        for: oldIntent,
+        sleepCycleID: cycleID
+    )
+    let witness = PrecisionRuntimeDisconnectWitness()
+    let wakePermit = try PrecisionRuntimeAdmissionReview.makeWakeResumePermit(
+        from: receipt,
+        for: oldIntent,
+        parent: parent,
+        disconnectWitness: witness
+    )
+    let freshIntent = try fixture.intent(
+        operation: .resume,
+        deadline: 400,
+        observerRunID: UUID(),
+        launchID: launchID
+    )
+    let authorization = try PrecisionRuntimeAdmissionAuthorizationFactory
+        .issueWakeResume(
+            for: freshIntent,
+            permit: wakePermit,
+            nowUptimeNanoseconds: 300
+        )
+    #expect(authorization.automaticPermit == nil)
+    #expect(authorization.wakeResumePermit === wakePermit)
+    #expect(throws: PrecisionWakeResumePermitError.alreadyUsed) {
+        _ = try PrecisionRuntimeAdmissionAuthorizationFactory.issueWakeResume(
+            for: freshIntent,
+            permit: wakePermit,
+            nowUptimeNanoseconds: 300
+        )
+    }
+    #expect(throws: PrecisionAutomaticRunError.rejectedBeforeDispatch) {
+        try parent.claimMutation()
+    }
+
+    let events = AdmissionEventRecorder()
+    let configuration = admissionConfiguration(
+        intent: freshIntent,
+        authorization: authorization,
+        handoff: ExactAdmissionHandoff(intent: freshIntent, events: events),
+        events: events,
+        nowProvider: { 300 }
+    )
+    let resumed = try await PrecisionRuntimeAdmissionFactory.admit(
+        configuration: configuration,
+        inspect: { try PrecisionRuntimeJournalBootstrap.inspect($0) },
+        acquireLease: {
+            try MXErgoDeviceOperationLease.acquire(beside: $0)
+        },
+        bootstrap: { request, lease in
+            try await PrecisionRuntimeJournalBootstrap.prepare(
+                request,
+                operationLease: lease
+            )
+        },
+        makeRuntime: { configuration in
+            #expect(configuration.automaticPermit == nil)
+            return AdmissionFakeRuntime(
+                context: configuration.journalContext,
+                events: events
+            )
+        }
+    )
+    #expect(await resumed.state == .active)
+    #expect(events.count("resume") == 1)
+    #expect(events.count("activate") == 0)
+    #expect(events.count("recover") == 0)
+    #expect(try Data(contentsOf: fixture.runtimeURL) == runtimeBefore)
+    _ = await resumed.shutdown()
+
+    let disconnectedWitness = PrecisionRuntimeDisconnectWitness()
+    let disconnectedReceipt = try PrecisionRuntimeAdmissionReview
+        .captureWakeResumeReceipt(for: oldIntent, sleepCycleID: UUID())
+    disconnectedWitness.markDisconnected()
+    #expect(throws: PrecisionRuntimeAdmissionError.runtimeJournalEvidenceChanged) {
+        _ = try PrecisionRuntimeAdmissionReview.makeWakeResumePermit(
+            from: disconnectedReceipt,
+            for: oldIntent,
+            parent: parent,
+            disconnectWitness: disconnectedWitness
+        )
+    }
+
+    let activationIntent = try fixture.intent(
+        operation: .activate,
+        deadline: 400,
+        observerRunID: UUID(),
+        launchID: launchID
+    )
+    let activationReceipt = try PrecisionRuntimeAdmissionReview
+        .captureWakeResumeReceipt(for: oldIntent, sleepCycleID: UUID())
+    let activationPermit = try PrecisionRuntimeAdmissionReview
+        .makeWakeResumePermit(
+            from: activationReceipt,
+            for: oldIntent,
+            parent: parent,
+            disconnectWitness: PrecisionRuntimeDisconnectWitness()
+        )
+    #expect(throws: PrecisionRuntimeAdmissionError.invalidAuthorizationBinding) {
+        _ = try PrecisionRuntimeAdmissionAuthorizationFactory.issueWakeResume(
+            for: activationIntent,
+            permit: activationPermit,
+            nowUptimeNanoseconds: 300
+        )
     }
 }
 

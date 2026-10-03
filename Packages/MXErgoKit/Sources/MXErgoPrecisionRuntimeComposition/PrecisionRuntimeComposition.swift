@@ -65,6 +65,7 @@ package struct PrecisionRuntimeCompositionConfiguration: Sendable {
     package let operationTimeoutNanoseconds: UInt64
     package let unsolicitedHIDPPHandler: (@Sendable ([UInt8]) -> Void)?
     package let deviceDisconnectHandler: (@Sendable () -> Void)?
+    package let disconnectWitness: PrecisionRuntimeDisconnectWitness
 
     package var plan: PrecisionTemporaryDiversionPlan {
         journalContext.plan
@@ -87,6 +88,7 @@ package struct PrecisionRuntimeCompositionConfiguration: Sendable {
         operationTimeoutNanoseconds: UInt64 = 5_000_000_000,
         unsolicitedHIDPPHandler: (@Sendable ([UInt8]) -> Void)? = nil,
         deviceDisconnectHandler: (@Sendable () -> Void)? = nil,
+        disconnectWitness: PrecisionRuntimeDisconnectWitness = .init(),
         automaticPermit: PrecisionAutomaticRunPermit? = nil
     ) {
         self.journalContext = journalContext
@@ -98,6 +100,7 @@ package struct PrecisionRuntimeCompositionConfiguration: Sendable {
         self.operationTimeoutNanoseconds = operationTimeoutNanoseconds
         self.unsolicitedHIDPPHandler = unsolicitedHIDPPHandler
         self.deviceDisconnectHandler = deviceDisconnectHandler
+        self.disconnectWitness = disconnectWitness
     }
 }
 
@@ -391,6 +394,7 @@ package enum PrecisionRuntimeCompositionFactory {
             pointerInspectionProbe: configuration.competitorProbe
         )
         endpoint.setDisconnectHandler {
+            configuration.disconnectWitness.markDisconnected()
             configuration.deviceDisconnectHandler?()
             Task { await composition.noteDeviceDisconnected() }
         }

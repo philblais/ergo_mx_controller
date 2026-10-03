@@ -1,5 +1,19 @@
 # Personal v1 release readiness
 
+## September 28 sleep/wake reconnect candidate
+
+The active-Precision sleep failure is now addressed in source. The app performs
+ordered pre-sleep endpoint teardown and post-wake GET-only resume through a
+one-use exact-evidence capability with no SET authority or activation fallback.
+All 566 package tests and the full signed Debug/helper verification pass. The
+warnings-as-errors Release build also passes strict signature validation for
+Team `XW848M73T3` with hardened runtime. Its executable SHA-256 is
+`ffdf9c5495a928ace94d0a758374f5c122980daa8c81806925cfcb073e6d059b`.
+Attended acceptance remains required for one
+audio-on sleep/wake cycle, one audio-off sleep/wake cycle, duplicate/rapid wake
+notifications, and ordinary controls after wake. No result from the earlier
+Precision-inactive sleep test counts for this candidate.
+
 ## September 11 automatic-start candidate
 
 Installed September 12: source `7cc86b0152af35cd2cbad4e311c1b031d880ecf2`.
@@ -67,7 +81,7 @@ a personal release candidate. The existing installation was not replaced.
 | Precision activation and restoration | Two completed revision-6 sessions on the volume-feedback candidate retain verified apply/restore evidence; latest UI confirms button restored. Earlier `0ef8bd6` evidence remains separately recorded. |
 | Volume/mute popup | Passed by user report September 10 (“It's all working”), with final restoration independently confirmed by UI and durable record. Isolated rendering and presentation checks also passed. |
 | Quiet login, remapping On and Off | Reboot availability and five mapped actions passed by user report with On. A subsequent logout/login retained Off by user report; the user then restored On. Both saved-setting login outcomes pass. Initial menu-only window behavior remains unconfirmed. |
-| Coexistence and interruption | Mac sleep/wake and a separate trackball off/on test with Precision inactive both passed by user report, including reconnection and five ordinary controls without restarting the app. Trackpad/other-mouse and browser/natural-scroll variations remain pending. Active-Precision interruption behavior is not established by these results. |
+| Coexistence and interruption | Mac sleep/wake and a separate trackball off/on test with Precision inactive both passed by user report, including reconnection and five ordinary controls without restarting the app. The new active-Precision sleep/wake path is implemented but still needs attended acceptance on its exact installed candidate. Trackpad/other-mouse and browser/natural-scroll variations remain pending. |
 | Repeated sessions and working week | Two completed sessions plus intervening archived record observed on the current candidate. Longer repeated-use acceptance and five normal working days remain pending. |
 | Operating instructions | [Everyday-use guide](USER-GUIDE.md) prepared and checked against current UI labels. |
 | Resource use | One-minute idle sample: approximately 0.05% of one CPU core, 117.42 MiB resident memory unchanged, diagnostic file unchanged at 95,988 bytes. Existing log file/backlog limits reviewed. Active-load and multi-day resource behavior remain unverified. |

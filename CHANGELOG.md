@@ -14,6 +14,28 @@ physical trackball actually did.
 
 ---
 
+## September 28 — guarded active-Precision sleep/wake reconnect
+
+The app now observes Mac sleep and wake while a remembered automatic Precision
+session is active. `willSleep` pauses audio and starts the existing ordered
+runtime shutdown; the observer fence is released only when the durable state is
+still exactly active, device close returns zero, the runtime journal remains
+byte-for-byte unchanged, and a callback-synchronous disconnect witness stayed
+clear. `didWake` starts a fresh observer and spends a one-use, non-persisted
+capability on GET-only `.resume`. The capability is bound to the launch, sleep
+cycle, prior and fresh observer runs, source baseline, canonical paths, and exact
+runtime bytes/envelope/hash. It is never passed to the physical writer and cannot
+authorize activate, recover, retry, or an inverse SET. Baseline, disconnect,
+changed evidence, failed close, opt-out, or stale completion leaves audio off.
+
+All 566 package tests pass. Focused admission and composition tests cover one-use
+replay, absence of a mutation permit, activation rejection, exact journal
+preservation, synchronous disconnect invalidation, GET-only resume, and no
+activate/recover call. The warnings-as-errors Release build passes strict
+signature validation for Team `XW848M73T3` with hardened runtime. Its executable
+SHA-256 is `ffdf9c5495a928ace94d0a758374f5c122980daa8c81806925cfcb073e6d059b`.
+No live HID operation was performed by the agent for this work.
+
 ## Current milestone: live mapped-control GET-only preflight
 
 This implementation remains observer-first. It can:

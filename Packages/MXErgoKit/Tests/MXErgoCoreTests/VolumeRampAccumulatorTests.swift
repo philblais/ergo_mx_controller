@@ -1,6 +1,26 @@
 import Testing
 @testable import MXErgoCore
 
+@Test func volumeRampRetargetReplacesClippedExcessAndRetainsFractionalMotion() {
+    var ramp = VolumeRampAccumulator()
+    ramp.enqueue(steps: 10)
+    ramp.retarget(pendingScalarChange: 0.10625)
+    var total: Float = 0
+    while let change = ramp.takeNextChange() { total += change }
+    #expect(abs(total - 0.10625) < 0.000_001)
+    #expect(!ramp.hasPendingChange)
+}
+
+@Test func volumeRampRetargetCanReverseOrCancelPendingMotion() {
+    var ramp = VolumeRampAccumulator()
+    ramp.enqueue(steps: 5)
+    ramp.retarget(pendingScalarChange: -0.01)
+    #expect(ramp.takeNextChange() == -0.01)
+    ramp.enqueue(steps: 5)
+    ramp.retarget(pendingScalarChange: 0.000_000_1)
+    #expect(ramp.takeNextChange() == nil)
+}
+
 @Test func volumeRampRetainsEveryEnqueuedStepAndBoundsEachTick() {
     var ramp = VolumeRampAccumulator(
         scalarPerStep: 0.1,

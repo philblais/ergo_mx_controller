@@ -27,6 +27,15 @@ public struct VolumeRampAccumulator: Sendable, Equatable {
         normalizePendingChange()
     }
 
+    /// Replaces pending motion after a caller clamps its absolute target.
+    /// Keeping the unapplied excess would make a later reversal move toward
+    /// a target the caller has already discarded.
+    public mutating func retarget(pendingScalarChange: Float) {
+        precondition(pendingScalarChange.isFinite)
+        self.pendingScalarChange = pendingScalarChange
+        normalizePendingChange()
+    }
+
     public mutating func takeNextChange() -> Float? {
         guard hasPendingChange else { return nil }
         let change = min(

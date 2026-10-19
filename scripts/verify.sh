@@ -61,9 +61,24 @@ if grep -q "skipped:" "$ROOT/.verify-tests.log"; then
     printf '\n\033[33mWARNING: some tests were skipped:\033[0m\n'
     grep "skipped:" "$ROOT/.verify-tests.log" || true
 fi
-SUMMARY="$(grep -E "Test run with [0-9]+ tests" "$ROOT/.verify-tests.log" | tail -1)"
+SUMMARY="$(awk '
+    /Test run with [0-9]+ tests/ {
+        summary = $0
+        sub(/^.*Test run with /, "", summary)
+        sub(/ tests.*$/, "", summary)
+        total += summary
+        runs += 1
+    }
+    END {
+        if (runs == 0) exit 1
+        printf "Passed %d package tests across %d test runs.", total, runs
+    }
+' "$ROOT/.verify-tests.log")" || fail "No package test summary was produced"
 echo "$SUMMARY"
 rm -f "$ROOT/.verify-tests.log"
+
+step "Checking app audio behavior with fake audio and a manual clock"
+scripts/test-app-audio.sh
 
 if [ "$TESTS_ONLY" -eq 1 ]; then
     step "Done (tests only)"

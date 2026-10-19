@@ -59,6 +59,8 @@ private final class Loop: @unchecked Sendable {
     private let stateLock = NSLock()
     private var thread: Thread?
     private var runLoop: CFRunLoop?
+    private var scrollTap: CFMachPort?
+    private var inputDeliveryReady = false
     private var stopRequested = false
 
     init(
@@ -134,8 +136,28 @@ private final class Loop: @unchecked Sendable {
 
             var tap: CFMachPort?
             var tapSource: CFRunLoopSource?
-            if openResult == kIOReturnSuccess,
-               let createdTap = CGEvent.tapCreate(
+            // Partial startup must not leave HID volume delivery running
+            // without the tap that prevents the same gesture scrolling a page.
+            defer {
+                stateLock.withLock {
+                    inputDeliveryReady = false
+                    scrollTap = nil
+                    runLoop = nil
+                }
+                if let tap {
+                    CGEvent.tapEnable(tap: tap, enable: false)
+                }
+                if let tapSource {
+                    CFRunLoopRemoveSource(currentRunLoop, tapSource, .commonModes)
+                }
+                IOHIDManagerUnscheduleFromRunLoop(
+                    manager, currentRunLoop, CFRunLoopMode.defaultMode.rawValue
+                )
+                IOHIDManagerRegisterInputValueCallback(manager, nil, nil)
+                _ = IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+            }
+            guard openResult == kIOReturnSuccess,
+                  let createdTap = CGEvent.tapCreate(
                 tap: .cghidEventTap,
                 place: .headInsertEventTap,
                 options: .defaultTap,
@@ -144,46 +166,44 @@ private final class Loop: @unchecked Sendable {
                 ),
                 callback: scrollTapCallback,
                 userInfo: context
-               ) {
-                tap = createdTap
-                if let source = CFMachPortCreateRunLoopSource(
-                    kCFAllocatorDefault,
-                    createdTap,
-                    0
-                ) {
-                    tapSource = source
-                    CFRunLoopAddSource(
-                        currentRunLoop,
-                        source,
-                        .commonModes
-                    )
-                    CGEvent.tapEnable(tap: createdTap, enable: true)
-                }
+                  ) else { return }
+            tap = createdTap
+            guard let source = CFMachPortCreateRunLoopSource(
+                kCFAllocatorDefault, createdTap, 0
+            ) else { return }
+            tapSource = source
+            CFRunLoopAddSource(currentRunLoop, source, .commonModes)
+            stateLock.withLock { scrollTap = createdTap }
+            CGEvent.tapEnable(tap: createdTap, enable: true)
+            let shouldRun = stateLock.withLock {
+                inputDeliveryReady = !stopRequested
+                return !stopRequested
             }
-
-            CFRunLoopRun()
-
-            if let tap {
-                CGEvent.tapEnable(tap: tap, enable: false)
-            }
-            if let tapSource {
-                CFRunLoopRemoveSource(
-                    currentRunLoop,
-                    tapSource,
-                    .commonModes
-                )
-            }
-            IOHIDManagerUnscheduleFromRunLoop(
-                manager,
-                currentRunLoop,
-                CFRunLoopMode.defaultMode.rawValue
-            )
-            IOHIDManagerRegisterInputValueCallback(manager, nil, nil)
-            _ = IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+            if shouldRun { CFRunLoopRun() }
         }
     }
 
+    fileprivate func handleScrollTap(
+        type: CGEventType,
+        event: CGEvent
+    ) -> Unmanaged<CGEvent>? {
+        WheelScrollTapHandler.handle(
+            type: type,
+            event: event,
+            isStopping: stateLock.withLock { stopRequested },
+            shouldSuppressScroll: shouldSuppressScroll,
+            reenableTap: { [self] in
+                stateLock.withLock {
+                    guard !stopRequested, let scrollTap else { return }
+                    CGEvent.tapEnable(tap: scrollTap, enable: true)
+                }
+            },
+            scrollTapObserver: scrollTapObserver
+        )
+    }
+
     fileprivate func receivedValue(result: IOReturn, value: IOHIDValue) {
+        guard stateLock.withLock({ inputDeliveryReady && !stopRequested }) else { return }
         guard result == kIOReturnSuccess else { return }
         let element = IOHIDValueGetElement(value)
         let device = IOHIDElementGetDevice(element)
@@ -207,24 +227,47 @@ private let wheelValueCallback: IOHIDValueCallback = { context, result, _, value
 }
 
 private let scrollTapCallback: CGEventTapCallBack = { _, type, event, refcon in
-    guard type == .scrollWheel else {
-        return Unmanaged.passUnretained(event)
-    }
     guard let refcon else {
         return Unmanaged.passUnretained(event)
     }
     let loop = Unmanaged<Loop>.fromOpaque(refcon).takeUnretainedValue()
-    let suppress = loop.shouldSuppressScroll()
-    // Reported after the decision so the sample says what actually happened,
-    // and only when someone asked: the Precision path passes no observer and
-    // is unchanged by this.
-    if let observe = loop.scrollTapObserver {
-        observe(ScrollTapSample(
-            deltaAxis1: Int(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)),
-            deltaAxis2: Int(event.getIntegerValueField(.scrollWheelEventDeltaAxis2)),
-            isContinuous: event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0,
+    return loop.handleScrollTap(type: type, event: event)
+}
+
+/// Callback policy kept separate from installing the live tap, so disabled-tap
+/// recovery and the scrolls that must remain usable can be exercised offline.
+enum WheelScrollTapHandler {
+    static func handle(
+        type: CGEventType,
+        event: CGEvent,
+        isStopping: Bool,
+        shouldSuppressScroll: () -> Bool,
+        reenableTap: () -> Void,
+        scrollTapObserver: MXErgoWheelObserver.ScrollTapObserver? = nil
+    ) -> Unmanaged<CGEvent>? {
+        let passThrough = Unmanaged.passUnretained(event)
+        guard !isStopping else { return passThrough }
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            // Re-arming this existing event tap sends no device command. Without
+            // it, HID volume changes continue while the page starts scrolling.
+            reenableTap()
+            return passThrough
+        }
+        guard type == .scrollWheel else { return passThrough }
+
+        let vertical = Int(event.getIntegerValueField(.scrollWheelEventDeltaAxis1))
+        let horizontal = Int(event.getIntegerValueField(.scrollWheelEventDeltaAxis2))
+        let continuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
+        // Only discrete vertical wheel input belongs to Precision volume.
+        // Trackpad gestures, tilt and mixed-axis scroll retain their behavior.
+        let suppress = !continuous && vertical != 0 && horizontal == 0
+            && shouldSuppressScroll()
+        scrollTapObserver?(ScrollTapSample(
+            deltaAxis1: vertical,
+            deltaAxis2: horizontal,
+            isContinuous: continuous,
             wasSuppressed: suppress
         ))
+        return suppress ? nil : passThrough
     }
-    return suppress ? nil : Unmanaged.passUnretained(event)
 }

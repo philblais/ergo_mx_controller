@@ -2673,3 +2673,38 @@ September 14 installation: tracking diagnostic source `44486e1`, executable
 pre-install settings/journal hashes are unchanged. The app was left closed for
 the user to begin the attended measurement. No live HID operation was initiated
 by the agent during installation.
+
+### October 17 — code review and input/audio reliability fixes
+
+The code review separates logical transport closure from physical IOHID removal.
+Closing the reader now rejects requests and wakes pending reads without marking
+the disconnect witness or cancelling input before output drains. Physical removal
+still notifies synchronously, including during orderly cancellation. This fixes
+the real endpoint path that otherwise invalidated every sleep/wake resume permit.
+The advisor reviewed this boundary before implementation.
+
+The existing Precision scroll tap re-arms after macOS disables it, passes
+continuous, horizontal and mixed-axis scroll through, and stops suppressing as
+soon as audio is paused. Partial HID/tap/source startup failures clean up without
+delivering wheel volume. A verified wake reinstalls wheel observation even when
+audio remains paused. Inactive runtime states cancel queued audio, and switching
+applications refreshes the natural-scroll preference without polling journals.
+
+Volume ramps track the clamped target rather than retaining excess movement
+beyond zero or full volume. A later mute cancels older movement; generation-bound
+ticks cannot consume a newer ramp after cancellation. Non-improving output and a
+per-input tick budget bound work when a driver cannot reach a requested level.
+The verification script now aggregates all Swift Testing target summaries and
+runs the production audio controller against memory-only audio and a manual clock.
+
+Nine new package regressions raise the observed total from 566 to 575, all
+passing with no skips. Six additional app audio checks pass. The full four-target
+signed build and audit workflow passes, as does the separate main-app Release
+build with Swift warnings treated as errors and strict signature verification.
+There is no new dependency edge, library product, device output site, event-post
+site, suppressing tap, SET permission, retry, inverse command or journal rewrite.
+Callback ordering across HID, wheel and UI handoffs remains a separate design
+concern; this patch does not claim to serialize those independent event sources.
+The next gate is attended sleep/wake, paused-audio, scrolling coexistence and
+audio-feedback acceptance on the rebuilt app. No live HID or audio operation was
+run, and the rebuilt app was not installed or launched.

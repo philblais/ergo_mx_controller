@@ -4,24 +4,41 @@ import MXErgoCore
 
 final class SmoothSystemAudioController: @unchecked Sendable {
     typealias StatusHandler = @Sendable (AudioExecutionStatus) -> Void
+    typealias TickScheduler = @Sendable (TimeInterval, @escaping @Sendable () -> Void) -> Void
 
-    private let queue = DispatchQueue(
-        label: "com.phib.MXErgoController.Audio",
-        qos: .userInteractive
-    )
+    private let queue: DispatchQueue
     private let statusHandler: StatusHandler
+    private let output: SystemAudioOutput
+    private let scheduleTick: TickScheduler
     private var ramp = VolumeRampAccumulator()
     private var isRampScheduled = false
     private var targetVolume: Float32?
+    private var currentVolume: Float32?
+    private var rampGeneration: UInt64 = 0
+    private var remainingRampTicks = 0
 
-    init(statusHandler: @escaping StatusHandler) {
+    init(
+        output: SystemAudioOutput = .live,
+        queue: DispatchQueue = DispatchQueue(
+            label: "com.phib.MXErgoController.Audio",
+            qos: .userInteractive
+        ),
+        scheduleTick: TickScheduler? = nil,
+        statusHandler: @escaping StatusHandler
+    ) {
+        self.output = output
+        self.queue = queue
+        self.scheduleTick = scheduleTick ?? { delay, tick in
+            queue.asyncAfter(deadline: .now() + delay, execute: tick)
+        }
         self.statusHandler = statusHandler
     }
 
     func prepare() {
         queue.async { [self] in
             do {
-                let volume = try CoreAudioOutput.currentVolume()
+                let volume = try output.currentVolume()
+                currentVolume = volume
                 targetVolume = volume
                 statusHandler(.ready(volumePercent: Self.percent(volume)))
             } catch {
@@ -33,24 +50,38 @@ final class SmoothSystemAudioController: @unchecked Sendable {
     func enqueueVolumeSteps(_ signedSteps: Int) {
         guard signedSteps != 0 else { return }
         queue.async { [self] in
-            if !isRampScheduled {
-                targetVolume = try? CoreAudioOutput.currentVolume()
-            }
-            if let targetVolume {
+            do {
+                if !isRampScheduled {
+                    let volume = try output.currentVolume()
+                    currentVolume = volume
+                    targetVolume = volume
+                }
+                guard let targetVolume, let currentVolume else { return }
                 let requestedChange = Float32(signedSteps) * ramp.scalarPerStep
-                self.targetVolume = min(1, max(0, targetVolume + requestedChange))
+                let nextTarget = min(1, max(0, targetVolume + requestedChange))
+                self.targetVolume = nextTarget
+                ramp.retarget(pendingScalarChange: nextTarget - currentVolume)
+                // Normalized volume needs at most 32 default ticks. Allow
+                // slower per-channel progress, but never chase a driver forever.
+                remainingRampTicks = Int(ceil(2 / ramp.maximumScalarChangePerTick))
+                guard !isRampScheduled else { return }
+                rampGeneration &+= 1
+                isRampScheduled = true
+                drainRamp(generation: rampGeneration)
+            } catch {
+                resetRamp()
+                statusHandler(.failed(message: error.localizedDescription))
             }
-            ramp.enqueue(steps: signedSteps)
-            guard !isRampScheduled else { return }
-            isRampScheduled = true
-            drainRamp()
         }
     }
 
     func toggleMute() {
         queue.async { [self] in
+            // A later mute gesture supersedes movement from an older scroll.
+            // Otherwise the next ramp tick would immediately unmute again.
+            resetRamp()
             do {
-                let isMuted = try CoreAudioOutput.toggleMute()
+                let isMuted = try output.toggleMute()
                 statusHandler(.muteChanged(isMuted: isMuted))
             } catch {
                 statusHandler(.failed(message: error.localizedDescription))
@@ -60,19 +91,43 @@ final class SmoothSystemAudioController: @unchecked Sendable {
 
     func cancelPendingVolumeChanges() {
         queue.async { [self] in
-            ramp.reset()
-            targetVolume = nil
+            resetRamp()
         }
     }
 
-    private func drainRamp() {
+    private func resetRamp() {
+        rampGeneration &+= 1
+        ramp.reset()
+        targetVolume = nil
+        currentVolume = nil
+        isRampScheduled = false
+        remainingRampTicks = 0
+    }
+
+    private func drainRamp(generation: UInt64) {
+        guard generation == rampGeneration, isRampScheduled else { return }
         guard let scalarChange = ramp.takeNextChange() else {
             isRampScheduled = false
             return
         }
 
         do {
-            let volume = try CoreAudioOutput.adjustVolume(by: scalarChange)
+            let previousDistance = targetVolume.flatMap { target in
+                currentVolume.map { abs(target - $0) }
+            }
+            let volume = try output.adjustVolume(scalarChange)
+            currentVolume = volume
+            remainingRampTicks -= 1
+            if let targetVolume {
+                ramp.retarget(pendingScalarChange: targetVolume - volume)
+                if remainingRampTicks <= 0
+                    || previousDistance.map({ abs(targetVolume - volume) >= $0 - 0.000_001 }) == true {
+                    // CoreAudio success need not mean the device accepted a
+                    // representable level. Stop at the reported value on a stall.
+                    ramp.reset()
+                    self.targetVolume = volume
+                }
+            }
             if ramp.hasPendingChange, let targetVolume {
                 statusHandler(.volumeAdjusting(
                     currentPercent: Self.percent(volume),
@@ -88,8 +143,7 @@ final class SmoothSystemAudioController: @unchecked Sendable {
                 targetVolume = volume
             }
         } catch {
-            ramp.reset()
-            isRampScheduled = false
+            resetRamp()
             statusHandler(.failed(message: error.localizedDescription))
             return
         }
@@ -99,13 +153,44 @@ final class SmoothSystemAudioController: @unchecked Sendable {
             return
         }
 
-        queue.asyncAfter(deadline: .now() + .milliseconds(16)) { [weak self] in
-            self?.drainRamp()
+        scheduleTick(0.016) { [weak self] in
+            self?.drainRamp(generation: generation)
         }
     }
 
     private static func percent(_ scalar: Float32) -> Int {
         Int((scalar * 100).rounded())
+    }
+}
+
+/// The app uses CoreAudio; regression tests inject memory-only operations.
+struct SystemAudioOutput: Sendable {
+    var currentVolume: @Sendable () throws -> Float32
+    var adjustVolume: @Sendable (Float32) throws -> Float32
+    var toggleMute: @Sendable () throws -> Bool
+
+    static let live = Self(
+        currentVolume: { try CoreAudioOutput.currentVolume() },
+        adjustVolume: { try CoreAudioOutput.adjustVolume(by: $0) },
+        toggleMute: { try CoreAudioOutput.toggleMute() }
+    )
+}
+
+/// Read synchronously by the wheel tap without crossing the main actor.
+final class AudioExecutionGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var enabled = false
+
+    var isEnabled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return enabled
+    }
+
+    func setEnabled(_ value: Bool) {
+        lock.lock()
+        enabled = value
+        lock.unlock()
     }
 }
 

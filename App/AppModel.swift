@@ -51,7 +51,7 @@ final class AppModel: ObservableObject {
                 sleepReconnectShouldRestoreAudio = false
                 finishFreshObserverWait(false)
                 pendingObserverRestart = false
-                disableAudioForTermination()
+                disableAudioExecution()
                 setEventLayerEnabled(false, remembering: false)
                 stopWheelObserver()
             },
@@ -281,12 +281,14 @@ final class AppModel: ObservableObject {
     private var precisionPreflightEvidenceGeneration: UInt64?
     private var firmwareMigrationPlanGeneration: UInt64?
     private var workspaceLaunchObserver: NSObjectProtocol?
+    private var workspaceActivateObserver: NSObjectProtocol?
     private var applicationActivateObserver: NSObjectProtocol?
     private var workspaceWillSleepObserver: NSObjectProtocol?
     private var workspaceDidWakeObserver: NSObjectProtocol?
     private var didBootstrap = false
     private var pendingObserverRestart = false
     private let audioFeedback = AudioFeedbackPresenter()
+    private let audioExecutionGate = AudioExecutionGate()
     private lazy var audioController = SmoothSystemAudioController { [weak self] status in
         Task { @MainActor [weak self] in
             guard let self, self.audioExecutionEnabled, !self.isTerminating else { return }
@@ -312,6 +314,17 @@ final class AppModel: ObservableObject {
             Task { @MainActor [weak self] in
                 self?.revalidatePrecisionReadinessCompetitors()
                 self?.revalidateMappedControlDiversionCompetitors()
+            }
+        }
+        workspaceActivateObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                // The menu app need not become active after System Settings.
+                // Read only this preference when focus returns to another app.
+                self?.refreshNaturalScrollingPreference()
             }
         }
         applicationActivateObserver = NotificationCenter.default.addObserver(
@@ -592,10 +605,7 @@ final class AppModel: ObservableObject {
         let wasGranted = inputMonitoringGranted
         inputMonitoringGranted = CGPreflightListenEventAccess()
         accessibilityGranted = AXIsProcessTrusted()
-        naturalScrollingEnabled = NaturalScrollDirection.isEnabled()
-        // The horizontal scroll sign inverts with this preference, so a
-        // running layer would otherwise navigate backwards until restarted.
-        eventLayer.setNaturalScrolling(enabled: naturalScrollingEnabled)
+        refreshNaturalScrollingPreference()
         refreshEventLayerDiagnostics()
         refreshLoginItemStatus()
         autostartEventLayerIfRemembered()
@@ -605,6 +615,13 @@ final class AppModel: ObservableObject {
         if inputMonitoringGranted, !wasGranted {
             restartObserverAfterPermissionGrant()
         }
+    }
+
+    private func refreshNaturalScrollingPreference() {
+        let enabled = NaturalScrollDirection.isEnabled()
+        guard enabled != naturalScrollingEnabled else { return }
+        naturalScrollingEnabled = enabled
+        eventLayer.setNaturalScrolling(enabled: enabled)
     }
 
     func requestInputMonitoringIfNeeded() {
@@ -877,7 +894,8 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func disableAudioForTermination() {
+    private func disableAudioExecution() {
+        audioExecutionGate.setEnabled(false)
         audioExecutionEnabled = false
         audioFeedback.hide()
         audioController.cancelPendingVolumeChanges()
@@ -886,6 +904,12 @@ final class AppModel: ObservableObject {
 
     func setAudioExecutionEnabled(_ isEnabled: Bool) {
         guard !isTerminating || !isEnabled else { return }
+        // Pausing is always available, including during cleanup or discovery.
+        // The tap must pass scroll through as soon as audio stops executing.
+        if !isEnabled {
+            disableAudioExecution()
+            return
+        }
         guard !rootQueryInProgress,
               !firmwareFingerprintInProgress,
               !controlEnumerationInProgress,
@@ -896,14 +920,9 @@ final class AppModel: ObservableObject {
               !precisionPreflightInProgress,
               !mappedLivePreflightInProgress,
               !firmwareMigrationCommitInProgress else { return }
-        audioExecutionEnabled = isEnabled
-        if isEnabled {
-            audioController.prepare()
-        } else {
-            audioController.cancelPendingVolumeChanges()
-            audioStatus = .disabled
-            audioFeedback.hide()
-        }
+        audioExecutionEnabled = true
+        audioExecutionGate.setEnabled(true)
+        audioController.prepare()
     }
 
     func performOneShotRootQuery(completion: (@MainActor @Sendable () -> Void)? = nil) {
@@ -1760,8 +1779,10 @@ final class AppModel: ObservableObject {
            connectionGeneration == generation,
            (automaticRun == nil || (try? automaticRun?.validate()) != nil),
            (wakeRun == nil || (try? wakeRun?.validate()) != nil) {
+            // A paused wake still needs the input observer for a later toggle.
+            // Its suppression gate remains off until audio is enabled.
+            startWheelObserver(owner: owner)
             if enableAudioOnSuccess {
-                startWheelObserver(owner: owner)
                 setAudioExecutionEnabled(true)
             }
             precisionResumeStatusText = wakeRun != nil && !enableAudioOnSuccess
@@ -2809,6 +2830,7 @@ final class AppModel: ObservableObject {
     private func startWheelObserver(owner: PrecisionRuntimeOwner) {
         guard !isTerminating else { return }
         let held = owner.precisionHeld
+        let audioGate = audioExecutionGate
         // The diagnostic mode holds the same observer. Clearing the flag here
         // keeps the UI honest about which mode the single tap is in.
         scrollDiagnosticsEnabled = false
@@ -2820,7 +2842,7 @@ final class AppModel: ObservableObject {
                     at: ProcessInfo.processInfo.systemUptime
                 ) }
             },
-            shouldSuppressScroll: { held.isHeld }
+            shouldSuppressScroll: { held.isHeld && audioGate.isEnabled }
         )
     }
 
@@ -2839,15 +2861,18 @@ final class AppModel: ObservableObject {
             runtimeOwnerDeviceDisconnected = false
         case .restored:
             runtimeOwnerNeedsRecovery = false
+            setAudioExecutionEnabled(false)
             stopWheelObserver()
         case .recoveryRequired:
             runtimeOwnerNeedsRecovery = true
             runtimeOwnerDeviceDisconnected = true
+            setAudioExecutionEnabled(false)
             stopWheelObserver()
             runtimeOwnerStatusText =
                 "MX Ergo disconnected while Precision was diverted. No restore SET was sent. Reconnect does not re-admit. Release for session rollover, then power-cycle the trackball; a later authorized recover is required if diversion remains."
         case let .shutDown(recoveryRequired):
             runtimeOwnerNeedsRecovery = recoveryRequired
+            setAudioExecutionEnabled(false)
             stopWheelObserver()
             if recoveryRequired {
                 runtimeOwnerStatusText =
@@ -2855,6 +2880,7 @@ final class AppModel: ObservableObject {
             }
         case .released:
             runtimeOwnerNeedsRecovery = false
+            setAudioExecutionEnabled(false)
         }
         Task { await refreshRuntimeOwnerFlags() }
     }

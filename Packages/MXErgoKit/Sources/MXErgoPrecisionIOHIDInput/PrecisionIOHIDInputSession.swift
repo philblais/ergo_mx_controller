@@ -79,6 +79,7 @@ final class PrecisionIOHIDInputSession:
     private let reportBuffer: UnsafeMutablePointer<UInt8>
     private let reportBufferByteCount: Int
     private var lifecycleState: LifecycleState = .initialized
+    private var readerDisconnected = false
     private var disconnectDelivered = false
     private var extraDisconnectHandler: DisconnectHandler?
     private var rejectedCallbackCountStorage = 0
@@ -127,6 +128,10 @@ final class PrecisionIOHIDInputSession:
         defer { lifecycleOperationLock.unlock() }
 
         lifecycleCondition.lock()
+        guard !readerDisconnected else {
+            lifecycleCondition.unlock()
+            throw PrecisionIOHIDInputError.permanentlyStopped
+        }
         switch lifecycleState {
         case .active:
             lifecycleCondition.unlock()
@@ -152,7 +157,7 @@ final class PrecisionIOHIDInputSession:
             )
             didConfigureRuntime = true
             lifecycleCondition.lock()
-            guard lifecycleState == .starting, !disconnectDelivered else {
+            guard lifecycleState == .starting, !readerDisconnected, !disconnectDelivered else {
                 lifecycleCondition.unlock()
                 throw PrecisionIOHIDInputError.permanentlyStopped
             }
@@ -231,7 +236,13 @@ final class PrecisionIOHIDInputSession:
     }
 
     func disconnected() {
-        transitionToDisconnected()
+        // Transport shutdown closes reads before physical output is drained.
+        // It is not evidence of removal and must not cancel IOHID callbacks;
+        // ordered ownership teardown performs that step after output drain.
+        lifecycleCondition.lock()
+        readerDisconnected = true
+        lifecycleCondition.unlock()
+        callbackChannel.disconnected()
     }
 
     func setUnsolicitedHIDPPHandler(
@@ -265,7 +276,7 @@ final class PrecisionIOHIDInputSession:
         reportLength: Int
     ) {
         lifecycleCondition.lock()
-        let isActive = lifecycleState == .active
+        let isActive = lifecycleState == .active && !readerDisconnected
         lifecycleCondition.unlock()
         guard isActive,
               result == 0,
@@ -321,7 +332,7 @@ final class PrecisionIOHIDInputSession:
     var isActive: Bool {
         lifecycleCondition.lock()
         defer { lifecycleCondition.unlock() }
-        return lifecycleState == .active
+        return lifecycleState == .active && !readerDisconnected
     }
     var isStopped: Bool {
         lifecycleCondition.lock()
@@ -332,7 +343,7 @@ final class PrecisionIOHIDInputSession:
     private func requireActive() throws {
         lifecycleCondition.lock()
         defer { lifecycleCondition.unlock() }
-        guard lifecycleState == .active, !disconnectDelivered else {
+        guard lifecycleState == .active, !readerDisconnected, !disconnectDelivered else {
             if lifecycleState == .stopped {
                 throw PrecisionIOHIDInputError.permanentlyStopped
             }
@@ -344,6 +355,7 @@ final class PrecisionIOHIDInputSession:
         var shouldCancel = false
         var shouldNotify = false
         lifecycleCondition.lock()
+        readerDisconnected = true
         switch lifecycleState {
         case .starting, .active:
             lifecycleState = .cancelling

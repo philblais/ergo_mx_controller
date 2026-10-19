@@ -203,6 +203,91 @@ import Testing
     fixture.session.shutdownAndWait()
 }
 
+@Test func transportShutdownClosesReadsWithoutReportingPhysicalRemovalOrCancellingInput() async throws {
+    let removals = LockedCounter()
+    let extraRemovals = LockedCounter()
+    let fixture = try inputFixture { removals.increment() }
+    let plan = try precisionPlan(device: fixture.device)
+    let writer = RuntimeCallbackWriter(calls: fixture.calls, responseBytes: inputMessageBytes())
+    let adapter = try PrecisionTransportAdapter(
+        plan: plan,
+        binding: fixture.binding,
+        writer: writer,
+        reader: fixture.session,
+        sessionProvider: { fixture.binding.session },
+        rootGenerationProvider: { fixture.binding.rootGeneration },
+        competitorProbe: { [] },
+        durableSnapshotLoader: { fatalError("shutdown must not load a mutation journal") }
+    )
+    try fixture.session.start()
+    fixture.session.setDisconnectHandler { extraRemovals.increment() }
+    let requestID = UUID()
+    try fixture.session.beginRequest(outputFrame(requestID, fixture: fixture))
+
+    await adapter.disconnected()
+    await adapter.disconnected()
+
+    await #expect(throws: PrecisionTransportReportIOError.disconnected) {
+        try await fixture.session.read(for: requestID)
+    }
+    #expect(removals.value == 0)
+    #expect(extraRemovals.value == 0)
+    #expect(!fixture.calls.events.contains("cancel"))
+    #expect(throws: PrecisionIOHIDInputError.notActive) {
+        try fixture.session.validateActiveConnection()
+    }
+    #expect(throws: PrecisionIOHIDInputError.notActive) {
+        try fixture.session.beginRequest(outputFrame(UUID(), fixture: fixture))
+    }
+    fixture.session.setDisconnectHandler { extraRemovals.increment() }
+    #expect(extraRemovals.value == 0)
+    #expect(writer.writeCount == 0)
+
+    fixture.session.shutdownAndWait()
+    #expect(fixture.calls.events.filter { $0 == "cancel" }.count == 1)
+    #expect(fixture.session.isStopped)
+    #expect(removals.value == 0)
+    #expect(extraRemovals.value == 0)
+}
+
+@Test func physicalRemovalStillNotifiesSynchronouslyDuringOrderlyInputShutdown() async throws {
+    let removals = LockedCounter()
+    let extraRemovals = LockedCounter()
+    let fixture = try inputFixture(completeCancellationImmediately: false) {
+        removals.increment()
+    }
+    try fixture.session.start()
+    fixture.session.setDisconnectHandler { extraRemovals.increment() }
+    fixture.session.disconnected()
+    let shutdown = Task.detached { fixture.session.shutdownAndWait() }
+    try await waitUntil { fixture.calls.events.contains("cancel") }
+    #expect(removals.value == 0)
+    #expect(extraRemovals.value == 0)
+
+    fixture.calls.fireRemoval(senderMatches: true)
+    fixture.calls.fireRemoval(senderMatches: true)
+    #expect(removals.value == 1)
+    #expect(extraRemovals.value == 1)
+    #expect(fixture.calls.events.filter { $0 == "cancel" }.count == 1)
+    fixture.calls.completeCancellation()
+    await shutdown.value
+    #expect(fixture.session.isStopped)
+}
+
+@Test func logicalReaderDisconnectBeforeStartupPerformsNoIOHIDWork() throws {
+    let removals = LockedCounter()
+    let fixture = try inputFixture { removals.increment() }
+    fixture.session.disconnected()
+    #expect(throws: PrecisionIOHIDInputError.permanentlyStopped) {
+        try fixture.session.start()
+    }
+    #expect(fixture.calls.events.isEmpty)
+    #expect(removals.value == 0)
+    fixture.session.shutdownAndWait()
+    #expect(fixture.session.isStopped)
+    #expect(fixture.calls.events.isEmpty)
+}
+
 @Test func precisionInputTargetRemainsProductlessUnwiredAndOutputFree() throws {
     let packageRoot = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()

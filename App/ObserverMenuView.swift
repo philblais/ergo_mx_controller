@@ -1886,15 +1886,8 @@ struct ObserverMenuView: View {
                     .font(.subheadline.weight(.medium))
             }
             .toggleStyle(.switch)
-            .disabled(
-                model.rootQueryInProgress
-                    || model.controlEnumerationInProgress
-                    || model.reportingSnapshotInProgress
-                    || model.recoveryRehearsalInProgress
-                    || model.transactionSimulationInProgress
-                    || model.restoreTrialSimulationInProgress
-                    || model.precisionPreflightInProgress
-            )
+            // Pausing is never blocked; only turning audio on waits.
+            .disabled(!model.audioExecutionEnabled && model.audioEnableBlockedByOperation)
 
             Label(
                 model.audioStatus.message,

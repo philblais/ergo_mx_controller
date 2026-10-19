@@ -11,7 +11,8 @@ private enum AppAudioRegression {
         try failedReadDoesNotDispatchVolumeChanges()
         try pausedAudioGatePassesScrollWithoutStoppingInput()
         try stalledOutputDoesNotScheduleAnEndlessRamp()
-        print("App audio regression: 6 checks passed (fake audio and scheduler only)")
+        try nonFiniteVolumeReadingFailsInsteadOfTrapping()
+        print("App audio regression: 7 checks passed (fake audio and scheduler only)")
     }
 
     private static func clippedTargetsReverseAtBothBounds() throws {
@@ -103,6 +104,22 @@ private enum AppAudioRegression {
                    "a successful but unchanged output must stop after its first tick")
         try expect(fixture.statuses.values.last == .volumeChanged(percent: 50),
                    "a stalled driver must report the actual level rather than its unreachable target")
+    }
+
+    private static func nonFiniteVolumeReadingFailsInsteadOfTrapping() throws {
+        let fixture = Fixture(volume: .nan)
+        fixture.controller.prepare()
+        fixture.flush()
+        try expect(fixture.statuses.values.last?.isFailure == true,
+                   "a non-finite prepared volume must be reported as a failure")
+        // Before the guard, this reached the ramp's retarget precondition.
+        fixture.controller.enqueueVolumeSteps(1)
+        fixture.flush()
+        try fixture.drain()
+        try expect(fixture.audio.adjustmentCount == 0,
+                   "a non-finite volume must stop before any adjustment")
+        try expect(fixture.statuses.values.last?.isFailure == true,
+                   "a non-finite volume during input must be visible")
     }
 }
 

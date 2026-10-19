@@ -2708,3 +2708,36 @@ concern; this patch does not claim to serialize those independent event sources.
 The next gate is attended sleep/wake, paused-audio, scrolling coexistence and
 audio-feedback acceptance on the rebuilt app. No live HID or audio operation was
 run, and the rebuilt app was not installed or launched.
+
+### October 19 — review follow-up: audio input validation and sleep busy state
+
+A follow-up review of the uncommitted October 17 changes and the app layer found
+four defects. None touches HID output, a journal, or the event layer.
+
+A non-finite output-volume reading crashed the app. Preparing audio converted
+it to an integer percentage, and the new clamped-target ramp passed a NaN change
+to the accumulator's precondition. The controller now treats a non-finite read
+or adjustment result as a failed read, and the CoreAudio reader refuses one
+before `adjustVolume` can clamp `NaN + change` to zero and write silence.
+
+A second sleep that invalidated a reconnect cycle while its ordered shutdown was
+still running left the operation flag claimed, so the menu read "Working…" until
+quit. The shutdown task now releases its own claim on every completion path,
+only while the same runtime owner is bound. It sends nothing, mints no permit,
+and re-enables only controls the owner's state already allows.
+
+The audio toggle and its model guard kept separate lists of blocking operations.
+Three were missing from the toggle, which looked available and snapped back.
+Both now read one property, and pausing is never disabled. The verification
+summary also counts Swift Testing's singular "1 test" line, which the plural
+pattern would have dropped from the total.
+
+One new app audio check raises those to 7, all passing; it traps on the
+controller as it stood before this entry. The package total is unchanged at 575,
+all passing with no skips. The full four-target signed build and audit workflow
+passes. The sleep-cycle fix has no automated coverage because
+`AppModel` has no test harness. There is no new dependency edge, library
+product, device output site, event-post site, suppressing tap, SET permission,
+retry, inverse command or journal rewrite. The attended gates named on October
+17 remain next. No live HID or audio operation was run, and the rebuilt app was
+not installed or launched.

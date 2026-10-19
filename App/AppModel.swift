@@ -395,6 +395,16 @@ final class AppModel: ObservableObject {
         automaticPrecisionStatus = "Pausing Precision for Mac sleep…"
         diagnosticsLog.append("Sleep reconnect \(cycleID): ordered endpoint shutdown started")
         sleepReconnectTask = Task { [weak self] in
+            // This task claimed the operation flag. A second sleep can
+            // invalidate the cycle while shutdown is still running, and nothing
+            // else would release the claim: the menu would say "Working…"
+            // until quit. Every other claimant either requires the flag clear
+            // or binds a different owner, which the identity check excludes.
+            defer {
+                if let self, self.runtimeOwner === owner {
+                    self.runtimeOwnerOperationInProgress = false
+                }
+            }
             do {
                 let run = try await owner.prepareForSleepReconnect(
                     automaticRun: automaticRun,
@@ -405,7 +415,6 @@ final class AppModel: ObservableObject {
                       !self.isTerminating else {
                     return nil
                 }
-                self.runtimeOwnerOperationInProgress = false
                 self.automaticPrecisionStatus =
                     "Precision paused safely. Waiting for the Mac to wake…"
                 self.diagnosticsLog.append(
@@ -416,7 +425,6 @@ final class AppModel: ObservableObject {
                 guard let self, self.sleepReconnectCycleID == cycleID else {
                     return nil
                 }
-                self.runtimeOwnerOperationInProgress = false
                 self.automaticPrecisionNeedsAttention = true
                 self.automaticPrecisionStatus =
                     "Precision could not pause safely for sleep. Audio remains off; quit and reopen the app."
@@ -902,6 +910,21 @@ final class AppModel: ObservableObject {
         audioStatus = .disabled
     }
 
+    /// One list for the guard and the toggle. Two copies drifted, so the switch
+    /// looked available during three operations and snapped back when flipped.
+    var audioEnableBlockedByOperation: Bool {
+        rootQueryInProgress
+            || firmwareFingerprintInProgress
+            || controlEnumerationInProgress
+            || reportingSnapshotInProgress
+            || recoveryRehearsalInProgress
+            || transactionSimulationInProgress
+            || restoreTrialSimulationInProgress
+            || precisionPreflightInProgress
+            || mappedLivePreflightInProgress
+            || firmwareMigrationCommitInProgress
+    }
+
     func setAudioExecutionEnabled(_ isEnabled: Bool) {
         guard !isTerminating || !isEnabled else { return }
         // Pausing is always available, including during cleanup or discovery.
@@ -910,16 +933,7 @@ final class AppModel: ObservableObject {
             disableAudioExecution()
             return
         }
-        guard !rootQueryInProgress,
-              !firmwareFingerprintInProgress,
-              !controlEnumerationInProgress,
-              !reportingSnapshotInProgress,
-              !recoveryRehearsalInProgress,
-              !transactionSimulationInProgress,
-              !restoreTrialSimulationInProgress,
-              !precisionPreflightInProgress,
-              !mappedLivePreflightInProgress,
-              !firmwareMigrationCommitInProgress else { return }
+        guard !audioEnableBlockedByOperation else { return }
         audioExecutionEnabled = true
         audioExecutionGate.setEnabled(true)
         audioController.prepare()

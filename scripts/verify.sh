@@ -61,11 +61,13 @@ if grep -q "skipped:" "$ROOT/.verify-tests.log"; then
     printf '\n\033[33mWARNING: some tests were skipped:\033[0m\n'
     grep "skipped:" "$ROOT/.verify-tests.log" || true
 fi
+# Swift Testing pluralizes: a target with one test prints "1 test", which a
+# plural-only pattern would silently drop from the total.
 SUMMARY="$(awk '
-    /Test run with [0-9]+ tests/ {
+    /Test run with [0-9]+ tests?( |$)/ {
         summary = $0
         sub(/^.*Test run with /, "", summary)
-        sub(/ tests.*$/, "", summary)
+        sub(/ tests?( .*)?$/, "", summary)
         total += summary
         runs += 1
     }

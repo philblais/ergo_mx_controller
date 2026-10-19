@@ -37,7 +37,7 @@ final class SmoothSystemAudioController: @unchecked Sendable {
     func prepare() {
         queue.async { [self] in
             do {
-                let volume = try output.currentVolume()
+                let volume = try Self.finite(output.currentVolume())
                 currentVolume = volume
                 targetVolume = volume
                 statusHandler(.ready(volumePercent: Self.percent(volume)))
@@ -52,7 +52,7 @@ final class SmoothSystemAudioController: @unchecked Sendable {
         queue.async { [self] in
             do {
                 if !isRampScheduled {
-                    let volume = try output.currentVolume()
+                    let volume = try Self.finite(output.currentVolume())
                     currentVolume = volume
                     targetVolume = volume
                 }
@@ -115,7 +115,7 @@ final class SmoothSystemAudioController: @unchecked Sendable {
             let previousDistance = targetVolume.flatMap { target in
                 currentVolume.map { abs(target - $0) }
             }
-            let volume = try output.adjustVolume(scalarChange)
+            let volume = try Self.finite(output.adjustVolume(scalarChange))
             currentVolume = volume
             remainingRampTicks -= 1
             if let targetVolume {
@@ -160,6 +160,14 @@ final class SmoothSystemAudioController: @unchecked Sendable {
 
     private static func percent(_ scalar: Float32) -> Int {
         Int((scalar * 100).rounded())
+    }
+
+    /// The ramp's retarget precondition traps on a non-finite change, and a
+    /// clamped NaN target becomes zero. A driver's garbage reading is a failed
+    /// read, not a reason to crash or to silence the output.
+    private static func finite(_ volume: Float32) throws -> Float32 {
+        guard volume.isFinite else { throw AudioControlError.invalidVolumeReading }
+        return volume
     }
 }
 
@@ -331,6 +339,9 @@ private enum CoreAudioOutput {
         var size = UInt32(MemoryLayout<Float32>.size)
         let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
         try requireSuccess(status, operation: "Read output volume")
+        // adjustVolume clamps current + change, and max(0, NaN) is 0: without
+        // this a NaN channel reading would be written back as silence.
+        guard value.isFinite else { throw AudioControlError.invalidVolumeReading }
         return value
     }
 
@@ -380,6 +391,7 @@ private enum CoreAudioOutput {
 private enum AudioControlError: LocalizedError {
     case noDefaultOutputDevice
     case propertyUnavailable
+    case invalidVolumeReading
     case coreAudio(operation: String, status: OSStatus)
 
     var errorDescription: String? {
@@ -388,6 +400,8 @@ private enum AudioControlError: LocalizedError {
             "No default audio output device is available."
         case .propertyUnavailable:
             "The current output device does not provide software volume or mute control."
+        case .invalidVolumeReading:
+            "The current output device reported an invalid volume level."
         case let .coreAudio(operation, status):
             "\(operation) failed (CoreAudio \(status))."
         }

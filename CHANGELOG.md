@@ -2741,3 +2741,35 @@ product, device output site, event-post site, suppressing tap, SET permission,
 retry, inverse command or journal rewrite. The attended gates named on October
 17 remain next. No live HID or audio operation was run, and the rebuilt app was
 not installed or launched.
+
+### October 19 — sleep reconnect bookkeeping extracted and tested
+
+The sleep reconnect milestone moves the app model's sleep/wake cycle state into
+`PrecisionSleepReconnectFlow` in `MXErgoCore`, so the stale-cycle and flag-claim
+rules can be tested without a live app. It is a `@MainActor` flow over an opaque
+wake-run type. It has no new product, dependency edge, IOKit import, or device
+capability; the app still supplies every owner call, status message, and
+observer restart.
+
+The flow owns the cycle identity, the one-wake guard, the audio-restore choice,
+and the shutdown task. A second sleep revokes automatic startup, invalidates the
+cycle, and pauses controls. The shutdown task releases its own operation claim
+on every completion path, but only while the same owner is bound. Wake waits for
+that shutdown, then checks the cycle after every await: an opted-out, revoked or
+foreign run finishes without reopening, an observer that is not ready or a run
+revoked during reopen finishes before resume, and a stale cycle never finishes.
+Termination ignores a later wake. Only resume through the existing GET-only
+owner path can report reconnection.
+
+Fifteen flow tests raise the package total to 590, all passing with no skips.
+They cover a second sleep during and after shutdown, a claim for a different
+owner, failed shutdown, wake during an unfinished shutdown, opt-out, revocation
+and sleep during reopen, an observer that is not ready, termination during
+shutdown, duplicate wake, paused audio, and a resume that does not verify
+active. With the claim rule restored to its pre-fix form, the two claim tests
+fail. The full four-target signed build and audit workflow passes. The app's
+status text, log lines, and order of owner calls are unchanged;
+"Mac woke. Reopening…" now appears before the old owner is released rather than
+just after. There is no new SET permission, retry, inverse command, automatic
+recovery, journal write, tap or event-post site. Attended sleep/wake acceptance
+remains the next gate. No live HID operation was run.

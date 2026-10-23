@@ -62,15 +62,16 @@ public actor PrecisionRuntimeOwner {
     public let observerRunID: UUID
     private let intent: PrecisionRuntimeAdmissionIntent
     private let lifecycle: PrecisionRuntimeLifecycle
-    private var eventPump: PrecisionControlEventPump
-    private var controlEventHandler: (@Sendable (ControllerIntent) -> Void)?
+    /// Diverted notifications and wheel notches reach this synchronously, in
+    /// arrival order. Per-input tasks could run a release before its press.
+    private nonisolated let input: PrecisionInputSequencer
     private var diversionStatusHandler:
         (@Sendable (PrecisionRuntimeOwnerDiversionStatus) -> Void)?
     private var deviceDisconnected = false
     private var quitRequested = false
     private var recoverLockedAfterAmbiguousSET = false
     private let disconnectWitness: PrecisionRuntimeDisconnectWitness
-    public nonisolated let precisionHeld = PrecisionHeldFlag()
+    public nonisolated let precisionHeld: PrecisionHeldFlag
 
     nonisolated public static func bind(
         observer: MXErgoObserver,
@@ -143,16 +144,15 @@ public actor PrecisionRuntimeOwner {
         self.intent = intent
         self.lifecycle = lifecycle
         self.disconnectWitness = disconnectWitness
-        eventPump = PrecisionControlEventPump(
-            featureIndex: intent.session.featureIndex
-        )
+        input = PrecisionInputSequencer(featureIndex: intent.session.featureIndex)
+        precisionHeld = input.held
     }
 
     public func setControlEventHandler(
         _ handler: (@Sendable (ControllerIntent) -> Void)?
     ) {
         guard !quitRequested else { return }
-        controlEventHandler = handler
+        input.setIntentHandler(handler)
     }
 
     public func setDiversionStatusHandler(
@@ -191,7 +191,7 @@ public actor PrecisionRuntimeOwner {
             guard !quitRequested, !deviceDisconnected else { throw PrecisionRuntimeOwnerError.notAdmitted }
             return observation
         } catch {
-            precisionHeld.set(false)
+            input.reset()
             await publishDiversionStatus()
             throw error
         }
@@ -366,7 +366,7 @@ public actor PrecisionRuntimeOwner {
     public func releaseVerifiedRestoredSession() async throws {
         guard !quitRequested, !deviceDisconnected, await lifecycle.phase == .admitted,
               await lifecycle.admissionState == .restored else { throw PrecisionRuntimeOwnerError.stillOwningRuntime }
-        precisionHeld.set(false)
+        input.reset()
         guard let report = await lifecycle.shutdown(), report.disposition == .clean(.restored),
               report.deviceCloseReturn == 0 else { throw PrecisionRuntimeOwnerError.stillOwningRuntime }
         guard try await lifecycle.releaseObserverRestartFence() else {
@@ -400,10 +400,7 @@ public actor PrecisionRuntimeOwner {
         } catch {
             throw PrecisionRuntimeOwnerError.invalidIntent
         }
-        precisionHeld.set(false)
-        eventPump = PrecisionControlEventPump(
-            featureIndex: intent.session.featureIndex
-        )
+        input.reset()
         guard let report = await lifecycle.shutdown(),
               report.disposition == .recoveryRequired(.active),
               report.deviceCloseReturn == 0,
@@ -485,10 +482,13 @@ public actor PrecisionRuntimeOwner {
                 competitorProbe: competitorProbe,
                 sessionProvider: sessionProvider,
                 rootGenerationProvider: rootGenerationProvider,
-                unsolicitedHIDPPHandler: { [weak self] bytes in
-                    Task { await self?.deliverUnsolicitedHIDPP(bytes) }
+                unsolicitedHIDPPHandler: { [input] bytes in
+                    // On the IOHID callback queue, stamped at arrival.
+                    input.receiveNotification(bytes, at: ProcessInfo.processInfo.systemUptime)
                 },
-                deviceDisconnectHandler: { [weak self] in
+                deviceDisconnectHandler: { [weak self, input] in
+                    // Release suppression at removal, before the actor runs.
+                    input.close()
                     Task { await self?.handleDeviceDisconnected() }
                 },
                 disconnectWitness: disconnectWitness
@@ -558,7 +558,7 @@ public actor PrecisionRuntimeOwner {
                 nextIntent,
                 authorization: authorization
             )
-            precisionHeld.set(false)
+            input.reset()
             await publishDiversionStatus()
         } catch let error as PrecisionRuntimeLifecycleError {
             throw mapped(error)
@@ -571,31 +571,23 @@ public actor PrecisionRuntimeOwner {
     /// releases the observer restart fence. It does not send an inverse SET.
     public func prepareForQuit() async {
         quitRequested = true
-        controlEventHandler = nil
+        input.close()
         diversionStatusHandler = nil
-        precisionHeld.set(false)
         _ = await lifecycle.shutdown()
         await publishDiversionStatus()
     }
 
-    public func noteVerticalScroll(notches: Int, at timestamp: TimeInterval) {
-        guard !deviceDisconnected, !quitRequested else { return }
-        let intents = eventPump.processVerticalScroll(
-            notches: notches,
-            at: timestamp
-        )
-        precisionHeld.set(eventPump.isPrecisionPressed)
-        publish(intents)
+    /// Called on the wheel observer thread with the notch's arrival time.
+    /// Disconnect and quit close the sequencer, so late notches do nothing.
+    public nonisolated func noteVerticalScroll(notches: Int, at timestamp: TimeInterval) {
+        input.receiveVerticalScroll(notches: notches, at: timestamp)
     }
 
-    func deliverUnsolicitedHIDPP(_ bytes: [UInt8]) {
-        guard !deviceDisconnected, !quitRequested else { return }
-        let intents = eventPump.processHIDPPNotification(
-            bytes,
-            at: ProcessInfo.processInfo.systemUptime
-        )
-        precisionHeld.set(eventPump.isPrecisionPressed)
-        publish(intents)
+    nonisolated func deliverUnsolicitedHIDPP(
+        _ bytes: [UInt8],
+        at timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime
+    ) {
+        input.receiveNotification(bytes, at: timestamp)
     }
 
     /// Physical disconnect while diverted. Stops control-event delivery,
@@ -607,18 +599,9 @@ public actor PrecisionRuntimeOwner {
             return
         }
         deviceDisconnected = true
-        precisionHeld.set(false)
-        eventPump = PrecisionControlEventPump(
-            featureIndex: intent.session.featureIndex
-        )
+        input.close()
         _ = await lifecycle.shutdown()
         await publishDiversionStatus()
-    }
-
-    private func publish(_ intents: [ControllerIntent]) {
-        for intent in intents {
-            controlEventHandler?(intent)
-        }
     }
 
     /// Session rollover. Allowed only when the runtime is not owning the

@@ -381,9 +381,9 @@ import Testing
         0x11, 0xFF, 0x0A, 0x00, 0x00, 0x00,
     ] + Array(repeating: 0, count: 14)
 
-    await owner.deliverUnsolicitedHIDPP(otherCID)
-    await owner.deliverUnsolicitedHIDPP(press)
-    await owner.deliverUnsolicitedHIDPP(release)
+    owner.deliverUnsolicitedHIDPP(otherCID)
+    owner.deliverUnsolicitedHIDPP(press)
+    owner.deliverUnsolicitedHIDPP(release)
     #expect(recorder.values == [.toggleMute])
 }
 
@@ -417,13 +417,57 @@ import Testing
     let press: [UInt8] = [
         0x11, 0xFF, 0x0A, 0x00, 0x00, 0xED,
     ] + Array(repeating: 0, count: 14)
-    await owner.noteVerticalScroll(notches: 1, at: 1)
+    owner.noteVerticalScroll(notches: 1, at: 1)
     #expect(recorder.values.isEmpty)
     #expect(!owner.precisionHeld.isHeld)
-    await owner.deliverUnsolicitedHIDPP(press)
+    owner.deliverUnsolicitedHIDPP(press)
     #expect(owner.precisionHeld.isHeld)
-    await owner.noteVerticalScroll(notches: 1, at: 10.1)
+    owner.noteVerticalScroll(notches: 1, at: 10.1)
     #expect(recorder.values == [.volumeUp(steps: 2)])
+}
+
+@Test func failedPointerInspectionForgetsThePressSoAScrollCannotResumeSuppression() async throws {
+    let coordinator = MXErgoObserverHandoffCoordinator()
+    let runID = try #require(coordinator.beginRun())
+    #expect(coordinator.markRunning(runID: runID))
+    let fenceID = try #require(
+        coordinator.installRestartFence(capturedRunID: runID)
+    )
+    let intent = ownerLifecycleIntent(observerRunID: runID)
+    let owner = PrecisionRuntimeOwner(
+        launchID: intent.launchID,
+        observerRunID: runID,
+        intent: intent,
+        lifecycle: PrecisionRuntimeLifecycle(
+            intent: intent,
+            fence: MXErgoObserverRestartFence(
+                fenceID: fenceID,
+                capturedRunID: runID,
+                observerID: UUID()
+            ),
+            hostHandoff: OwnerStubHandoff(events: nil),
+            releaseFence: { _ in true }
+        )
+    )
+    let recorder = LockedOwnerIntents()
+    await owner.setControlEventHandler { intent in
+        recorder.append(intent)
+    }
+    let press: [UInt8] = [
+        0x11, 0xFF, 0x0A, 0x00, 0x00, 0xED,
+    ] + Array(repeating: 0, count: 14)
+    owner.deliverUnsolicitedHIDPP(press, at: 1)
+    #expect(owner.precisionHeld.isHeld)
+
+    await #expect(throws: (any Error).self) {
+        _ = try await owner.inspectPointerScaling()
+    }
+    #expect(!owner.precisionHeld.isHeld)
+    // Clearing only the flag left the pump pressed, so this notch used to turn
+    // suppression back on and change the volume.
+    owner.noteVerticalScroll(notches: 1, at: 1.1)
+    #expect(!owner.precisionHeld.isHeld)
+    #expect(recorder.values.isEmpty)
 }
 
 @Test func disconnectWhileAdmittedShutsDownWithoutSETAllowsRolloverAndDropsEvents()
@@ -474,7 +518,7 @@ import Testing
     let press: [UInt8] = [
         0x11, 0xFF, 0x0A, 0x00, 0x00, 0xED,
     ] + Array(repeating: 0, count: 14)
-    await owner.deliverUnsolicitedHIDPP(press)
+    owner.deliverUnsolicitedHIDPP(press)
     #expect(owner.precisionHeld.isHeld)
 
     await owner.handleDeviceDisconnected()
@@ -484,8 +528,8 @@ import Testing
     #expect(!owner.precisionHeld.isHeld)
     #expect(events.values == ["admit", "shutdown"])
 
-    await owner.noteVerticalScroll(notches: 1, at: 20)
-    await owner.deliverUnsolicitedHIDPP(press)
+    owner.noteVerticalScroll(notches: 1, at: 20)
+    owner.deliverUnsolicitedHIDPP(press)
     #expect(recorder.values.isEmpty)
 
     await #expect(throws: PrecisionRuntimeOwnerError.notAdmitted) {
@@ -884,15 +928,15 @@ private final class LockedOwnerEvents: @unchecked Sendable {
     let release: [UInt8] = [0x11, 0xFF, 0x0A, 0, 0, 0]
         + Array(repeating: 0, count: 14)
     await owner.setControlEventHandler { recorder.append($0) }
-    await owner.deliverUnsolicitedHIDPP(press)
+    owner.deliverUnsolicitedHIDPP(press)
     #expect(owner.precisionHeld.isHeld)
     await owner.prepareForQuit()
     await owner.prepareForQuit()
     await owner.setControlEventHandler { recorder.append($0) }
     await owner.setDiversionStatusHandler { _ in Issue.record("Late status handler must stay disabled") }
-    await owner.deliverUnsolicitedHIDPP(press)
-    await owner.noteVerticalScroll(notches: 1, at: 10)
-    await owner.deliverUnsolicitedHIDPP(release)
+    owner.deliverUnsolicitedHIDPP(press)
+    owner.noteVerticalScroll(notches: 1, at: 10)
+    owner.deliverUnsolicitedHIDPP(release)
     #expect(!owner.precisionHeld.isHeld)
     #expect(recorder.values.isEmpty)
     #expect(await owner.phase == .shutDown)

@@ -1826,9 +1826,14 @@ final class AppModel: ObservableObject {
             runtimeOwnerSession = session
             runtimeOwnerRootGeneration = rootGeneration
             await owner.setControlEventHandler { [weak self] intent in
-                Task { @MainActor in
-                    guard self?.runtimeOwnerBindingID == bindingID else { return }
-                    self?.record([intent])
+                // The owner emits intents in arrival order. The main queue is
+                // explicitly first-in, first-out, so a mute cannot overtake the
+                // volume steps that came before it.
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        guard self?.runtimeOwnerBindingID == bindingID else { return }
+                        self?.record([intent])
+                    }
                 }
             }
             await owner.setDiversionStatusHandler { [weak self] status in
@@ -2797,10 +2802,12 @@ final class AppModel: ObservableObject {
         wheelObserver.stop()
         wheelObserver.start(
             handler: { notches in
-                Task { await owner.noteVerticalScroll(
+                // Synchronous, stamped at arrival, and ordered with Precision
+                // notifications by the owner's input sequencer.
+                owner.noteVerticalScroll(
                     notches: notches,
                     at: ProcessInfo.processInfo.systemUptime
-                ) }
+                )
             },
             shouldSuppressScroll: { held.isHeld && audioGate.isEnabled }
         )

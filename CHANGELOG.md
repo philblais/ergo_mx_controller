@@ -2773,3 +2773,40 @@ status text, log lines, and order of owner calls are unchanged;
 just after. There is no new SET permission, retry, inverse command, automatic
 recovery, journal write, tap or event-post site. Attended sleep/wake acceptance
 remains the next gate. No live HID operation was run.
+
+### October 19 — Precision input processed in arrival order
+
+The ordered input milestone adds `PrecisionInputSequencer` to `MXErgoCore` as
+the single owner of the Precision event pump and held flag. It is Foundation
+only, with no new product, dependency edge, IOKit import, or device capability.
+
+Diverted-button notifications previously reached the owner actor through one
+unstructured task each, and wheel notches through another, so a release could
+be handled before its press. Precision would then stay held, and the scroll tap
+would swallow discrete vertical scroll from every pointing device until the
+next tap. Both inputs now enter the sequencer synchronously under one lock: the
+existing unsolicited handler on the IOHID callback queue, and the wheel observer
+thread through a now-synchronous `noteVerticalScroll`. Each is stamped at
+arrival, so the 0.3-second tap limit no longer includes scheduling delay. The
+held flag is updated before delivery returns. The app forwards intents through
+the main queue, whose first-in, first-out order is explicit.
+
+Physical removal closes the sequencer synchronously from the endpoint's removal
+handler, before the actor classifies recovery; quit and disconnect handling also
+close it. Sleep rollover, deactivation, verified release, and a
+failed pointer inspection reset it. The last of these previously cleared only
+the flag and left the pump pressed, so the next notch re-enabled suppression and
+changed the volume. A closed sequencer ignores later input and handler
+registration.
+
+Seven tests raise the package total to 597, all passing with no skips. They
+cover held updates before delivery returns, arrival-ordered intents with arrival
+timestamps, reset of a press in progress, closure against late input and
+handlers, other controls and feature indexes, two concurrent producers, and the
+failed-inspection notch; that last test fails against the previous behavior.
+The full four-target signed build and audit workflow passes. There is no new
+SET permission, retry, inverse command, automatic recovery,
+journal write, tap or event-post site, and no owner admission or lifecycle call
+changed. The next gate is attended confirmation that tap-to-mute, hold-and-scroll
+volume and the scroll swallow still behave on the rebuilt app. No live HID
+operation was run.
